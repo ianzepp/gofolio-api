@@ -562,6 +562,24 @@
     "requiredEnv": ["JWT_ADMIN_TOKEN"]
   },
   {
+    "name": "admin-market-data-admin-query-json-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/market-data?query=AAPL&skip=0&take=5",
+    "mode": "json",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"],
+    "ignoreJsonPaths": ["marketData"]
+  },
+  {
+    "name": "admin-market-data-admin-sort-json-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/market-data?sortColumn=name&sortDirection=desc&skip=0&take=5",
+    "mode": "json",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"],
+    "ignoreJsonPaths": ["marketData"]
+  },
+  {
     "name": "admin-users-no-auth-unauthorized",
     "method": "GET",
     "path": "/api/v1/admin/user",
@@ -654,6 +672,25 @@
     "mode": "json",
     "auth": "jwt:JWT_USER_TOKEN",
     "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"],
+    "ignoreJsonPaths": [
+      "meta.date",
+      "meta.version",
+      "assetProfiles",
+      "platforms",
+      "tags",
+      "user",
+      "accounts.*.balances",
+      "activities.*.id",
+      "activities.*.tags"
+    ]
+  },
+  {
+    "name": "export-user-filtered-symbol-json-parity",
+    "method": "GET",
+    "path": "/api/v1/export?dataSource=YAHOO&symbol=AAPL",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
     "ignoreJsonPaths": [
       "meta.date",
       "meta.version",
