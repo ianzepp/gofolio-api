@@ -9,19 +9,43 @@ and compares responses per case.
 
 ## Run
 
+Preferred (auto-start `api-go`, preflight checks, auto-cleanup):
+
 ```bash
 cd apps/api-go
-LEGACY_BASE_URL=http://localhost:3333 \
-GO_BASE_URL=http://localhost:3334 \
+./tests/integration/run.sh
+```
+
+Manual:
+
+```bash
+cd apps/api-go
+LEGACY_BASE_URL=http://127.0.0.1:3333 \
+GO_BASE_URL=http://127.0.0.1:3334 \
 go test ./tests/integration -v
 ```
 
 If base URLs are unset, defaults are used:
 
-- `LEGACY_BASE_URL=http://localhost:3333`
-- `GO_BASE_URL=http://localhost:3334`
+- `LEGACY_BASE_URL=http://127.0.0.1:3333`
+- `GO_BASE_URL=http://127.0.0.1:3334`
 
 If either API is unreachable at `/api/v1/health`, tests are skipped.
+
+### `run.sh` behavior
+
+- Verifies legacy API is up before running tests.
+- Starts Go API on `GO_PORT` (default `3334`) if it is not already running.
+- Waits for Go health endpoint before running tests.
+- Automatically stops the Go API process it started.
+- Writes Go API startup/runtime logs to `${TMPDIR:-/tmp}/api-go-integration.log`.
+
+Useful env vars:
+
+- `LEGACY_BASE_URL` (default `http://127.0.0.1:3333`)
+- `GO_BASE_URL` (default `http://127.0.0.1:3334`)
+- `GO_PORT` (default `3334`)
+- `START_TIMEOUT_SECONDS` (default `20`)
 
 ## Auth
 
@@ -45,7 +69,6 @@ Fields:
 - `path` (required)
 - `mode`: `"status"` or `"json"` (default `"status"`)
 - `headers`: optional header map
-- `auth`: `""`, `"jwt"`, or `"api-key"`
 - `auth`: `""`, `"jwt"`, `"jwt:ENV_NAME"`, `"api-key"`, or `"api-key:ENV_NAME"`
 - `body`: optional JSON payload
 - `ignoreJsonPaths`: optional list of dot-paths to ignore in JSON mode
