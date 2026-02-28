@@ -69,6 +69,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/asset/{dataSource}/{symbol}", handler.HandleGetAsset)
 
 	// Assets (web manifest)
+	mux.HandleFunc("GET /assets/{languageCode}/site.webmanifest", handler.HandleGetWebManifest)
 	mux.HandleFunc("GET /api/v1/assets/{languageCode}/site.webmanifest", handler.HandleGetWebManifest)
 
 	// Auth
@@ -111,6 +112,8 @@ func main() {
 
 	// Health
 	mux.HandleFunc("GET /api/v1/health", handler.HandleGetHealth)
+	mux.HandleFunc("GET /api/v1/health/data-enhancer/{name}", handler.HandleGetHealthDataEnhancer)
+	mux.HandleFunc("GET /api/v1/health/data-provider/{dataSource}", handler.HandleGetHealthDataProvider)
 
 	// Import
 	mux.HandleFunc("POST /api/v1/import", handler.HandleCreateImport)
@@ -159,6 +162,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/public/{accessId}/portfolio", handler.HandleGetPublicPortfolio)
 
 	// Sitemap
+	mux.HandleFunc("GET /sitemap.xml", handler.HandleGetSitemap)
 	mux.HandleFunc("GET /api/v1/sitemap.xml", handler.HandleGetSitemap)
 
 	// Subscription
