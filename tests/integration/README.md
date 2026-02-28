@@ -35,6 +35,10 @@ If either API is unreachable at `/api/v1/health`, tests are skipped.
 ### `run.sh` behavior
 
 - Verifies legacy API is up before running tests.
+- Bootstraps a fresh legacy user by default:
+  - calls `POST /api/v1/user`
+  - uses returned `authToken` (or exchanges `accessToken` via `POST /api/v1/auth/anonymous`)
+  - exports `JWT_USER_TOKEN` and `JWT_TOKEN` for differential cases
 - Starts Go API on `GO_PORT` (default `3334`) if it is not already running.
 - Waits for Go health endpoint before running tests.
 - Automatically stops the Go API process it started.
@@ -46,6 +50,19 @@ Useful env vars:
 - `GO_BASE_URL` (default `http://127.0.0.1:3334`)
 - `GO_PORT` (default `3334`)
 - `START_TIMEOUT_SECONDS` (default `20`)
+- `BOOTSTRAP_LEGACY_USER` (`1` default; set `0` to disable auto user bootstrap)
+
+For JWT-auth parity cases, Go must use the same `JWT_SECRET_KEY` as legacy.
+`run.sh` resolves it in this order:
+
+1. `JWT_SECRET_KEY` from current shell env
+2. `JWT_SECRET_KEY` from repo `.env` (if present)
+
+For DB-backed parity cases, Go also needs `DATABASE_URL`.
+`run.sh` resolves it in this order:
+
+1. `DATABASE_URL` from current shell env
+2. `DATABASE_URL` from repo `.env` (if present)
 
 ## Auth
 
