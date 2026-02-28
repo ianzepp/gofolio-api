@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
@@ -61,6 +62,88 @@ func (s *ExchangeRateService) GetExchangeRate(ctx context.Context, symbol string
 	}
 
 	return nil, nil // not found
+}
+
+// GetExchangeRatesByCurrency returns historical exchange rates for multiple
+// source currencies against a target currency over a date range. The result is
+// keyed as map[pair][date] = rate, where pair is e.g. "USDCHF".
+// Rates are forward-filled: if no market data exists for a given date, the
+// most recent prior rate is carried forward.
+func (s *ExchangeRateService) GetExchangeRatesByCurrency(
+	ctx context.Context,
+	currencies []string,
+	targetCurrency string,
+	startDate, endDate time.Time,
+) (map[string]map[string]float64, error) {
+	result := make(map[string]map[string]float64)
+
+	repo := repository.NewMarketDataRepository(s.db)
+
+	for _, sourceCurrency := range currencies {
+		pair := sourceCurrency + targetCurrency
+
+		if _, exists := result[pair]; exists {
+			continue // already computed
+		}
+
+		rates := make(map[string]float64)
+
+		if sourceCurrency == targetCurrency {
+			// Same currency: all rates are 1.0
+			for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+				dateStr := d.Format("2006-01-02")
+				rates[dateStr] = 1.0
+			}
+			result[pair] = rates
+			continue
+		}
+
+		// Query market data for this FX pair
+		symbol := sourceCurrency + targetCurrency
+
+		// Try YAHOO first, then MANUAL
+		var marketData []model.MarketData
+		var err error
+
+		items := []struct{ DataSource, Symbol string }{
+			{DataSource: "YAHOO", Symbol: symbol},
+		}
+		marketData, err = repo.FindBySymbolsAndDateRange(ctx, items, startDate, endDate)
+		if err != nil {
+			return nil, fmt.Errorf("query exchange rates for %s: %w", symbol, err)
+		}
+
+		if len(marketData) == 0 {
+			items[0].DataSource = "MANUAL"
+			marketData, err = repo.FindBySymbolsAndDateRange(ctx, items, startDate, endDate)
+			if err != nil {
+				return nil, fmt.Errorf("query exchange rates for %s (MANUAL): %w", symbol, err)
+			}
+		}
+
+		// Build date->rate map from market data
+		mdByDate := make(map[string]float64)
+		for _, md := range marketData {
+			dateStr := md.Date.Format("2006-01-02")
+			mdByDate[dateStr] = md.MarketPrice
+		}
+
+		// Forward-fill rates across the date range
+		lastRate := 0.0
+		for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+			dateStr := d.Format("2006-01-02")
+			if r, ok := mdByDate[dateStr]; ok {
+				lastRate = r
+			}
+			if lastRate > 0 {
+				rates[dateStr] = lastRate
+			}
+		}
+
+		result[pair] = rates
+	}
+
+	return result, nil
 }
 
 // findRate queries MarketData for the most recent price on or before the given

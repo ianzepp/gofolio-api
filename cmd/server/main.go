@@ -78,6 +78,8 @@ func main() {
 			providers := []provider.DataProvider{yahooProvider, manualProvider}
 			dataProviderSvc := service.NewDataProviderService(d, providers)
 			symbolSvc := service.NewSymbolService(d, dataProviderSvc)
+			exchangeRateSvc := service.NewExchangeRateService(d)
+			userSvc := service.NewUserService(d)
 
 			deps = &handler.Deps{
 				DB:                    d,
@@ -88,16 +90,17 @@ func main() {
 				AssetService:          service.NewAssetService(d),
 				BenchmarkService:      service.NewBenchmarkService(d),
 				DataProviderService:   dataProviderSvc,
-				ExchangeRateService:   service.NewExchangeRateService(d),
+				ExchangeRateService:   exchangeRateSvc,
 				ExportService:         service.NewExportService(d),
 				InfoService:           service.NewInfoService(d),
 				LogoService:           service.NewLogoService(d),
 				MarketDataService:     service.NewMarketDataService(d),
 				OrderService:          service.NewOrderService(d),
 				PlatformService:       service.NewPlatformService(d),
+				PortfolioService:      service.NewPortfolioService(d, exchangeRateSvc, userSvc),
 				SymbolService:         symbolSvc,
 				TagService:            service.NewTagService(d),
-				UserService:           service.NewUserService(d),
+				UserService:           userSvc,
 				WatchlistService:      service.NewWatchlistService(d),
 			}
 		}
@@ -258,14 +261,14 @@ func main() {
 	mux.HandleFunc("GET /api/v1/platforms", auth.RequirePermission(authCfg, auth.ReadPlatforms, handler.GetPlatforms(deps)))
 
 	// Portfolio
-	mux.HandleFunc("GET /api/v1/portfolio/details", auth.Authenticate(authCfg, handler.HandleGetPortfolioDetails))
-	mux.HandleFunc("GET /api/v1/portfolio/dividends", auth.Authenticate(authCfg, handler.HandleGetPortfolioDividends))
+	mux.HandleFunc("GET /api/v1/portfolio/details", auth.Authenticate(authCfg, handler.GetPortfolioDetails(deps)))
+	mux.HandleFunc("GET /api/v1/portfolio/dividends", auth.Authenticate(authCfg, handler.GetPortfolioDividends(deps)))
 	mux.HandleFunc("GET /api/v1/portfolio/holding/{dataSource}/{symbol}", auth.Authenticate(authCfg, handler.GetPortfolioHolding(deps)))
 	mux.HandleFunc("PUT /api/v1/portfolio/holding/{dataSource}/{symbol}/tags", auth.RequirePermission(authCfg, auth.UpdateOrder, handler.HandleUpdatePortfolioHoldingTags))
-	mux.HandleFunc("GET /api/v1/portfolio/holdings", auth.Authenticate(authCfg, handler.HandleGetPortfolioHoldings))
-	mux.HandleFunc("GET /api/v1/portfolio/investments", auth.Authenticate(authCfg, handler.HandleGetPortfolioInvestments))
-	mux.HandleFunc("GET /api/v1/portfolio/performance", handler.HandleGetPortfolioPerformance)
-	mux.HandleFunc("GET /api/v1/portfolio/report", auth.Authenticate(authCfg, handler.HandleGetPortfolioReport))
+	mux.HandleFunc("GET /api/v1/portfolio/holdings", auth.Authenticate(authCfg, handler.GetPortfolioHoldings(deps)))
+	mux.HandleFunc("GET /api/v1/portfolio/investments", auth.Authenticate(authCfg, handler.GetPortfolioInvestments(deps)))
+	mux.HandleFunc("GET /api/v1/portfolio/performance", auth.Authenticate(authCfg, handler.GetPortfolioPerformance(deps)))
+	mux.HandleFunc("GET /api/v1/portfolio/report", auth.Authenticate(authCfg, handler.GetPortfolioReport(deps)))
 
 	// Public
 	mux.HandleFunc("GET /api/v1/public/{accessId}/portfolio", handler.HandleGetPublicPortfolio)

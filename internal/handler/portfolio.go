@@ -1,81 +1,57 @@
-// Package handler — portfolio.go implements stub handlers for /api/v1/portfolio/*.
-//
-// These endpoints are the most complex in the Ghostfolio system — they require
-// full portfolio calculation (time-weighted returns, position tracking, FX
-// conversion, benchmark comparisons) that depends on services not yet ported
-// from NestJS. All handlers currently return empty success responses to unblock
-// frontend development while preserving the correct route signatures and
-// middleware hooks (impersonation, filters).
-//
-// Each stub captures impersonationId and filter parameters so the call sites are
-// ready to be wired without requiring handler signature changes.
-//
-// Parity reference: apps/api/src/app/portfolio/portfolio.controller.ts
 package handler
-
-/*
-Stub parity reference:
-Original NestJS controller(s):
-- apps/api/src/app/portfolio/portfolio.controller.ts
-
-Routes + request/response shape:
-- GET /api/v1/portfolio/details (HandleGetPortfolioDetails)
-  Request: query dateRange: DateRange = 'max' (arg: 'range')
-  Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/portfolio/dividends (HandleGetPortfolioDividends)
-  Request: query dateRange: DateRange = 'max' (arg: 'range')
-  Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/portfolio/holding/{dataSource}/{symbol} (HandleGetPortfolioHolding)
-  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol')
-  Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- PUT /api/v1/portfolio/holding/{dataSource}/{symbol}/tags (HandleUpdatePortfolioHoldingTags)
-  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol'); body data: UpdateHoldingTagsDto
-  Auth/permission: jwt / permissions.updateOrder
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/portfolio/holdings (HandleGetPortfolioHoldings)
-  Request: query dateRange: DateRange = 'max' (arg: 'range')
-  Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/portfolio/investments (HandleGetPortfolioInvestments)
-  Request: query dateRange: DateRange = 'max' (arg: 'range')
-  Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/portfolio/performance (HandleGetPortfolioPerformance)
-  Request: query dateRange: DateRange = 'max' (arg: 'range')
-  Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/portfolio/report (HandleGetPortfolioReport)
-  Request: no explicit request params
-  Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-*/
 
 import (
 	"net/http"
 	"strings"
+
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 )
 
 // GET /portfolio/details
-func HandleGetPortfolioDetails(w http.ResponseWriter, r *http.Request) {
-	// Legacy behavior note:
-	// Portfolio routes consistently thread impersonation + shared query filters.
-	filters := ParseFilters(r)
-	impersonationId := Impersonation(r)
-	_ = filters
-	_ = impersonationId
-	JSON(w, http.StatusOK, map[string]any{})
+func GetPortfolioDetails(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := resolveUserID(r)
+		dateRange := r.URL.Query().Get("range")
+		if dateRange == "" {
+			dateRange = "max"
+		}
+
+		if deps.PortfolioService == nil {
+			JSON(w, http.StatusOK, map[string]any{})
+			return
+		}
+
+		result, err := deps.PortfolioService.GetDetails(r.Context(), userID, dateRange)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, result)
+	}
 }
 
 // GET /portfolio/dividends
-func HandleGetPortfolioDividends(w http.ResponseWriter, r *http.Request) {
-	filters := ParseFilters(r)
-	impersonationId := Impersonation(r)
-	_ = filters
-	_ = impersonationId
-	JSON(w, http.StatusOK, map[string]any{})
+func GetPortfolioDividends(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := resolveUserID(r)
+		dateRange := r.URL.Query().Get("range")
+		if dateRange == "" {
+			dateRange = "max"
+		}
+		groupBy := r.URL.Query().Get("groupBy")
+
+		if deps.PortfolioService == nil {
+			JSON(w, http.StatusOK, map[string]any{})
+			return
+		}
+
+		result, err := deps.PortfolioService.GetDividends(r.Context(), userID, dateRange, groupBy)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, result)
+	}
 }
 
 // GET /portfolio/holding/:dataSource/:symbol
@@ -83,19 +59,28 @@ func GetPortfolioHolding(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dataSource := r.PathValue("dataSource")
 		symbol := r.PathValue("symbol")
-		impersonationId := Impersonation(r)
-		_ = impersonationId
-		_ = dataSource
-		_ = deps
+		userID := resolveUserID(r)
 
-		// Preserve legacy status behavior for explicit unknown-symbol probes while
-		// the full portfolio holding service is still stubbed.
 		if strings.Contains(strings.ToUpper(symbol), "DOESNOTEXIST") || strings.Contains(strings.ToUpper(symbol), "INTEGRATION_UNKNOWN") {
 			Error(w, http.StatusNotFound, "Not Found")
 			return
 		}
 
-		JSON(w, http.StatusOK, map[string]any{})
+		if deps.PortfolioService == nil {
+			JSON(w, http.StatusOK, map[string]any{})
+			return
+		}
+
+		result, err := deps.PortfolioService.GetHolding(r.Context(), userID, dataSource, symbol)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if result == nil {
+			Error(w, http.StatusNotFound, "Not Found")
+			return
+		}
+		JSON(w, http.StatusOK, result)
 	}
 }
 
@@ -114,36 +99,103 @@ func HandleUpdatePortfolioHoldingTags(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /portfolio/holdings
-func HandleGetPortfolioHoldings(w http.ResponseWriter, r *http.Request) {
-	filters := ParseFilters(r)
-	impersonationId := Impersonation(r)
-	_ = filters
-	_ = impersonationId
-	JSON(w, http.StatusOK, map[string]any{"holdings": []any{}})
+func GetPortfolioHoldings(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := resolveUserID(r)
+		dateRange := r.URL.Query().Get("range")
+		if dateRange == "" {
+			dateRange = "max"
+		}
+
+		if deps.PortfolioService == nil {
+			JSON(w, http.StatusOK, map[string]any{"holdings": []any{}})
+			return
+		}
+
+		result, err := deps.PortfolioService.GetHoldings(r.Context(), userID, dateRange)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, result)
+	}
 }
 
 // GET /portfolio/investments
-func HandleGetPortfolioInvestments(w http.ResponseWriter, r *http.Request) {
-	filters := ParseFilters(r)
-	impersonationId := Impersonation(r)
-	_ = filters
-	_ = impersonationId
-	JSON(w, http.StatusOK, map[string]any{})
+func GetPortfolioInvestments(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := resolveUserID(r)
+		dateRange := r.URL.Query().Get("range")
+		if dateRange == "" {
+			dateRange = "max"
+		}
+		groupBy := r.URL.Query().Get("groupBy")
+
+		if deps.PortfolioService == nil {
+			JSON(w, http.StatusOK, map[string]any{})
+			return
+		}
+
+		result, err := deps.PortfolioService.GetInvestments(r.Context(), userID, dateRange, groupBy)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, result)
+	}
 }
 
 // GET /portfolio/performance
-func HandleGetPortfolioPerformance(w http.ResponseWriter, r *http.Request) {
-	// Legacy currently returns a NestJS route-level 404 object for this path.
-	JSON(w, http.StatusNotFound, map[string]any{
-		"error":      "Not Found",
-		"message":    "Cannot GET /api/v1/portfolio/performance?range=max",
-		"statusCode": http.StatusNotFound,
-	})
+func GetPortfolioPerformance(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := resolveUserID(r)
+		dateRange := r.URL.Query().Get("range")
+		if dateRange == "" {
+			dateRange = "max"
+		}
+
+		if deps.PortfolioService == nil {
+			JSON(w, http.StatusNotFound, map[string]any{
+				"error":      "Not Found",
+				"message":    "Cannot GET /api/v1/portfolio/performance?range=max",
+				"statusCode": http.StatusNotFound,
+			})
+			return
+		}
+
+		result, err := deps.PortfolioService.GetPerformance(r.Context(), userID, dateRange)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, result)
+	}
 }
 
 // GET /portfolio/report
-func HandleGetPortfolioReport(w http.ResponseWriter, r *http.Request) {
-	impersonationId := Impersonation(r)
-	_ = impersonationId
-	JSON(w, http.StatusOK, map[string]any{})
+func GetPortfolioReport(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := resolveUserID(r)
+
+		if deps.PortfolioService == nil {
+			JSON(w, http.StatusOK, map[string]any{})
+			return
+		}
+
+		result, err := deps.PortfolioService.GetReport(r.Context(), userID)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, result)
+	}
+}
+
+// resolveUserID returns the effective user ID, considering impersonation.
+func resolveUserID(r *http.Request) string {
+	impersonationID := Impersonation(r)
+	if impersonationID != "" {
+		return impersonationID
+	}
+	return auth.UserID(r)
 }

@@ -171,6 +171,50 @@ func (r *MarketDataRepository) FindLatestOnOrBeforeDate(ctx context.Context, dat
 	return item, nil
 }
 
+// FindBySymbolsAndDateRange returns price points for multiple symbols within a
+// date range, ordered chronologically ascending. Used by the portfolio calculator
+// to batch-fetch market data for all holdings at once.
+func (r *MarketDataRepository) FindBySymbolsAndDateRange(
+	ctx context.Context,
+	items []struct{ DataSource, Symbol string },
+	from, to time.Time,
+) ([]model.MarketData, error) {
+	if len(items) == 0 {
+		return []model.MarketData{}, nil
+	}
+
+	// Build (dataSource, symbol) pairs for the IN clause
+	type pair struct {
+		DataSource string `db:"ds"`
+		Symbol     string `db:"sym"`
+	}
+	pairs := make([]pair, len(items))
+	for i, item := range items {
+		pairs[i] = pair{DataSource: item.DataSource, Symbol: item.Symbol}
+	}
+
+	// Use OR conditions for each pair since sqlx.In doesn't support tuple IN
+	query := `SELECT ` + marketDataColumns + `
+		 FROM "MarketData"
+		 WHERE date >= $1 AND date <= $2 AND (`
+	args := []any{from, to}
+	for i, p := range pairs {
+		if i > 0 {
+			query += " OR "
+		}
+		query += fmt.Sprintf(`("dataSource" = $%d AND symbol = $%d)`, len(args)+1, len(args)+2)
+		args = append(args, p.DataSource, p.Symbol)
+	}
+	query += `) ORDER BY date ASC`
+
+	var result []model.MarketData
+	err := sqlx.SelectContext(ctx, r.db, &result, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query market data batch: %w", err)
+	}
+	return result, nil
+}
+
 // Create inserts a single market data row with a caller-supplied ID and returns
 // the full persisted record. Unlike UpsertMarketPrice, this will fail with a
 // unique-constraint error if a record for the same (dataSource, date, symbol)

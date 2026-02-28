@@ -184,6 +184,42 @@ func (r *OrderRepository) CountByDataSourceAndSymbol(ctx context.Context, dataSo
 	return count, nil
 }
 
+// OrderWithProfile extends Order with SymbolProfile fields needed by the
+// portfolio calculator. Column aliases use the sp_ prefix to avoid collision.
+type OrderWithProfile struct {
+	model.Order
+	SPCurrency      string  `db:"sp_currency"`
+	SPDataSource    string  `db:"sp_dataSource"`
+	SPSymbol        string  `db:"sp_symbol"`
+	SPAssetSubClass *string `db:"sp_assetSubClass"`
+	SPUserID        *string `db:"sp_userId"`
+	SPName          *string `db:"sp_name"`
+}
+
+// FindActiveByUserIDWithProfile returns all non-draft orders for a user, joined
+// with SymbolProfile fields needed by the portfolio calculator. Results are
+// ordered by date ascending for chronological processing.
+func (r *OrderRepository) FindActiveByUserIDWithProfile(ctx context.Context, userID string) ([]OrderWithProfile, error) {
+	var items []OrderWithProfile
+	err := sqlx.SelectContext(ctx, r.db,
+		&items,
+		`SELECT `+orderColumns+`,
+		        sp.currency AS sp_currency,
+		        sp."dataSource" AS "sp_dataSource",
+		        sp.symbol AS sp_symbol,
+		        sp."assetSubClass" AS "sp_assetSubClass",
+		        sp."userId" AS "sp_userId",
+		        sp.name AS sp_name
+		 FROM "Order" o
+		 JOIN "SymbolProfile" sp ON o."symbolProfileId" = sp.id
+		 WHERE o."userId" = $1 AND o."isDraft" = false
+		 ORDER BY o.date ASC`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("query orders with profile: %w", err)
+	}
+	return items, nil
+}
+
 // Delete removes an order by ID without an ownership check.
 // WHY: admin paths need unconditional deletion; user-facing paths should use
 // DeleteByIDAndUserID instead.

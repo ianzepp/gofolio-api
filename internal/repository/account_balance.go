@@ -62,6 +62,23 @@ func (r *AccountBalanceRepository) FindByAccountID(ctx context.Context, accountI
 	return items, nil
 }
 
+// FindByUserID returns all balance snapshots for a user across all accounts,
+// ordered chronologically ascending. Used by the portfolio calculator to include
+// account balance data in the timeline.
+func (r *AccountBalanceRepository) FindByUserID(ctx context.Context, userID string) ([]model.AccountBalance, error) {
+	var items []model.AccountBalance
+	err := sqlx.SelectContext(ctx, r.db,
+		&items,
+		`SELECT id, "accountId", "createdAt", date, "updatedAt", "userId", value
+		 FROM "AccountBalance"
+		 WHERE "userId" = $1
+		 ORDER BY date ASC`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("query account-balances by user: %w", err)
+	}
+	return items, nil
+}
+
 // Upsert creates or updates an AccountBalance keyed on (accountId, date).
 // Matches NestJS Prisma upsert semantics on the unique constraint.
 func (r *AccountBalanceRepository) Upsert(ctx context.Context, ab model.AccountBalance) (model.AccountBalance, error) {

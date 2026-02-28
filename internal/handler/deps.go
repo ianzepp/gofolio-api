@@ -35,6 +35,7 @@ type Deps struct {
 	MarketDataService     *service.MarketDataService
 	OrderService          *service.OrderService
 	PlatformService       *service.PlatformService
+	PortfolioService      *service.PortfolioService
 	SymbolService         *service.SymbolService
 	TagService            *service.TagService
 	UserService           *service.UserService
