@@ -161,7 +161,7 @@ type AdminUsersResponse struct {
 // data that the standard user query deliberately omits for privacy reasons.
 func (s *AdminService) GetUsers(ctx context.Context, skip int, take int) (AdminUsersResponse, error) {
 	// Query users joined with analytics and counts
-	rows, err := s.db.Query(ctx,
+	rows, err := s.db.QueryContext(ctx,
 		`SELECT u.id, u."createdAt", u.provider, u.role,
 		        a."activityCount", a.country,
 		        a."dataProviderGhostfolioDailyRequests",
@@ -218,7 +218,7 @@ func (s *AdminService) GetUsers(ctx context.Context, skip int, take int) (AdminU
 
 	// Total count
 	var total int
-	if err := s.db.QueryRow(ctx, `SELECT COUNT(*) FROM "User"`).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "User"`).Scan(&total); err != nil {
 		return AdminUsersResponse{}, fmt.Errorf("count admin users: %w", err)
 	}
 
@@ -236,7 +236,7 @@ func (s *AdminService) GetUser(ctx context.Context, id string) (AdminUser, error
 	var lastReq *time.Time
 	var accountCount int
 
-	err := s.db.QueryRow(ctx,
+	err := s.db.QueryRowContext(ctx,
 		`SELECT u.id, u."createdAt", u.provider, u.role,
 		        a."activityCount", a.country,
 		        a."dataProviderGhostfolioDailyRequests",
@@ -315,7 +315,7 @@ func (s *AdminService) GetMarketData(ctx context.Context, skip int, take int, qu
 	argIdx := 1
 
 	if query != "" {
-		whereClause = fmt.Sprintf(` WHERE (sp.symbol ILIKE $%d OR sp.name ILIKE $%d OR sp.isin ILIKE $%d)`, argIdx, argIdx, argIdx)
+		whereClause = fmt.Sprintf(` WHERE (LOWER(sp.symbol) LIKE LOWER($%d) OR LOWER(sp.name) LIKE LOWER($%d) OR LOWER(sp.isin) LIKE LOWER($%d))`, argIdx, argIdx, argIdx)
 		args = append(args, "%"+query+"%")
 		argIdx++
 	}
@@ -323,7 +323,7 @@ func (s *AdminService) GetMarketData(ctx context.Context, skip int, take int, qu
 	// Count total
 	var total int
 	countSQL := `SELECT COUNT(*) FROM "SymbolProfile" sp` + whereClause
-	if err := s.db.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx, countSQL, args...).Scan(&total); err != nil {
 		return AdminMarketDataResponse{}, fmt.Errorf("count admin market data: %w", err)
 	}
 
@@ -359,7 +359,7 @@ func (s *AdminService) GetMarketData(ctx context.Context, skip int, take int, qu
 
 	args = append(args, take, skip)
 
-	rows, err := s.db.Query(ctx, mainSQL, args...)
+	rows, err := s.db.QueryContext(ctx, mainSQL, args...)
 	if err != nil {
 		return AdminMarketDataResponse{}, fmt.Errorf("query admin market data: %w", err)
 	}
