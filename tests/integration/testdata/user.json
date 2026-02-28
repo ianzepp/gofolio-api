@@ -1,0 +1,79 @@
+[
+  {
+    "name": "user-access-token-wrong-token-forbidden-parity",
+    "method": "POST",
+    "path": "/api/v1/user/access-token",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": {
+      "accessToken": "integration-invalid-access-token"
+    }
+  },
+  {
+    "name": "user-delete-own-wrong-token-forbidden-parity",
+    "method": "DELETE",
+    "path": "/api/v1/user",
+    "mode": "status",
+    "auth": "jwt:JWT_EMPTY_USER_TOKEN",
+    "requiredEnv": ["JWT_EMPTY_USER_TOKEN"],
+    "body": {
+      "accessToken": "integration-invalid-access-token"
+    }
+  },
+  {
+    "name": "user-admin-access-token-existing-user-created-parity",
+    "method": "POST",
+    "path": "/api/v1/user/${LEGACY_USER_ID}/access-token",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN", "LEGACY_USER_ID"]
+  },
+  {
+    "name": "user-admin-access-token-foreign-id-parity",
+    "method": "POST",
+    "path": "/api/v1/user/${ADMIN_USER_ID}/access-token",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_USER_ID"]
+  },
+  {
+    "name": "user-signup-public-created-parity",
+    "method": "POST",
+    "path": "/api/v1/user",
+    "mode": "status"
+  },
+  {
+    "name": "user-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/user",
+    "mode": "status"
+  },
+  {
+    "name": "user-delete-self-by-id-admin-forbidden-parity",
+    "method": "DELETE",
+    "path": "/api/v1/user/${ADMIN_DB_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_DB_USER_ID"]
+  },
+  {
+    "name": "user-get-json-parity",
+    "method": "GET",
+    "path": "/api/v1/user",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "LEGACY_USER_ID"],
+    "ignoreJsonPaths": [
+      "access",
+      "accounts",
+      "activitiesCount",
+      "dateOfFirstActivity",
+      "permissions",
+      "settings",
+      "systemMessage",
+      "tags",
+      "subscription"
+    ]
+  }
+]

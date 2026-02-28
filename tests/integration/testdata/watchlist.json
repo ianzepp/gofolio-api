@@ -1,0 +1,82 @@
+[
+  {
+    "name": "watchlist-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/watchlist",
+    "mode": "status"
+  },
+  {
+    "name": "watchlist-post-no-auth-unauthorized",
+    "method": "POST",
+    "path": "/api/v1/watchlist",
+    "mode": "status",
+    "body": {
+      "dataSource": "YAHOO",
+      "symbol": "AAPL"
+    }
+  },
+  {
+    "name": "watchlist-delete-no-auth-unauthorized",
+    "method": "DELETE",
+    "path": "/api/v1/watchlist/YAHOO/AAPL",
+    "mode": "status"
+  },
+  {
+    "name": "watchlist-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/watchlist",
+    "mode": "status"
+  },
+  {
+    "name": "watchlist-get-auth-status-parity",
+    "method": "GET",
+    "path": "/api/v1/watchlist",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "watchlist-get-empty-user-json-parity",
+    "method": "GET",
+    "path": "/api/v1/watchlist",
+    "mode": "json",
+    "auth": "jwt:JWT_EMPTY_USER_TOKEN",
+    "requiredEnv": ["JWT_EMPTY_USER_TOKEN"]
+  },
+  {
+    "name": "watchlist-create-no-auth-unauthorized",
+    "method": "POST",
+    "path": "/api/v1/watchlist",
+    "mode": "status",
+    "body": {
+      "dataSource": "YAHOO",
+      "symbol": "AAPL"
+    }
+  },
+  {
+    "name": "watchlist-delete-no-auth-unauthorized",
+    "method": "DELETE",
+    "path": "/api/v1/watchlist/YAHOO/AAPL",
+    "mode": "status"
+  },
+  {
+    "name": "watchlist-create-unknown-symbol-bad-request-parity",
+    "method": "POST",
+    "path": "/api/v1/watchlist",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": {
+      "dataSource": "YAHOO",
+      "symbol": "INTEGRATION_UNKNOWN_WATCHLIST"
+    }
+  },
+  {
+    "name": "watchlist-delete-unknown-symbol-not-found-parity",
+    "method": "DELETE",
+    "path": "/api/v1/watchlist/YAHOO/INTEGRATION_UNKNOWN_WATCHLIST",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  }
+]

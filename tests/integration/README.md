@@ -101,12 +101,14 @@ Optional tools used by advanced bootstrap paths:
 
 ## Current Coverage
 
-Current fixture set (`tests/integration/testdata/cases.json`) has:
+Fixture files live in `tests/integration/testdata/`, one JSON file per handler (e.g. `account.json`, `order.json`, `portfolio.json`). The harness auto-loads all `*.json` files in that directory.
 
-- `131` total cases
-- `102` status-compare cases
+Current totals across all fixture files:
+
+- `161` total cases
+- `132` status-compare cases
 - `29` JSON-compare cases
-- `12` export-focused parity cases
+- `20` fixture files (1:1 with handler files)
 
 ## Auth
 
@@ -121,7 +123,7 @@ Path, headers, and JSON body support env expansion via `${ENV_NAME}`.
 
 ## Case Fixture
 
-Edit `tests/integration/testdata/cases.json`.
+Add or edit a JSON file in `tests/integration/testdata/` (one file per handler, e.g. `portfolio.json`).
 
 Fields:
 

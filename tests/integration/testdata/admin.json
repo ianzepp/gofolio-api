@@ -1,0 +1,125 @@
+[
+  {
+    "name": "admin-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/admin",
+    "mode": "status"
+  },
+  {
+    "name": "admin-get-user-forbidden-parity",
+    "method": "GET",
+    "path": "/api/v1/admin",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "admin-get-user-forbidden-json-parity",
+    "method": "GET",
+    "path": "/api/v1/admin",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "admin-get-admin-ok-parity",
+    "method": "GET",
+    "path": "/api/v1/admin",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"]
+  },
+  {
+    "name": "admin-market-data-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/admin/market-data",
+    "mode": "status"
+  },
+  {
+    "name": "admin-market-data-user-forbidden-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/market-data",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "admin-market-data-admin-ok-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/market-data",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"]
+  },
+  {
+    "name": "admin-market-data-admin-query-json-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/market-data?query=AAPL&skip=0&take=5",
+    "mode": "json",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"],
+    "ignoreJsonPaths": ["marketData"]
+  },
+  {
+    "name": "admin-market-data-admin-sort-json-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/market-data?sortColumn=name&sortDirection=desc&skip=0&take=5",
+    "mode": "json",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"],
+    "ignoreJsonPaths": ["marketData"]
+  },
+  {
+    "name": "admin-users-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/admin/user",
+    "mode": "status"
+  },
+  {
+    "name": "admin-users-user-forbidden-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/user",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "admin-users-admin-ok-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/user",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"]
+  },
+  {
+    "name": "admin-user-by-id-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/admin/user/${ADMIN_DB_USER_ID}",
+    "mode": "status",
+    "requiredEnv": ["ADMIN_DB_USER_ID"]
+  },
+  {
+    "name": "admin-user-by-id-admin-ok-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/user/${ADMIN_DB_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_DB_USER_ID"]
+  },
+  {
+    "name": "admin-user-by-id-admin-missing-not-found-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/user/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_USER_ID"]
+  },
+  {
+    "name": "admin-user-by-id-admin-invalid-format-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/user/not-a-uuid",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"]
+  }
+]

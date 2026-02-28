@@ -1,0 +1,22 @@
+[
+  {
+    "name": "info-status",
+    "method": "GET",
+    "path": "/api/v1/info",
+    "mode": "status"
+  },
+  {
+    "name": "info-json-parity",
+    "method": "GET",
+    "path": "/api/v1/info",
+    "mode": "json",
+    "ignoreJsonPaths": [
+      "statistics",
+      "demoAuthToken",
+      "countriesOfSubscribers",
+      "fearAndGreedDataSource",
+      "isReadOnlyMode",
+      "subscriptionOffer"
+    ]
+  }
+]

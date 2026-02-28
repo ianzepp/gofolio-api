@@ -95,27 +95,39 @@ func TestDifferentialAPI(t *testing.T) {
 }
 
 func loadCases() ([]testCase, error) {
-	fixturePath := filepath.Join("testdata", "cases.json")
-	b, err := os.ReadFile(fixturePath)
+	files, err := filepath.Glob(filepath.Join("testdata", "*.json"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("glob testdata: %w", err)
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no JSON fixture files found in testdata/")
 	}
 
-	var cases []testCase
-	if err := json.Unmarshal(b, &cases); err != nil {
-		return nil, err
-	}
-
-	for i := range cases {
-		if cases[i].Mode == "" {
-			cases[i].Mode = compareStatus
+	var all []testCase
+	for _, f := range files {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", f, err)
 		}
-		if cases[i].Method == "" || cases[i].Path == "" || cases[i].Name == "" {
-			return nil, fmt.Errorf("invalid case at index %d: name/method/path required", i)
+
+		var cases []testCase
+		if err := json.Unmarshal(b, &cases); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
+
+		for i := range cases {
+			if cases[i].Mode == "" {
+				cases[i].Mode = compareStatus
+			}
+			if cases[i].Method == "" || cases[i].Path == "" || cases[i].Name == "" {
+				return nil, fmt.Errorf("invalid case at index %d in %s: name/method/path required", i, f)
+			}
+		}
+
+		all = append(all, cases...)
 	}
 
-	return cases, nil
+	return all, nil
 }
 
 func doRequest(client *http.Client, baseURL string, tc testCase) (response, error) {

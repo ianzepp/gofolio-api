@@ -1,0 +1,74 @@
+[
+  {
+    "name": "order-delete-empty-user-json-parity",
+    "method": "DELETE",
+    "path": "/api/v1/order",
+    "mode": "json",
+    "auth": "jwt:JWT_EMPTY_USER_TOKEN",
+    "requiredEnv": ["JWT_EMPTY_USER_TOKEN"]
+  },
+  {
+    "name": "order-get-foreign-id-not-found-parity",
+    "method": "GET",
+    "path": "/api/v1/order/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "ADMIN_USER_ID"]
+  },
+  {
+    "name": "order-delete-foreign-id-forbidden-parity",
+    "method": "DELETE",
+    "path": "/api/v1/order/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "ADMIN_USER_ID"]
+  },
+  {
+    "name": "order-update-foreign-id-forbidden-parity",
+    "method": "PUT",
+    "path": "/api/v1/order/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "ADMIN_USER_ID"],
+    "body": {
+      "id": "${ADMIN_USER_ID}",
+      "assetClass": "EQUITY",
+      "assetSubClass": "STOCK",
+      "currency": "USD",
+      "dataSource": "YAHOO",
+      "date": "2024-01-01T00:00:00.000Z",
+      "fee": 0,
+      "quantity": 1,
+      "symbol": "AAPL",
+      "type": "BUY",
+      "unitPrice": 100
+    }
+  },
+  {
+    "name": "order-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/order",
+    "mode": "status"
+  },
+  {
+    "name": "order-get-no-auth-unauthorized-json-parity",
+    "method": "GET",
+    "path": "/api/v1/order",
+    "mode": "json"
+  },
+  {
+    "name": "order-delete-no-auth-unauthorized",
+    "method": "DELETE",
+    "path": "/api/v1/order",
+    "mode": "status"
+  },
+  {
+    "name": "order-get-json-parity",
+    "method": "GET",
+    "path": "/api/v1/order",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "ignoreJsonPaths": ["activities"]
+  }
+]

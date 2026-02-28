@@ -1,0 +1,54 @@
+[
+  {
+    "name": "market-data-by-symbol-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/market-data/YAHOO/AAPL",
+    "mode": "status"
+  },
+  {
+    "name": "market-data-by-symbol-no-auth-unauthorized-json-parity",
+    "method": "GET",
+    "path": "/api/v1/market-data/YAHOO/AAPL",
+    "mode": "json"
+  },
+  {
+    "name": "market-data-by-symbol-user-common-forbidden-parity",
+    "method": "GET",
+    "path": "/api/v1/market-data/YAHOO/AAPL",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "market-data-by-symbol-user-common-forbidden-json-parity",
+    "method": "GET",
+    "path": "/api/v1/market-data/YAHOO/AAPL",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "market-data-by-symbol-admin-common-ok-parity",
+    "method": "GET",
+    "path": "/api/v1/market-data/YAHOO/AAPL",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"]
+  },
+  {
+    "name": "market-data-by-symbol-missing-noncurrency-not-found-parity",
+    "method": "GET",
+    "path": "/api/v1/market-data/YAHOO/INTEGRATION_UNKNOWN_ASSET",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "market-data-by-symbol-missing-currency-fallback-parity",
+    "method": "GET",
+    "path": "/api/v1/market-data/YAHOO/CHFUSD",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  }
+]

@@ -1,0 +1,54 @@
+[
+  {
+    "name": "data-provider-ghostfolio-asset-profile-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/data-providers/ghostfolio/asset-profile/AAPL",
+    "mode": "status"
+  },
+  {
+    "name": "data-provider-ghostfolio-dividends-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/data-providers/ghostfolio/dividends/AAPL",
+    "mode": "status"
+  },
+  {
+    "name": "data-provider-ghostfolio-historical-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/data-providers/ghostfolio/historical/AAPL",
+    "mode": "status"
+  },
+  {
+    "name": "data-provider-ghostfolio-lookup-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/data-providers/ghostfolio/lookup?query=apple",
+    "mode": "status"
+  },
+  {
+    "name": "data-provider-ghostfolio-quotes-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/data-providers/ghostfolio/quotes?symbols=AAPL",
+    "mode": "status"
+  },
+  {
+    "name": "data-provider-ghostfolio-status-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/data-providers/ghostfolio/status",
+    "mode": "status"
+  },
+  {
+    "name": "data-provider-ghostfolio-lookup-empty-query-status-parity",
+    "method": "GET",
+    "path": "/api/v1/data-providers/ghostfolio/lookup?query=",
+    "mode": "status",
+    "auth": "api-key:API_KEY_USER",
+    "requiredEnv": ["API_KEY_USER"]
+  },
+  {
+    "name": "data-provider-ghostfolio-status-api-key-status-parity",
+    "method": "GET",
+    "path": "/api/v1/data-providers/ghostfolio/status",
+    "mode": "status",
+    "auth": "api-key:API_KEY_USER",
+    "requiredEnv": ["API_KEY_USER"]
+  }
+]

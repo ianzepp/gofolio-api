@@ -1,0 +1,20 @@
+[
+  {
+    "name": "logo-by-url-status-parity",
+    "method": "GET",
+    "path": "/api/v1/logo?url=https://apple.com",
+    "mode": "status"
+  },
+  {
+    "name": "logo-by-url-missing-url-status-parity",
+    "method": "GET",
+    "path": "/api/v1/logo",
+    "mode": "status"
+  },
+  {
+    "name": "logo-by-symbol-unknown-status-parity",
+    "method": "GET",
+    "path": "/api/v1/logo/YAHOO/INTEGRATION_UNKNOWN_LOGO",
+    "mode": "status"
+  }
+]

@@ -230,7 +230,8 @@ Current test pattern:
   - Run the same request fixtures against legacy NestJS and the Go API
   - Compare status (and JSON where configured) to detect parity regressions
   - Details: [`tests/integration/README.md`](./tests/integration/README.md)
-  - Current fixture count: `131` total (`102` status compare, `29` JSON compare)
+  - Fixtures split per handler in `testdata/*.json` (e.g. `account.json`, `portfolio.json`)
+  - Current fixture count: `161` total (`132` status compare, `29` JSON compare) across `20` files
 
 Run all tests:
 

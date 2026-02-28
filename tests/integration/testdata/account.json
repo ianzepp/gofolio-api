@@ -1,0 +1,129 @@
+[
+  {
+    "name": "account-transfer-missing-accounts-not-found-parity",
+    "method": "POST",
+    "path": "/api/v1/account/transfer-balance",
+    "mode": "status",
+    "auth": "jwt:JWT_EMPTY_USER_TOKEN",
+    "requiredEnv": ["JWT_EMPTY_USER_TOKEN", "ADMIN_USER_ID"],
+    "body": {
+      "accountIdFrom": "${ADMIN_USER_ID}",
+      "accountIdTo": "${ADMIN_USER_ID}",
+      "balance": 1
+    }
+  },
+  {
+    "name": "account-transfer-same-account-bad-request-parity",
+    "method": "POST",
+    "path": "/api/v1/account/transfer-balance",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"],
+    "body": {
+      "accountIdFrom": "${TRANSFER_ACCOUNT_FROM_ID}",
+      "accountIdTo": "${TRANSFER_ACCOUNT_FROM_ID}",
+      "balance": 1
+    }
+  },
+  {
+    "name": "account-transfer-insufficient-funds-bad-request-parity",
+    "method": "POST",
+    "path": "/api/v1/account/transfer-balance",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": [
+      "JWT_USER_TOKEN",
+      "TRANSFER_ACCOUNT_FROM_ID",
+      "TRANSFER_ACCOUNT_TO_ID"
+    ],
+    "body": {
+      "accountIdFrom": "${TRANSFER_ACCOUNT_FROM_ID}",
+      "accountIdTo": "${TRANSFER_ACCOUNT_TO_ID}",
+      "balance": 1000000
+    }
+  },
+  {
+    "name": "account-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/account",
+    "mode": "status"
+  },
+  {
+    "name": "account-get-no-auth-unauthorized-json-parity",
+    "method": "GET",
+    "path": "/api/v1/account",
+    "mode": "json"
+  },
+  {
+    "name": "account-transfer-no-auth-unauthorized",
+    "method": "POST",
+    "path": "/api/v1/account/transfer-balance",
+    "mode": "status",
+    "body": {
+      "accountIdFrom": "00000000-0000-4000-8000-000000000000",
+      "accountIdTo": "11111111-1111-4111-8111-111111111111",
+      "balance": 1
+    }
+  },
+  {
+    "name": "account-get-by-id-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/account/${TRANSFER_ACCOUNT_FROM_ID}",
+    "mode": "status",
+    "requiredEnv": ["TRANSFER_ACCOUNT_FROM_ID"]
+  },
+  {
+    "name": "account-get-by-id-user-ok-parity",
+    "method": "GET",
+    "path": "/api/v1/account/${TRANSFER_ACCOUNT_FROM_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"]
+  },
+  {
+    "name": "account-get-by-id-user-json-parity",
+    "method": "GET",
+    "path": "/api/v1/account/${TRANSFER_ACCOUNT_FROM_ID}",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"],
+    "ignoreJsonPaths": [
+      "createdAt",
+      "updatedAt",
+      "activitiesCount",
+      "allocationInPercentage",
+      "balanceInBaseCurrency",
+      "comment",
+      "dividendInBaseCurrency",
+      "interestInBaseCurrency",
+      "platform",
+      "platformId",
+      "value",
+      "valueInBaseCurrency"
+    ]
+  },
+  {
+    "name": "account-balances-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/account/${TRANSFER_ACCOUNT_FROM_ID}/balances",
+    "mode": "status",
+    "requiredEnv": ["TRANSFER_ACCOUNT_FROM_ID"]
+  },
+  {
+    "name": "account-balances-user-ok-parity",
+    "method": "GET",
+    "path": "/api/v1/account/${TRANSFER_ACCOUNT_FROM_ID}/balances",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"]
+  },
+  {
+    "name": "account-get-json-parity",
+    "method": "GET",
+    "path": "/api/v1/account",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "ignoreJsonPaths": ["accounts"]
+  }
+]

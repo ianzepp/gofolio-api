@@ -1,0 +1,26 @@
+[
+  {
+    "name": "symbol-lookup-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/symbol/lookup?query=apple",
+    "mode": "status"
+  },
+  {
+    "name": "symbol-by-date-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/symbol/YAHOO/AAPL/2024-01-01",
+    "mode": "status"
+  },
+  {
+    "name": "symbol-get-invalid-data-source-not-found-parity",
+    "method": "GET",
+    "path": "/api/v1/symbol/INTEGRATION_INVALID/AAPL",
+    "mode": "status"
+  },
+  {
+    "name": "symbol-get-missing-symbol-not-found-parity",
+    "method": "GET",
+    "path": "/api/v1/symbol/YAHOO/INTEGRATION_UNKNOWN_SYMBOL",
+    "mode": "status"
+  }
+]

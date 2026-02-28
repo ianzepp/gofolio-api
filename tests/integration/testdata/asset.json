@@ -1,0 +1,26 @@
+[
+  {
+    "name": "asset-get-status-parity",
+    "method": "GET",
+    "path": "/api/v1/asset/YAHOO/AAPL",
+    "mode": "status"
+  },
+  {
+    "name": "asset-get-missing-symbol-json-parity",
+    "method": "GET",
+    "path": "/api/v1/asset/YAHOO/INTEGRATION_UNKNOWN_ASSET",
+    "mode": "json",
+    "ignoreJsonPaths": [
+      "assetProfile.name",
+      "marketData.*.id",
+      "marketData.*.createdAt",
+      "marketData.*.date"
+    ]
+  },
+  {
+    "name": "asset-get-missing-symbol-fallback-parity",
+    "method": "GET",
+    "path": "/api/v1/asset/YAHOO/INTEGRATION_UNKNOWN_ASSET",
+    "mode": "status"
+  }
+]

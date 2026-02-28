@@ -1,0 +1,227 @@
+[
+  {
+    "name": "portfolio-holdings-authed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/holdings",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-holdings-unauthed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/holdings",
+    "mode": "status"
+  },
+  {
+    "name": "portfolio-details-authed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/details",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-details-unauthed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/details",
+    "mode": "status"
+  },
+  {
+    "name": "portfolio-details-range-1y",
+    "method": "GET",
+    "path": "/api/v1/portfolio/details?range=1y",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-details-range-ytd",
+    "method": "GET",
+    "path": "/api/v1/portfolio/details?range=ytd",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-performance-authed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/performance?range=max",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-performance-unauthed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/performance?range=max",
+    "mode": "status"
+  },
+  {
+    "name": "portfolio-performance-range-1d",
+    "method": "GET",
+    "path": "/api/v1/portfolio/performance?range=1d",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-performance-range-1y",
+    "method": "GET",
+    "path": "/api/v1/portfolio/performance?range=1y",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-performance-range-ytd",
+    "method": "GET",
+    "path": "/api/v1/portfolio/performance?range=ytd",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-dividends-authed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/dividends",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-dividends-unauthed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/dividends",
+    "mode": "status"
+  },
+  {
+    "name": "portfolio-investments-authed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/investments",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-investments-unauthed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/investments",
+    "mode": "status"
+  },
+  {
+    "name": "portfolio-investments-group-by-month",
+    "method": "GET",
+    "path": "/api/v1/portfolio/investments?groupBy=month",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-investments-group-by-year",
+    "method": "GET",
+    "path": "/api/v1/portfolio/investments?groupBy=year",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-report-authed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/report",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-report-unauthed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/report",
+    "mode": "status"
+  },
+  {
+    "name": "portfolio-holding-aapl-authed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/holding/YAHOO/AAPL",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "SEED_ORDER_ID"]
+  },
+  {
+    "name": "portfolio-holding-msft-authed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/holding/YAHOO/MSFT",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "SEED_ORDER_TWO_ID"]
+  },
+  {
+    "name": "portfolio-holding-unknown-symbol",
+    "method": "GET",
+    "path": "/api/v1/portfolio/holding/YAHOO/DOESNOTEXIST999",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-holding-unauthed",
+    "method": "GET",
+    "path": "/api/v1/portfolio/holding/YAHOO/AAPL",
+    "mode": "status"
+  },
+  {
+    "name": "portfolio-holdings-filter-by-account",
+    "method": "GET",
+    "path": "/api/v1/portfolio/holdings?accounts=${TRANSFER_ACCOUNT_FROM_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"]
+  },
+  {
+    "name": "portfolio-details-filter-by-account",
+    "method": "GET",
+    "path": "/api/v1/portfolio/details?accounts=${TRANSFER_ACCOUNT_FROM_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"]
+  },
+  {
+    "name": "portfolio-performance-filter-by-account",
+    "method": "GET",
+    "path": "/api/v1/portfolio/performance?range=max&accounts=${TRANSFER_ACCOUNT_FROM_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"]
+  },
+  {
+    "name": "portfolio-holdings-empty-user",
+    "method": "GET",
+    "path": "/api/v1/portfolio/holdings",
+    "mode": "status",
+    "auth": "jwt:JWT_EMPTY_USER_TOKEN",
+    "requiredEnv": ["JWT_EMPTY_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-details-empty-user",
+    "method": "GET",
+    "path": "/api/v1/portfolio/details",
+    "mode": "status",
+    "auth": "jwt:JWT_EMPTY_USER_TOKEN",
+    "requiredEnv": ["JWT_EMPTY_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-performance-empty-user",
+    "method": "GET",
+    "path": "/api/v1/portfolio/performance?range=max",
+    "mode": "status",
+    "auth": "jwt:JWT_EMPTY_USER_TOKEN",
+    "requiredEnv": ["JWT_EMPTY_USER_TOKEN"]
+  },
+  {
+    "name": "portfolio-holding-tags-update-unauthed",
+    "method": "PUT",
+    "path": "/api/v1/portfolio/holding/YAHOO/AAPL/tags",
+    "mode": "status",
+    "body": { "tags": [] }
+  }
+]

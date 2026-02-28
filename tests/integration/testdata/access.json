@@ -1,0 +1,37 @@
+[
+  {
+    "name": "access-delete-foreign-id-forbidden-parity",
+    "method": "DELETE",
+    "path": "/api/v1/access/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "ADMIN_USER_ID"]
+  },
+  {
+    "name": "access-update-foreign-id-forbidden-parity",
+    "method": "PUT",
+    "path": "/api/v1/access/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "ADMIN_USER_ID"],
+    "body": {
+      "id": "${ADMIN_USER_ID}",
+      "permissions": []
+    }
+  },
+  {
+    "name": "access-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/access",
+    "mode": "status"
+  },
+  {
+    "name": "access-get-user-json-parity",
+    "method": "GET",
+    "path": "/api/v1/access",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "ignoreJsonPaths": ["*.createdAt", "*.updatedAt"]
+  }
+]

@@ -1,0 +1,24 @@
+[
+  {
+    "name": "exchange-rate-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/exchange-rate/USDEUR/2024-01-15",
+    "mode": "status"
+  },
+  {
+    "name": "exchange-rate-auth-status-parity",
+    "method": "GET",
+    "path": "/api/v1/exchange-rate/USDEUR/2024-01-15",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "exchange-rate-unknown-pair-status-parity",
+    "method": "GET",
+    "path": "/api/v1/exchange-rate/XXXYYY/2024-01-15",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  }
+]

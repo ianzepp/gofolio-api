@@ -1,0 +1,90 @@
+[
+  {
+    "name": "platforms-get-user-ok-parity",
+    "method": "GET",
+    "path": "/api/v1/platforms",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "platform-get-user-forbidden-parity",
+    "method": "GET",
+    "path": "/api/v1/platform",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "platform-get-user-forbidden-json-parity",
+    "method": "GET",
+    "path": "/api/v1/platform",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "platforms-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/platforms",
+    "mode": "status"
+  },
+  {
+    "name": "platform-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/platform",
+    "mode": "status"
+  },
+  {
+    "name": "platform-create-user-forbidden-parity",
+    "method": "POST",
+    "path": "/api/v1/platform",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": {
+      "name": "integration-platform-user-denied",
+      "url": "https://example.com"
+    }
+  },
+  {
+    "name": "platform-update-user-forbidden-parity",
+    "method": "PUT",
+    "path": "/api/v1/platform/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "ADMIN_USER_ID"],
+    "body": {
+      "name": "integration-platform-update-denied",
+      "url": "https://example.com"
+    }
+  },
+  {
+    "name": "platform-delete-user-forbidden-parity",
+    "method": "DELETE",
+    "path": "/api/v1/platform/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "ADMIN_USER_ID"]
+  },
+  {
+    "name": "platform-update-admin-foreign-id-forbidden-parity",
+    "method": "PUT",
+    "path": "/api/v1/platform/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_USER_ID"],
+    "body": {
+      "name": "integration-platform-admin-update-foreign",
+      "url": "https://example.com"
+    }
+  },
+  {
+    "name": "platform-delete-admin-foreign-id-forbidden-parity",
+    "method": "DELETE",
+    "path": "/api/v1/platform/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_USER_ID"]
+  }
+]

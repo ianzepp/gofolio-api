@@ -1,0 +1,68 @@
+[
+  {
+    "name": "tags-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/tags",
+    "mode": "status"
+  },
+  {
+    "name": "tags-get-invalid-bearer-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/tags",
+    "mode": "status",
+    "headers": {
+      "Authorization": "Bearer invalid.token.value"
+    }
+  },
+  {
+    "name": "tags-get-api-key-user-parity",
+    "method": "GET",
+    "path": "/api/v1/tags",
+    "mode": "status",
+    "auth": "api-key:API_KEY_USER",
+    "requiredEnv": ["API_KEY_USER"]
+  },
+  {
+    "name": "tags-get-user-json-parity",
+    "method": "GET",
+    "path": "/api/v1/tags",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "tags-post-user-missing-user-id-parity",
+    "method": "POST",
+    "path": "/api/v1/tags",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": {
+      "name": "integration-tag-user-missing-id"
+    }
+  },
+  {
+    "name": "tags-post-user-foreign-user-id-parity",
+    "method": "POST",
+    "path": "/api/v1/tags",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "ADMIN_USER_ID"],
+    "body": {
+      "name": "integration-tag-user-foreign-id",
+      "userId": "${ADMIN_USER_ID}"
+    }
+  },
+  {
+    "name": "tags-post-demo-forbidden-parity",
+    "method": "POST",
+    "path": "/api/v1/tags",
+    "mode": "status",
+    "auth": "jwt:JWT_DEMO_TOKEN",
+    "requiredEnv": ["JWT_DEMO_TOKEN", "DEMO_USER_ID"],
+    "body": {
+      "name": "integration-tag-demo",
+      "userId": "${DEMO_USER_ID}"
+    }
+  }
+]
