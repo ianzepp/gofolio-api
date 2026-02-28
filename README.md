@@ -96,8 +96,44 @@ Startup now opens a PostgreSQL connection pool via `pgxpool` and fails fast if D
 
 ## Testing
 
-Differential integration tests (legacy NestJS vs Go API) live in
-[`tests/integration/README.md`](./tests/integration/README.md). This harness runs the same request cases against both servers and compares behavior.
+Current test pattern:
+
+- **Unit/handler tests** in `internal/handler/*_test.go`
+  - Use Go's built-in `testing` package
+  - Use `httptest` for request/response assertions
+  - Prefer table-driven test cases for route behavior
+- **Differential integration tests** in `tests/integration`
+  - Run the same request fixtures against legacy NestJS and the Go API
+  - Compare status (and JSON where configured) to detect parity regressions
+  - Details: [`tests/integration/README.md`](./tests/integration/README.md)
+
+Run all tests:
+
+```bash
+cd apps/api-go
+go test ./...
+```
+
+Run with race detector:
+
+```bash
+cd apps/api-go
+go test -race ./...
+```
+
+Run differential integration tests:
+
+```bash
+cd apps/api-go
+LEGACY_BASE_URL=http://localhost:3333 \
+GO_BASE_URL=http://localhost:3334 \
+go test ./tests/integration -v
+```
+
+Optional auth env vars for integration fixtures:
+
+- `JWT_TOKEN`
+- `API_KEY`
 
 ## Route Surface
 
