@@ -365,6 +365,26 @@
     "requiredEnv": ["JWT_USER_TOKEN", "ADMIN_USER_ID"]
   },
   {
+    "name": "platform-update-admin-foreign-id-forbidden-parity",
+    "method": "PUT",
+    "path": "/api/v1/platform/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_USER_ID"],
+    "body": {
+      "name": "integration-platform-admin-update-foreign",
+      "url": "https://example.com"
+    }
+  },
+  {
+    "name": "platform-delete-admin-foreign-id-forbidden-parity",
+    "method": "DELETE",
+    "path": "/api/v1/platform/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_USER_ID"]
+  },
+  {
     "name": "user-get-json-parity",
     "method": "GET",
     "path": "/api/v1/user",

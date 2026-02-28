@@ -25,11 +25,13 @@ Routes + request/response shape:
 */
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 func GetPlatformsWithAccountCount(deps *Deps) http.HandlerFunc {
@@ -100,6 +102,16 @@ func DeletePlatform(deps *Deps) http.HandlerFunc {
 		}
 
 		id := r.PathValue("id")
+		_, err := deps.PlatformService.GetPlatform(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				// Legacy parity: delete missing platform returns forbidden.
+				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+				return
+			}
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		if err := deps.PlatformService.DeletePlatform(r.Context(), id); err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
@@ -132,6 +144,11 @@ func UpdatePlatform(deps *Deps) http.HandlerFunc {
 
 		updated, err := deps.PlatformService.UpdatePlatform(r.Context(), p)
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				// Legacy parity: update missing platform returns bad request.
+				Error(w, http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+				return
+			}
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
 		}
