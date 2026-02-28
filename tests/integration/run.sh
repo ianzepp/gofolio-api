@@ -188,6 +188,32 @@ bootstrap_legacy_user() {
     export LEGACY_USER_ID="${user_id}"
   fi
 
+  # Bootstrap an additional throwaway user for destructive/edge parity cases.
+  # This user is expected to have no linked data (orders/accounts/etc.).
+  local empty_signup_response
+  local empty_access_token
+  local empty_auth_token
+  local empty_user_id
+  empty_signup_response="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/user")"
+  empty_access_token="$(printf '%s' "${empty_signup_response}" | jq -r '.accessToken // empty')"
+  empty_auth_token="$(printf '%s' "${empty_signup_response}" | jq -r '.authToken // empty')"
+  if [[ -z "${empty_auth_token}" && -n "${empty_access_token}" ]]; then
+    empty_auth_token="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/auth/anonymous" \
+      -H "Content-Type: application/json" \
+      -d "$(jq -nc --arg accessToken "${empty_access_token}" '{accessToken: $accessToken}')" \
+      | jq -r '.authToken // empty')"
+  fi
+  if [[ -n "${empty_auth_token}" ]]; then
+    export JWT_EMPTY_USER_TOKEN="${empty_auth_token}"
+    empty_user_id="$(decode_jwt_user_id "${empty_auth_token}")"
+    if [[ -n "${empty_user_id}" ]]; then
+      export EMPTY_USER_ID="${empty_user_id}"
+    fi
+  fi
+  if [[ -n "${empty_access_token}" ]]; then
+    export EMPTY_USER_ACCESS_TOKEN="${empty_access_token}"
+  fi
+
   # For foreign-user validation cases, we only need an ID that differs from
   # the bootstrapped user ID.
   if [[ -z "${ADMIN_USER_ID:-}" ]]; then

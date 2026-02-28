@@ -41,7 +41,7 @@ func (s *OrderService) DeleteOrder(ctx context.Context, id string) error {
 	return repo.Delete(ctx, id)
 }
 
-func (s *OrderService) DeleteOrdersByUserID(ctx context.Context, userID string) error {
+func (s *OrderService) DeleteOrdersByUserID(ctx context.Context, userID string) (int64, error) {
 	repo := repository.NewOrderRepository(s.pool)
 	return repo.DeleteByUserID(ctx, userID)
 }

@@ -80,5 +80,35 @@
       "name": "integration-tag-demo",
       "userId": "${DEMO_USER_ID}"
     }
+  },
+  {
+    "name": "user-access-token-wrong-token-forbidden-parity",
+    "method": "POST",
+    "path": "/api/v1/user/access-token",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": {
+      "accessToken": "integration-invalid-access-token"
+    }
+  },
+  {
+    "name": "order-delete-empty-user-json-parity",
+    "method": "DELETE",
+    "path": "/api/v1/order",
+    "mode": "json",
+    "auth": "jwt:JWT_EMPTY_USER_TOKEN",
+    "requiredEnv": ["JWT_EMPTY_USER_TOKEN"]
+  },
+  {
+    "name": "user-delete-own-wrong-token-forbidden-parity",
+    "method": "DELETE",
+    "path": "/api/v1/user",
+    "mode": "status",
+    "auth": "jwt:JWT_EMPTY_USER_TOKEN",
+    "requiredEnv": ["JWT_EMPTY_USER_TOKEN"],
+    "body": {
+      "accessToken": "integration-invalid-access-token"
+    }
   }
 ]

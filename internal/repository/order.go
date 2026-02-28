@@ -86,10 +86,10 @@ func (r *OrderRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *OrderRepository) DeleteByUserID(ctx context.Context, userID string) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM "Order" WHERE "userId" = $1`, userID)
+func (r *OrderRepository) DeleteByUserID(ctx context.Context, userID string) (int64, error) {
+	tag, err := r.db.Exec(ctx, `DELETE FROM "Order" WHERE "userId" = $1`, userID)
 	if err != nil {
-		return fmt.Errorf("delete orders by user: %w", err)
+		return 0, fmt.Errorf("delete orders by user: %w", err)
 	}
-	return nil
+	return tag.RowsAffected(), nil
 }

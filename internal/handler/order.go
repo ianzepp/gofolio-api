@@ -229,11 +229,12 @@ func DeleteOrders(deps *Deps) http.HandlerFunc {
 		// Legacy parity: bulk delete accepts filter params but current impl
 		// deletes all orders for the user.
 		_ = ParseFilters(r)
-		if err := deps.OrderService.DeleteOrdersByUserID(r.Context(), userID); err != nil {
+		count, err := deps.OrderService.DeleteOrdersByUserID(r.Context(), userID)
+		if err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		JSON(w, http.StatusOK, map[string]any{})
+		// Legacy parity: returns number of deleted rows.
+		JSON(w, http.StatusOK, count)
 	}
 }
-
