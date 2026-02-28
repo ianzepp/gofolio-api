@@ -1,0 +1,155 @@
+# Go API — Remaining Gaps
+
+Tracked inventory of everything between current state and full parity with the NestJS backend. Each section is a workstream; items within are ordered by priority/dependency.
+
+Last updated: 2026-02-28 (fast wins pass)
+
+---
+
+## 1. ROAI Calculator JSON Parity (7 failures)
+
+The calculator engine is structurally complete (~2,000 LOC) but output values diverge from NestJS. All 7 failing differential tests are JSON-mode comparisons against the ROAI-seeded user.
+
+| #   | Test Case                                | Endpoint                               | Key Ignored Fields                                                                                   |
+| --- | ---------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 1   | `roai-holdings-json`                     | `GET /portfolio/holdings`              | marketPrice, grossPerformance, netPerformance, allocation, investment, dividend, valueInBaseCurrency |
+| 2   | `roai-details-json`                      | `GET /portfolio/details`               | accounts, platforms, holdings, markets, marketsAdvanced, summary                                     |
+| 3   | `roai-holding-btcusd-json`               | `GET /portfolio/holding/YAHOO/BTCUSD`  | historicalData, averagePrice, gross/net performance (all variants), marketPrice, value               |
+| 4   | `roai-holding-msft-json`                 | `GET /portfolio/holding/YAHOO/MSFT`    | same as #3                                                                                           |
+| 5   | `roai-dividends-json`                    | `GET /portfolio/dividends`             | dividends.\*.investment                                                                              |
+| 6   | `roai-investments-json`                  | `GET /portfolio/investments`           | investments.\*.investment                                                                            |
+| 7   | `roai-holdings-filter-roai-account-json` | `GET /portfolio/holdings?accounts=...` | same as #1                                                                                           |
+
+**Root causes to investigate:**
+
+- [ ] Rounding differences (shopspring/decimal vs big.js)
+- [ ] Exchange rate lookup timing (which date's rate is used for conversion)
+- [ ] Currency effect calculations
+- [ ] Date boundary handling (local timezone vs UTC)
+- [ ] `details` response missing `accounts`, `platforms`, `markets`, `marketsAdvanced`, `summary` aggregations
+- [ ] Single-holding `historicalData` and `performances` are stubbed empty
+
+**Approach:** Run tests without `ignoreJsonPaths`, diff actual vs expected, fix line-by-line.
+
+---
+
+## 2. Stubbed In-Scope Routes (~30 routes)
+
+These routes return empty/mock JSON and are within the declared scope of the rewrite.
+
+### 2a. Admin — Data Gather (6 routes)
+
+Background job triggers. NestJS uses BullMQ to enqueue gather tasks.
+
+| Method | Path                                             | Purpose                        |
+| ------ | ------------------------------------------------ | ------------------------------ |
+| POST   | `/admin/gather`                                  | Gather data (7 days)           |
+| POST   | `/admin/gather/max`                              | Gather data (max range)        |
+| POST   | `/admin/gather/profile-data`                     | Gather all profile data        |
+| POST   | `/admin/gather/profile-data/:dataSource/:symbol` | Gather profile data for symbol |
+| POST   | `/admin/gather/:dataSource/:symbol`              | Gather symbol data             |
+| POST   | `/admin/gather/:dataSource/:symbol/:dateString`  | Gather symbol data for date    |
+
+**Dependency:** Requires goroutine-based job queue (see `migrate-off-redis.md`).
+
+### ~~2b. Admin — Profile Data CRUD (3 routes)~~ DONE
+
+Wired: Create, Update, Delete profile data with auth guards.
+
+### 2c. Admin — Misc (3 routes)
+
+| Method | Path                                          | Purpose                  |
+| ------ | --------------------------------------------- | ------------------------ |
+| PUT    | `/admin/settings/:key`                        | Update admin setting     |
+| GET    | `/admin/demo-user/sync`                       | Sync demo user           |
+| POST   | `/admin/market-data/:dataSource/:symbol/test` | Test market data scraper |
+
+### 2d. Import (2 routes)
+
+| Method | Path                                    | Purpose                                |
+| ------ | --------------------------------------- | -------------------------------------- |
+| POST   | `/import`                               | Import portfolio (activities CSV/JSON) |
+| GET    | `/import/dividends/:dataSource/:symbol` | Import dividends for symbol            |
+
+### ~~2e. Market Data Write (1 route)~~ DONE
+
+Wired: Bulk upsert via existing `UpsertMarketPrice` repo method.
+
+### 2f. Benchmark Management (3 routes) — 2/3 DONE
+
+Create and delete wired. Detail (GET with performance calc) remains a stub.
+
+| Method | Path                                               | Status |
+| ------ | -------------------------------------------------- | ------ |
+| POST   | `/benchmarks`                                      | DONE   |
+| DELETE | `/benchmarks/:dataSource/:symbol`                  | DONE   |
+| GET    | `/benchmarks/:dataSource/:symbol/:startDateString` | Stub   |
+
+### 2g. Portfolio — Remaining (2 routes) — 1/2 DONE
+
+Holding tags update wired. Report remains a stub.
+
+| Method | Path                                          | Status |
+| ------ | --------------------------------------------- | ------ |
+| GET    | `/portfolio/report`                           | Stub   |
+| PUT    | `/portfolio/holding/:dataSource/:symbol/tags` | DONE   |
+
+### 2h. Symbol Date Lookup (1 route, partially wired)
+
+| Method | Path                                      | Purpose                           |
+| ------ | ----------------------------------------- | --------------------------------- |
+| GET    | `/symbol/:dataSource/:symbol/:dateString` | Get symbol data for specific date |
+
+### 2i. Infrastructure (2 routes)
+
+| Method | Path                                     | Purpose            |
+| ------ | ---------------------------------------- | ------------------ |
+| GET    | `/sitemap.xml`                           | Sitemap generation |
+| GET    | `/assets/:languageCode/site.webmanifest` | Web manifest       |
+
+---
+
+## 3. Excluded from Scope (14 routes)
+
+These are intentionally not being ported. Documented here for completeness.
+
+| Area                         | Routes | Reason                                 |
+| ---------------------------- | ------ | -------------------------------------- |
+| `auth/oauth` (Google + OIDC) | 4      | Server-side OAuth provider integration |
+| `auth/webauthn`              | 4      | FIDO2/WebAuthn crypto                  |
+| `subscription/*`             | 3      | Stripe-only billing                    |
+| `agent/*`                    | 3      | Local-only agent code, not upstream    |
+
+---
+
+### ~~4. README Drift~~ DONE
+
+Main README parity snapshot updated to reflect 196 cases across 21 fixture files.
+
+---
+
+## 5. Test Coverage Gaps
+
+Areas with no or minimal differential test coverage:
+
+- [ ] Import endpoints (no fixtures — stubbed)
+- [ ] Admin gather endpoints (no JSON fixtures — stubbed)
+- [ ] Admin profile data CRUD (no fixtures — stubbed)
+- [ ] Benchmark create/delete/detail (status only, no JSON)
+- [ ] Market data create (no fixtures — stubbed)
+- [ ] Portfolio report (no fixtures — stubbed)
+- [ ] Holding tags update (no fixtures — stubbed)
+- [ ] Symbol date lookup (no JSON fixture)
+
+---
+
+## 6. Suggested Priority Order
+
+1. **ROAI calculator parity** — Fix the 7 JSON failures. This is the hardest and highest-value work. The calculator is the core differentiator of the app.
+2. **Details response enrichment** — Wire `accounts`, `platforms`, `markets`, `summary` into the details endpoint. Partially blocks ROAI parity.
+3. **Import** — Last major in-scope feature area with zero implementation.
+4. ~~**Admin profile data CRUD**~~ DONE
+5. ~~**Benchmark create/delete**~~ DONE (detail still stub)
+6. **Admin gather** — Depends on job queue design decision (goroutines vs external).
+7. **Portfolio report** — Rules engine, lower priority.
+8. ~~**README update**~~ DONE

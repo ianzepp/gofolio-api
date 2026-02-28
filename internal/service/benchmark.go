@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
@@ -86,4 +88,80 @@ func (s *BenchmarkService) GetBenchmarks(ctx context.Context) (BenchmarkResponse
 	}
 
 	return BenchmarkResponse{Benchmarks: items}, nil
+}
+
+// AddBenchmark appends a new benchmark to the BENCHMARKS Property JSON array.
+func (s *BenchmarkService) AddBenchmark(ctx context.Context, dataSource, symbol string) error {
+	spRepo := repository.NewSymbolProfileRepository(s.db)
+	propRepo := repository.NewPropertyRepository(s.db)
+
+	profile, err := spRepo.FindByDataSourceAndSymbol(ctx, dataSource, symbol)
+	if err != nil {
+		return fmt.Errorf("symbol profile not found: %w", err)
+	}
+
+	benchProps, err := s.loadBenchmarkProps(ctx, propRepo)
+	if err != nil {
+		benchProps = []BenchmarkProperty{}
+	}
+
+	// Check for duplicate
+	for _, bp := range benchProps {
+		if bp.SymbolProfileId == profile.ID {
+			return nil // already exists
+		}
+	}
+
+	benchProps = append(benchProps, BenchmarkProperty{
+		SymbolProfileId: profile.ID,
+		EnableSharing:   false,
+	})
+
+	return s.saveBenchmarkProps(ctx, propRepo, benchProps)
+}
+
+// DeleteBenchmark removes a benchmark from the BENCHMARKS Property JSON array.
+func (s *BenchmarkService) DeleteBenchmark(ctx context.Context, dataSource, symbol string) error {
+	spRepo := repository.NewSymbolProfileRepository(s.db)
+	propRepo := repository.NewPropertyRepository(s.db)
+
+	profile, err := spRepo.FindByDataSourceAndSymbol(ctx, dataSource, symbol)
+	if err != nil {
+		return fmt.Errorf("symbol profile not found: %w", err)
+	}
+
+	benchProps, err := s.loadBenchmarkProps(ctx, propRepo)
+	if err != nil {
+		return nil // nothing to delete
+	}
+
+	filtered := make([]BenchmarkProperty, 0, len(benchProps))
+	for _, bp := range benchProps {
+		if bp.SymbolProfileId != profile.ID {
+			filtered = append(filtered, bp)
+		}
+	}
+
+	return s.saveBenchmarkProps(ctx, propRepo, filtered)
+}
+
+func (s *BenchmarkService) loadBenchmarkProps(ctx context.Context, propRepo *repository.PropertyRepository) ([]BenchmarkProperty, error) {
+	prop, err := propRepo.FindByKey(ctx, "BENCHMARKS")
+	if err != nil {
+		return nil, err
+	}
+	var items []BenchmarkProperty
+	if err := json.Unmarshal([]byte(prop.Value), &items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (s *BenchmarkService) saveBenchmarkProps(ctx context.Context, propRepo *repository.PropertyRepository, items []BenchmarkProperty) error {
+	data, err := json.Marshal(items)
+	if err != nil {
+		return fmt.Errorf("marshal benchmarks: %w", err)
+	}
+	_, err = propRepo.Upsert(ctx, model.Property{Key: "BENCHMARKS", Value: string(data)})
+	return err
 }

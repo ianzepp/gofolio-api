@@ -262,6 +262,53 @@ func (r *OrderRepository) DeleteByIDAndUserID(ctx context.Context, id string, us
 	return result.RowsAffected()
 }
 
+// ReplaceTagsForOrders clears existing tags and assigns new ones for a set of
+// order IDs. Used by the holding tags update endpoint.
+func (r *OrderRepository) ReplaceTagsForOrders(ctx context.Context, orderIDs []string, tagIDs []string) error {
+	if len(orderIDs) == 0 {
+		return nil
+	}
+
+	// Delete existing tag associations
+	delQuery, delArgs, err := sqlx.In(
+		`DELETE FROM "_OrderToTag" WHERE "A" IN (?)`, orderIDs)
+	if err != nil {
+		return fmt.Errorf("build delete tags query: %w", err)
+	}
+	delQuery = sqlx.Rebind(sqlx.DOLLAR, delQuery)
+	if _, err := r.db.ExecContext(ctx, delQuery, delArgs...); err != nil {
+		return fmt.Errorf("delete order tags: %w", err)
+	}
+
+	// Insert new associations
+	if len(tagIDs) == 0 {
+		return nil
+	}
+	for _, orderID := range orderIDs {
+		for _, tagID := range tagIDs {
+			if _, err := r.db.ExecContext(ctx,
+				`INSERT INTO "_OrderToTag" ("A", "B") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+				orderID, tagID); err != nil {
+				return fmt.Errorf("insert order tag: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+// FindIDsByUserAndSymbol returns order IDs for a user matching a given symbol.
+func (r *OrderRepository) FindIDsByUserAndSymbol(ctx context.Context, userID, dataSource, symbol string) ([]string, error) {
+	var ids []string
+	err := sqlx.SelectContext(ctx, r.db, &ids,
+		`SELECT o.id FROM "Order" o
+		 JOIN "SymbolProfile" sp ON o."symbolProfileId" = sp.id
+		 WHERE o."userId" = $1 AND sp."dataSource" = $2 AND sp.symbol = $3`, userID, dataSource, symbol)
+	if err != nil {
+		return nil, fmt.Errorf("find order ids by symbol: %w", err)
+	}
+	return ids, nil
+}
+
 // DeleteByUserID removes all orders belonging to userID, returning the count
 // of deleted rows. Used during account deletion to cascade-remove activity
 // before the User row itself is dropped.

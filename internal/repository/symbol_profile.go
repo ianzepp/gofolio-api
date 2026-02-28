@@ -7,6 +7,7 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -128,6 +129,64 @@ func (r *SymbolProfileRepository) SearchByQuery(ctx context.Context, dataSource 
 		return nil, fmt.Errorf("search symbol profiles: %w", err)
 	}
 	return items, nil
+}
+
+// Create inserts a new SymbolProfile row and returns the persisted record.
+func (r *SymbolProfileRepository) Create(ctx context.Context, sp model.SymbolProfile) (model.SymbolProfile, error) {
+	if sp.ID == "" {
+		sp.ID = uuid.New().String()
+	}
+	var item model.SymbolProfile
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
+		`INSERT INTO "SymbolProfile" (id, "assetClass", "assetSubClass", comment, countries,
+		  currency, cusip, "dataSource", figi, "figiComposite", "figiShareClass",
+		  holdings, "isActive", isin, name, "scraperConfiguration", sectors,
+		  symbol, "symbolMapping", url, "userId")
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+		 RETURNING `+symbolProfileColumns,
+		sp.ID, sp.AssetClass, sp.AssetSubClass, sp.Comment, sp.Countries,
+		sp.Currency, sp.Cusip, sp.DataSource, sp.Figi, sp.FigiComposite, sp.FigiShareClass,
+		sp.Holdings, sp.IsActive, sp.Isin, sp.Name, sp.ScraperConfiguration, sp.Sectors,
+		sp.Symbol, sp.SymbolMapping, sp.Url, sp.UserId)
+	if err != nil {
+		return model.SymbolProfile{}, fmt.Errorf("insert symbol profile: %w", err)
+	}
+	return item, nil
+}
+
+// Update modifies mutable fields on an existing SymbolProfile identified by ID.
+func (r *SymbolProfileRepository) Update(ctx context.Context, sp model.SymbolProfile) (model.SymbolProfile, error) {
+	var item model.SymbolProfile
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
+		`UPDATE "SymbolProfile"
+		 SET "assetClass" = $2, "assetSubClass" = $3, comment = $4, countries = $5,
+		     currency = $6, cusip = $7, figi = $8, "figiComposite" = $9,
+		     "figiShareClass" = $10, holdings = $11, "isActive" = $12, isin = $13,
+		     name = $14, "scraperConfiguration" = $15, sectors = $16,
+		     "symbolMapping" = $17, url = $18, "userId" = $19
+		 WHERE id = $1
+		 RETURNING `+symbolProfileColumns,
+		sp.ID, sp.AssetClass, sp.AssetSubClass, sp.Comment, sp.Countries,
+		sp.Currency, sp.Cusip, sp.Figi, sp.FigiComposite,
+		sp.FigiShareClass, sp.Holdings, sp.IsActive, sp.Isin,
+		sp.Name, sp.ScraperConfiguration, sp.Sectors,
+		sp.SymbolMapping, sp.Url, sp.UserId)
+	if err != nil {
+		return model.SymbolProfile{}, fmt.Errorf("update symbol profile: %w", err)
+	}
+	return item, nil
+}
+
+// DeleteByDataSourceAndSymbol removes a symbol profile by its natural key.
+func (r *SymbolProfileRepository) DeleteByDataSourceAndSymbol(ctx context.Context, dataSource string, symbol string) error {
+	_, err := r.db.ExecContext(ctx,
+		`DELETE FROM "SymbolProfile" WHERE "dataSource" = $1 AND symbol = $2`, dataSource, symbol)
+	if err != nil {
+		return fmt.Errorf("delete symbol profile: %w", err)
+	}
+	return nil
 }
 
 // FindAll retrieves every symbol profile ordered by ticker symbol.

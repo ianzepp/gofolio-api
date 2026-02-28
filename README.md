@@ -42,11 +42,10 @@ Go eliminates the ceremony. No decorators, no DI containers, no module system. F
 
 Current parity snapshot:
 
-- Differential harness: `169` cases total (`132` status + `37` JSON)
-- Differential pass rate (as of February 28, 2026): `162/169` passing
+- Differential harness: `196` cases total (`156` status + `40` JSON) across `21` fixture files
+- Differential pass rate (estimated): `~189/196` passing
 - 20 services wired into handler `Deps` struct
 - 14 repository files, 13 model files, 3 provider files, 22 service files, 6 calculator files
-- `14,233` Go LOC in `apps/api-go` (`15,641` total including tests)
 - Remaining parity failures are concentrated in ROAI portfolio-calculator JSON responses:
   - `roai-holdings-json`
   - `roai-details-json`
@@ -55,11 +54,10 @@ Current parity snapshot:
   - `roai-dividends-json`
   - `roai-investments-json`
   - `roai-holdings-filter-roai-account-json`
-- Recently wired handlers: `auth/anonymous` (login), `api-keys`, `ai/prompt`, `cache/flush`, `auth-device`
-- Auth guards added: `admin/queue/*`, `cache/flush`
-- Recently wired: `public` (public portfolio via access link)
-- Remaining stub areas: `import`
+- Recently wired: benchmark create/delete, admin profile-data CRUD, market-data write, portfolio holding tags update, `auth/anonymous`, `api-keys`, `ai/prompt`, `cache/flush`, `auth-device`, `public` portfolio
+- Remaining stub areas: `import`, admin gather (job queue), admin settings, benchmark detail, portfolio report
 - Excluded from scope: `agent/*` (local-only code), `subscription/*` (Stripe-only), `auth/oauth` (Google/OIDC server-side), `auth/webauthn` (FIDO2 crypto)
+- See [`GAPS.md`](./GAPS.md) for the full remaining-work inventory
 
 ## Architecture
 

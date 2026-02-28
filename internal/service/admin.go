@@ -403,3 +403,100 @@ func (s *AdminService) GetMarketData(ctx context.Context, skip int, take int, qu
 
 	return AdminMarketDataResponse{Count: total, MarketData: items}, nil
 }
+
+// CreateProfileData creates a new SymbolProfile for the given dataSource+symbol.
+func (s *AdminService) CreateProfileData(ctx context.Context, dataSource, symbol, currency string) error {
+	spRepo := repository.NewSymbolProfileRepository(s.db)
+
+	_, err := spRepo.Create(ctx, model.SymbolProfile{
+		DataSource: model.DataSource(dataSource),
+		Symbol:     symbol,
+		Currency:   currency,
+		IsActive:   true,
+	})
+	if err != nil {
+		return fmt.Errorf("create symbol profile: %w", err)
+	}
+	return nil
+}
+
+// UpdateProfileData patches mutable fields on an existing SymbolProfile.
+func (s *AdminService) UpdateProfileData(ctx context.Context, dataSource, symbol string, fields map[string]any) error {
+	spRepo := repository.NewSymbolProfileRepository(s.db)
+
+	profile, err := spRepo.FindByDataSourceAndSymbol(ctx, dataSource, symbol)
+	if err != nil {
+		return fmt.Errorf("find symbol profile: %w", err)
+	}
+
+	// Apply simple string fields
+	if v, ok := fields["name"].(string); ok {
+		profile.Name = &v
+	}
+	if v, ok := fields["url"].(string); ok {
+		profile.Url = &v
+	}
+	if v, ok := fields["currency"].(string); ok {
+		profile.Currency = v
+	}
+	if v, ok := fields["comment"].(string); ok {
+		profile.Comment = &v
+	}
+	if v, ok := fields["assetClass"].(string); ok {
+		ac := model.AssetClass(v)
+		profile.AssetClass = &ac
+	}
+	if v, ok := fields["assetSubClass"].(string); ok {
+		asc := model.AssetSubClass(v)
+		profile.AssetSubClass = &asc
+	}
+	if v, ok := fields["isin"].(string); ok {
+		profile.Isin = &v
+	}
+	// JSON fields
+	if v, ok := fields["countries"]; ok {
+		if b, err := json.Marshal(v); err == nil {
+			profile.Countries = b
+		}
+	}
+	if v, ok := fields["sectors"]; ok {
+		if b, err := json.Marshal(v); err == nil {
+			profile.Sectors = b
+		}
+	}
+	if v, ok := fields["holdings"]; ok {
+		if b, err := json.Marshal(v); err == nil {
+			profile.Holdings = b
+		}
+	}
+	if v, ok := fields["symbolMapping"]; ok {
+		if b, err := json.Marshal(v); err == nil {
+			profile.SymbolMapping = b
+		}
+	}
+	if v, ok := fields["scraperConfiguration"]; ok {
+		if b, err := json.Marshal(v); err == nil {
+			profile.ScraperConfiguration = b
+		}
+	}
+
+	_, err = spRepo.Update(ctx, profile)
+	return err
+}
+
+// DeleteProfileData removes all market data and the symbol profile for a given
+// dataSource+symbol pair. Mirrors NestJS AdminService.deleteProfileData().
+func (s *AdminService) DeleteProfileData(ctx context.Context, dataSource, symbol string) error {
+	mdRepo := repository.NewMarketDataRepository(s.db)
+	spRepo := repository.NewSymbolProfileRepository(s.db)
+
+	if err := mdRepo.DeleteByDataSourceAndSymbol(ctx, dataSource, symbol); err != nil {
+		return fmt.Errorf("delete market data: %w", err)
+	}
+
+	if err := spRepo.DeleteByDataSourceAndSymbol(ctx, dataSource, symbol); err != nil {
+		return fmt.Errorf("delete symbol profile: %w", err)
+	}
+
+	return nil
+}

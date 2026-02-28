@@ -99,17 +99,31 @@ func GetPortfolioHolding(deps *Deps) http.HandlerFunc {
 }
 
 // PUT /portfolio/holding/:dataSource/:symbol/tags
-func HandleUpdatePortfolioHoldingTags(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
-	symbol := r.PathValue("symbol")
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+func UpdatePortfolioHoldingTags(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dataSource := r.PathValue("dataSource")
+		symbol := r.PathValue("symbol")
+		userID := auth.UserID(r)
+
+		var body struct {
+			Tags []string `json:"tags"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		if deps.OrderService == nil {
+			Error(w, http.StatusInternalServerError, "Service unavailable")
+			return
+		}
+
+		if err := deps.OrderService.UpdateTagsForHolding(r.Context(), userID, dataSource, symbol, body.Tags); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		JSON(w, http.StatusOK, map[string]any{})
 	}
-	_ = dataSource
-	_ = symbol
-	_ = body
-	JSON(w, http.StatusOK, map[string]any{})
 }
 
 // GET /portfolio/holdings

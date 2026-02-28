@@ -72,3 +72,16 @@ func (s *OrderService) DeleteOrdersByUserID(ctx context.Context, userID string) 
 	repo := repository.NewOrderRepository(s.db)
 	return repo.DeleteByUserID(ctx, userID)
 }
+
+// UpdateTagsForHolding replaces all tag associations for orders matching a
+// user's holding (by dataSource+symbol).
+func (s *OrderService) UpdateTagsForHolding(ctx context.Context, userID, dataSource, symbol string, tagIDs []string) error {
+	repo := repository.NewOrderRepository(s.db)
+
+	orderIDs, err := repo.FindIDsByUserAndSymbol(ctx, userID, dataSource, symbol)
+	if err != nil {
+		return err
+	}
+
+	return repo.ReplaceTagsForOrders(ctx, orderIDs, tagIDs)
+}

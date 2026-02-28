@@ -20,8 +20,8 @@
 // mirrors the NestJS server's behavior of starting before all providers are
 // ready, and keeps the process alive so orchestrators can detect and restart it.
 //
-// Port selection: defaults to 3334 (one above the NestJS server at 3333) so
-// both servers can run side-by-side during the parity testing phase.
+// Port selection: defaults to 3333 (same as NestJS) for production use.
+// During parity testing, the differential test runner passes GO_PORT=3334.
 package main
 
 import (
@@ -29,6 +29,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
@@ -39,9 +40,9 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// defaultPort runs one above the NestJS server (3333) so both can coexist
-// during the parity-testing phase.
-const defaultPort = "3334"
+// defaultPort matches the NestJS server for production use. During parity
+// testing, the differential test runner sets PORT=3334 explicitly.
+const defaultPort = "3333"
 
 func main() {
 	var dbCloser func() error
@@ -156,9 +157,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/gather/{dataSource}/{symbol}/{dateString}", handler.HandleGatherDataForDate)
 	mux.HandleFunc("GET /api/v1/admin/market-data", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminMarketData(deps)))
 	mux.HandleFunc("POST /api/v1/admin/market-data/{dataSource}/{symbol}/test", handler.HandleTestMarketData)
-	mux.HandleFunc("DELETE /api/v1/admin/profile-data/{dataSource}/{symbol}", handler.HandleDeleteProfileData)
-	mux.HandleFunc("PATCH /api/v1/admin/profile-data/{dataSource}/{symbol}", handler.HandleUpdateProfileData)
-	mux.HandleFunc("POST /api/v1/admin/profile-data/{dataSource}/{symbol}", handler.HandleCreateProfileData)
+	mux.HandleFunc("DELETE /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.DeleteProfileData(deps)))
+	mux.HandleFunc("PATCH /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.UpdateProfileData(deps)))
+	mux.HandleFunc("POST /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.CreateProfileData(deps)))
 	mux.HandleFunc("PUT /api/v1/admin/settings/{key}", handler.HandleUpdateAdminSetting)
 	mux.HandleFunc("GET /api/v1/admin/user", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminUsers(deps)))
 	mux.HandleFunc("GET /api/v1/admin/user/{id}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminUser(deps)))
@@ -203,8 +204,8 @@ func main() {
 
 	// Benchmarks
 	mux.HandleFunc("GET /api/v1/benchmarks", handler.GetBenchmarks(deps))
-	mux.HandleFunc("POST /api/v1/benchmarks", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleCreateBenchmark))
-	mux.HandleFunc("DELETE /api/v1/benchmarks/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleDeleteBenchmark))
+	mux.HandleFunc("POST /api/v1/benchmarks", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.CreateBenchmark(deps)))
+	mux.HandleFunc("DELETE /api/v1/benchmarks/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.DeleteBenchmark(deps)))
 	mux.HandleFunc("GET /api/v1/benchmarks/{dataSource}/{symbol}/{startDateString}", auth.Authenticate(authCfg, handler.HandleGetBenchmarkDetail))
 
 	// Cache
@@ -241,7 +242,7 @@ func main() {
 	// Market Data
 	mux.HandleFunc("GET /api/v1/market-data/markets", handler.HandleGetMarkets)
 	mux.HandleFunc("GET /api/v1/market-data/{dataSource}/{symbol}", auth.Authenticate(authCfg, handler.GetMarketData(deps)))
-	mux.HandleFunc("POST /api/v1/market-data/{dataSource}/{symbol}", handler.HandleCreateMarketData)
+	mux.HandleFunc("POST /api/v1/market-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.CreateMarketData(deps)))
 
 	// Order
 	mux.HandleFunc("DELETE /api/v1/order", auth.RequirePermission(authCfg, auth.DeleteOrder, handler.DeleteOrders(deps)))
@@ -264,7 +265,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/portfolio/details", auth.Authenticate(authCfg, handler.GetPortfolioDetails(deps)))
 	mux.HandleFunc("GET /api/v1/portfolio/dividends", auth.Authenticate(authCfg, handler.GetPortfolioDividends(deps)))
 	mux.HandleFunc("GET /api/v1/portfolio/holding/{dataSource}/{symbol}", auth.Authenticate(authCfg, handler.GetPortfolioHolding(deps)))
-	mux.HandleFunc("PUT /api/v1/portfolio/holding/{dataSource}/{symbol}/tags", auth.RequirePermission(authCfg, auth.UpdateOrder, handler.HandleUpdatePortfolioHoldingTags))
+	mux.HandleFunc("PUT /api/v1/portfolio/holding/{dataSource}/{symbol}/tags", auth.RequirePermission(authCfg, auth.UpdateOrder, handler.UpdatePortfolioHoldingTags(deps)))
 	mux.HandleFunc("GET /api/v1/portfolio/holdings", auth.Authenticate(authCfg, handler.GetPortfolioHoldings(deps)))
 	mux.HandleFunc("GET /api/v1/portfolio/investments", auth.Authenticate(authCfg, handler.GetPortfolioInvestments(deps)))
 	mux.HandleFunc("GET /api/v1/portfolio/performance", handler.GetPortfolioPerformance(deps))
@@ -305,6 +306,17 @@ func main() {
 	mux.HandleFunc("GET /api/v1/watchlist", auth.RequirePermission(authCfg, auth.ReadWatchlist, handler.GetWatchlist(deps)))
 	mux.HandleFunc("POST /api/v1/watchlist", auth.RequirePermission(authCfg, auth.CreateWatchlistItem, handler.CreateWatchlistItem(deps)))
 	mux.HandleFunc("DELETE /api/v1/watchlist/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.DeleteWatchlistItem, handler.DeleteWatchlistItem(deps)))
+
+	// Static file serving (Angular frontend)
+	// In Docker, the working directory is /ghostfolio/apps/api, so ../client
+	// resolves to /ghostfolio/apps/client where the Angular build output lives.
+	// CLIENT_DIR env var overrides for local development.
+	clientDir := os.Getenv("CLIENT_DIR")
+	if clientDir == "" {
+		clientDir = filepath.Join("..", "client")
+	}
+	staticHandler := handler.NewStaticHandler(clientDir)
+	mux.Handle("/", staticHandler)
 
 	// PHASE 5: HTTP SERVER START
 	// WHY: Explicit timeouts are set on all phases of a request lifecycle to

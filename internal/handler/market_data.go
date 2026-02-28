@@ -80,17 +80,33 @@ func GetMarketData(deps *Deps) http.HandlerFunc {
 	}
 }
 
-func HandleCreateMarketData(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
-	symbol := r.PathValue("symbol")
-	_ = dataSource
-	_ = symbol
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+func CreateMarketData(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dataSource := r.PathValue("dataSource")
+		symbol := r.PathValue("symbol")
+
+		var body struct {
+			MarketData []struct {
+				Date        string  `json:"date"`
+				MarketPrice float64 `json:"marketPrice"`
+			} `json:"marketData"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		if deps.MarketDataService == nil {
+			Error(w, http.StatusInternalServerError, "Service unavailable")
+			return
+		}
+
+		if err := deps.MarketDataService.UpdateMany(r.Context(), dataSource, symbol, body.MarketData); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		JSON(w, http.StatusCreated, map[string]any{})
 	}
-	_ = body
-	JSON(w, http.StatusCreated, map[string]any{})
 }
 
 func HandleGetMarkets(w http.ResponseWriter, r *http.Request) {

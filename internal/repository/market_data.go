@@ -49,6 +49,16 @@ func (r *MarketDataRepository) FindBySymbol(ctx context.Context, dataSource stri
 	return items, nil
 }
 
+// DeleteByDataSourceAndSymbol removes all market data rows for a given symbol.
+func (r *MarketDataRepository) DeleteByDataSourceAndSymbol(ctx context.Context, dataSource string, symbol string) error {
+	_, err := r.db.ExecContext(ctx,
+		`DELETE FROM "MarketData" WHERE "dataSource" = $1 AND symbol = $2`, dataSource, symbol)
+	if err != nil {
+		return fmt.Errorf("delete market data by symbol: %w", err)
+	}
+	return nil
+}
+
 // FindBySymbolAndDateRange returns price points for a symbol within a closed
 // date interval [from, to], ordered chronologically ascending. This ordering
 // is important for time-series calculations (TWR, MWRR) that must process

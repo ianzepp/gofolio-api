@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
@@ -56,4 +57,24 @@ func (s *MarketDataService) GetBySymbol(ctx context.Context, dataSource string, 
 		AssetProfile: profile,
 		MarketData:   marketData,
 	}, nil
+}
+
+// UpdateMany upserts a batch of market data entries for a given symbol.
+func (s *MarketDataService) UpdateMany(ctx context.Context, dataSource, symbol string, items []struct {
+	Date        string  `json:"date"`
+	MarketPrice float64 `json:"marketPrice"`
+}) error {
+	mdRepo := repository.NewMarketDataRepository(s.db)
+
+	for _, item := range items {
+		date, err := time.Parse("2006-01-02", item.Date)
+		if err != nil {
+			return fmt.Errorf("parse date %q: %w", item.Date, err)
+		}
+		if err := mdRepo.UpsertMarketPrice(ctx, dataSource, symbol, date, item.MarketPrice, model.MarketDataStateClose); err != nil {
+			return fmt.Errorf("upsert market data for %s: %w", item.Date, err)
+		}
+	}
+
+	return nil
 }

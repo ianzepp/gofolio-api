@@ -181,35 +181,75 @@ func HandleTestMarketData(w http.ResponseWriter, r *http.Request) {
 }
 
 // DELETE /admin/profile-data/:dataSource/:symbol
-func HandleDeleteProfileData(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
-	symbol := r.PathValue("symbol")
-	_ = dataSource
-	_ = symbol
-	JSON(w, http.StatusOK, map[string]any{})
+func DeleteProfileData(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dataSource := r.PathValue("dataSource")
+		symbol := r.PathValue("symbol")
+
+		if deps.AdminService == nil {
+			Error(w, http.StatusInternalServerError, "Service unavailable")
+			return
+		}
+
+		if err := deps.AdminService.DeleteProfileData(r.Context(), dataSource, symbol); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		JSON(w, http.StatusOK, map[string]any{})
+	}
 }
 
 // PATCH /admin/profile-data/:dataSource/:symbol
-func HandleUpdateProfileData(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
-	symbol := r.PathValue("symbol")
-	_ = dataSource
-	_ = symbol
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+func UpdateProfileData(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dataSource := r.PathValue("dataSource")
+		symbol := r.PathValue("symbol")
+
+		var body map[string]any
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		if deps.AdminService == nil {
+			Error(w, http.StatusInternalServerError, "Service unavailable")
+			return
+		}
+
+		if err := deps.AdminService.UpdateProfileData(r.Context(), dataSource, symbol, body); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		JSON(w, http.StatusOK, map[string]any{})
 	}
-	_ = body
-	JSON(w, http.StatusOK, map[string]any{})
 }
 
 // POST /admin/profile-data/:dataSource/:symbol
-func HandleCreateProfileData(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
-	symbol := r.PathValue("symbol")
-	_ = dataSource
-	_ = symbol
-	JSON(w, http.StatusCreated, map[string]any{})
+func CreateProfileData(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dataSource := r.PathValue("dataSource")
+		symbol := r.PathValue("symbol")
+
+		var body struct {
+			Currency string `json:"currency"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		if deps.AdminService == nil {
+			Error(w, http.StatusInternalServerError, "Service unavailable")
+			return
+		}
+
+		if err := deps.AdminService.CreateProfileData(r.Context(), dataSource, symbol, body.Currency); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		JSON(w, http.StatusCreated, map[string]any{})
+	}
 }
 
 // PUT /admin/settings/:key
