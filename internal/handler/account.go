@@ -73,13 +73,19 @@ func GetAccounts(deps *Deps) http.HandlerFunc {
 			accounts = []model.Account{}
 		}
 
-		// Legacy parity: NestJS returns wrapped response with aggregate fields.
-		// Computed fields (valueInBaseCurrency, etc.) require portfolio calculator;
-		// return zero defaults until calculator is wired.
+		totalBalance := 0.0
+		for _, account := range accounts {
+			totalBalance += account.Balance
+		}
+
+		// Legacy parity: include aggregate keys expected by client/API contract.
 		JSON(w, http.StatusOK, map[string]any{
-			"accounts":                    accounts,
-			"totalBalanceInBaseCurrency":  0,
-			"totalValueInBaseCurrency":    0,
+			"accounts":                      accounts,
+			"activitiesCount":               0,
+			"totalBalanceInBaseCurrency":    totalBalance,
+			"totalDividendInBaseCurrency":   0,
+			"totalInterestInBaseCurrency":   0,
+			"totalValueInBaseCurrency":      totalBalance,
 		})
 	}
 }

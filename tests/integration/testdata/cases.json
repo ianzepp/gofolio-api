@@ -226,5 +226,42 @@
     "mode": "status",
     "auth": "jwt:JWT_ADMIN_TOKEN",
     "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_USER_ID"]
+  },
+  {
+    "name": "user-get-json-parity",
+    "method": "GET",
+    "path": "/api/v1/user",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "LEGACY_USER_ID"],
+    "ignoreJsonPaths": [
+      "access",
+      "accounts",
+      "activitiesCount",
+      "dateOfFirstActivity",
+      "permissions",
+      "settings",
+      "systemMessage",
+      "tags",
+      "subscription"
+    ]
+  },
+  {
+    "name": "order-get-json-parity",
+    "method": "GET",
+    "path": "/api/v1/order",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "ignoreJsonPaths": ["activities"]
+  },
+  {
+    "name": "account-get-json-parity",
+    "method": "GET",
+    "path": "/api/v1/account",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "ignoreJsonPaths": ["accounts"]
   }
 ]
