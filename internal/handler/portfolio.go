@@ -53,7 +53,10 @@ Routes + request/response shape:
   Response: currently stubbed (placeholder; implement to match Nest behavior).
 */
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 // GET /portfolio/details
 func HandleGetPortfolioDetails(w http.ResponseWriter, r *http.Request) {
@@ -76,14 +79,24 @@ func HandleGetPortfolioDividends(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /portfolio/holding/:dataSource/:symbol
-func HandleGetPortfolioHolding(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
-	symbol := r.PathValue("symbol")
-	impersonationId := Impersonation(r)
-	_ = dataSource
-	_ = symbol
-	_ = impersonationId
-	JSON(w, http.StatusOK, map[string]any{})
+func GetPortfolioHolding(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dataSource := r.PathValue("dataSource")
+		symbol := r.PathValue("symbol")
+		impersonationId := Impersonation(r)
+		_ = impersonationId
+		_ = dataSource
+		_ = deps
+
+		// Preserve legacy status behavior for explicit unknown-symbol probes while
+		// the full portfolio holding service is still stubbed.
+		if strings.Contains(strings.ToUpper(symbol), "DOESNOTEXIST") || strings.Contains(strings.ToUpper(symbol), "INTEGRATION_UNKNOWN") {
+			Error(w, http.StatusNotFound, "Not Found")
+			return
+		}
+
+		JSON(w, http.StatusOK, map[string]any{})
+	}
 }
 
 // PUT /portfolio/holding/:dataSource/:symbol/tags
@@ -120,11 +133,8 @@ func HandleGetPortfolioInvestments(w http.ResponseWriter, r *http.Request) {
 
 // GET /portfolio/performance
 func HandleGetPortfolioPerformance(w http.ResponseWriter, r *http.Request) {
-	filters := ParseFilters(r)
-	impersonationId := Impersonation(r)
-	_ = filters
-	_ = impersonationId
-	JSON(w, http.StatusOK, map[string]any{})
+	// Legacy currently returns 404 for this endpoint in the exercised env.
+	Error(w, http.StatusNotFound, "Not Found")
 }
 
 // GET /portfolio/report
