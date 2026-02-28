@@ -291,6 +291,80 @@
     }
   },
   {
+    "name": "account-get-by-id-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/account/${TRANSFER_ACCOUNT_FROM_ID}",
+    "mode": "status",
+    "requiredEnv": ["TRANSFER_ACCOUNT_FROM_ID"]
+  },
+  {
+    "name": "account-get-by-id-user-ok-parity",
+    "method": "GET",
+    "path": "/api/v1/account/${TRANSFER_ACCOUNT_FROM_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"]
+  },
+  {
+    "name": "account-balances-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/account/${TRANSFER_ACCOUNT_FROM_ID}/balances",
+    "mode": "status",
+    "requiredEnv": ["TRANSFER_ACCOUNT_FROM_ID"]
+  },
+  {
+    "name": "account-balances-user-ok-parity",
+    "method": "GET",
+    "path": "/api/v1/account/${TRANSFER_ACCOUNT_FROM_ID}/balances",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"]
+  },
+  {
+    "name": "platforms-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/platforms",
+    "mode": "status"
+  },
+  {
+    "name": "platform-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/platform",
+    "mode": "status"
+  },
+  {
+    "name": "platform-create-user-forbidden-parity",
+    "method": "POST",
+    "path": "/api/v1/platform",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": {
+      "name": "integration-platform-user-denied",
+      "url": "https://example.com"
+    }
+  },
+  {
+    "name": "platform-update-user-forbidden-parity",
+    "method": "PUT",
+    "path": "/api/v1/platform/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "ADMIN_USER_ID"],
+    "body": {
+      "name": "integration-platform-update-denied",
+      "url": "https://example.com"
+    }
+  },
+  {
+    "name": "platform-delete-user-forbidden-parity",
+    "method": "DELETE",
+    "path": "/api/v1/platform/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "ADMIN_USER_ID"]
+  },
+  {
     "name": "user-get-json-parity",
     "method": "GET",
     "path": "/api/v1/user",
