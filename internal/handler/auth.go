@@ -48,7 +48,10 @@ Routes + request/response shape:
   Response: currently stubbed (placeholder; implement to match Nest behavior).
 */
 
-import "net/http"
+import (
+	"net/http"
+	"os"
+)
 
 // POST /auth/anonymous
 func HandleAuthAnonymous(w http.ResponseWriter, r *http.Request) {
@@ -69,22 +72,39 @@ func HandleGetAuthAnonymous(w http.ResponseWriter, r *http.Request) {
 
 // GET /auth/google
 func HandleGetAuthGoogle(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{})
+	http.Redirect(w, r, rootURL()+"/oauth/google", http.StatusFound)
 }
 
 // GET /auth/google/callback
 func HandleGetAuthGoogleCallback(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{})
+	jwt := r.URL.Query().Get("jwt")
+	if jwt != "" {
+		http.Redirect(w, r, rootURL()+"/"+defaultLanguageCode+"/auth/"+jwt, http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, rootURL()+"/"+defaultLanguageCode+"/auth", http.StatusFound)
 }
 
 // GET /auth/oidc
 func HandleGetAuthOidc(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{})
+	if os.Getenv("ENABLE_FEATURE_AUTH_OIDC") != "true" {
+		Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+		return
+	}
+
+	http.Redirect(w, r, rootURL()+"/oauth/oidc", http.StatusFound)
 }
 
 // GET /auth/oidc/callback
 func HandleGetAuthOidcCallback(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{})
+	jwt := r.URL.Query().Get("jwt")
+	if jwt != "" {
+		http.Redirect(w, r, rootURL()+"/"+defaultLanguageCode+"/auth/"+jwt, http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, rootURL()+"/"+defaultLanguageCode+"/auth", http.StatusFound)
 }
 
 // POST /auth/webauthn/generate-authentication-options
@@ -120,4 +140,14 @@ func HandleWebauthnVerifyAuthentication(w http.ResponseWriter, r *http.Request) 
 	}
 	_ = body // TODO: pass to service
 	JSON(w, http.StatusOK, map[string]any{})
+}
+
+const defaultLanguageCode = "en"
+
+func rootURL() string {
+	if value := os.Getenv("ROOT_URL"); value != "" {
+		return value
+	}
+
+	return "http://localhost:4200"
 }

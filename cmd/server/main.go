@@ -70,7 +70,6 @@ func main() {
 
 	// Assets (web manifest)
 	mux.HandleFunc("GET /assets/{languageCode}/site.webmanifest", handler.HandleGetWebManifest)
-	mux.HandleFunc("GET /api/v1/assets/{languageCode}/site.webmanifest", handler.HandleGetWebManifest)
 
 	// Auth
 	mux.HandleFunc("POST /api/v1/auth/anonymous", handler.HandleAuthAnonymous)
@@ -163,7 +162,6 @@ func main() {
 
 	// Sitemap
 	mux.HandleFunc("GET /sitemap.xml", handler.HandleGetSitemap)
-	mux.HandleFunc("GET /api/v1/sitemap.xml", handler.HandleGetSitemap)
 
 	// Subscription
 	mux.HandleFunc("POST /api/v1/subscription/redeem-coupon", handler.HandleRedeemCoupon)

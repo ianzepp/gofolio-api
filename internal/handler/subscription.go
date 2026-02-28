@@ -27,7 +27,7 @@ func HandleRedeemCoupon(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleGetStripeCallback(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{})
+	http.Redirect(w, r, rootURL()+"/"+defaultLanguageCode+"/account/membership", http.StatusFound)
 }
 
 func HandleCreateStripeCheckoutSession(w http.ResponseWriter, r *http.Request) {

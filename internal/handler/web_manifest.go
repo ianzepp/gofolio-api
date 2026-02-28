@@ -10,10 +10,6 @@ Routes + request/response shape:
   Request: path languageCode: string (arg: 'languageCode')
   Auth/permission: public / -
   Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/assets/{languageCode}/site.webmanifest (HandleGetWebManifest)
-  Request: path languageCode: string (arg: 'languageCode')
-  Auth/permission: public / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
 */
 
 import "net/http"

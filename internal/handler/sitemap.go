@@ -10,10 +10,6 @@ Routes + request/response shape:
   Request: no explicit request params
   Auth/permission: public / -
   Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/sitemap.xml (HandleGetSitemap)
-  Request: no explicit request params
-  Auth/permission: public / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
 */
 
 import "net/http"
