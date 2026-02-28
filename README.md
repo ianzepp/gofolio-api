@@ -33,41 +33,85 @@ Go eliminates the ceremony. No decorators, no DI containers, no module system. F
 
 ## Status
 
-**Phase 1 — Stubs** (in progress): Every route returns 200 with empty/mock JSON so the Angular frontend loads without errors.
+**Phase 1 — Stubs** (complete): Every route returns 200 with empty/mock JSON so the Angular frontend loads without errors.
+
+**Phase 2 — DB harness** (in progress): 3-layer architecture (handler → service → repository) with raw `pgx` queries. Tag endpoints are the first vertical slice wired to real DB queries.
 
 ## Architecture
 
 ```
 apps/api-go/
-  cmd/server/main.go        # Entry point, router setup
+  cmd/server/main.go        # Entry point, wiring, router setup
   internal/
+    db/                      # Pool management, DBTX interface, transaction helper
     handler/                 # HTTP handlers (one file per controller)
-    service/                 # Business logic
-    model/                   # DB structs (derived from Prisma schema)
+      deps.go                # Deps struct injected into handlers via closures
+    service/                 # Business logic, orchestration
+    repository/              # SQL queries, struct scanning
+    model/                   # Go structs with db:"column" tags, enums
     middleware/              # Auth (JWT), logging, interceptors
     calculator/              # Portfolio calculator (ROAI port)
     provider/                # Data provider integrations
 ```
 
+### Layering
+
+```
+handler/         → HTTP concerns only (parse request, call service, write response)
+  ↓
+service/         → Business logic, orchestration, transaction boundaries
+  ↓
+repository/      → SQL queries, struct scanning, transaction participation
+  ↓
+db/              → Pool management, DBTX interface, WithTx helper
+```
+
 - **Router:** Go 1.22+ stdlib (`net/http` with method+pattern routing)
-- **Database:** `pgx` (PostgreSQL driver)
-- **Cache:** `go-redis`
-- **Decimal math:** `shopspring/decimal`
+- **Database:** `pgx/v5` with `pgxpool` (raw SQL, no ORM)
+- **Scanning:** `pgx.RowToStructByName` with `db:"columnName"` struct tags
+- **Cache:** `go-redis` (planned)
+- **Decimal math:** `shopspring/decimal` (planned, deferred to calculator layer)
 - **No frameworks.** Standard library + minimal dependencies.
+
+### Dependency injection
+
+Handlers receive a `*handler.Deps` struct via closures instead of a DI container:
+
+```go
+// main.go — wire services into deps
+deps := &handler.Deps{
+    TagService:      service.NewTagService(pool),
+    AccountService:  service.NewAccountService(pool),
+    // ...
+}
+
+// Route registration — closure captures deps
+mux.HandleFunc("GET /api/v1/tags", handler.GetTags(deps))
+
+// handler/tag.go — handler is a closure factory
+func GetTags(deps *Deps) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        tags, err := deps.TagService.GetTags(r.Context())
+        // ...
+    }
+}
+```
+
+Stub handlers that aren't yet wired to services remain as plain `func(w, r)` functions. They will be converted to the closure pattern incrementally.
 
 ## Database
 
-The Go server now initializes a PostgreSQL connection pool at startup using
+### Connection pool
+
+The Go server initializes a PostgreSQL connection pool at startup using
 `pgxpool` and the existing `DATABASE_URL` value.
 
-### Current behavior
-
 - Reads `DATABASE_URL` from the environment (required)
-- Creates a shared `pgxpool` at startup
+- Creates a shared `*pgxpool.Pool` at startup
 - Performs a startup ping to fail early on invalid DB connectivity
 - Closes the pool on process shutdown
 
-Optional pool tuning env vars (all optional):
+Optional pool tuning env vars:
 
 - `DB_CONNECT_TIMEOUT` (duration, default `10s`)
 - `DB_MAX_CONNS` (default `10`)
@@ -76,12 +120,79 @@ Optional pool tuning env vars (all optional):
 - `DB_MAX_CONN_IDLE_TIME` (duration, default `15m`)
 - `DB_HEALTH_CHECK_PERIOD` (duration, default `1m`)
 
+### DBTX interface
+
+The `db.DBTX` interface abstracts over `*pgxpool.Pool` and `pgx.Tx`, so repositories work identically inside or outside a transaction:
+
+```go
+type DBTX interface {
+    Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+    Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+    QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+```
+
+### Transaction patterns
+
+Mapped from the NestJS/Prisma patterns:
+
+| NestJS Pattern                               | Go Equivalent                                             |
+| -------------------------------------------- | --------------------------------------------------------- |
+| `prisma.$transaction(async (tx) => { ... })` | `db.WithTx(ctx, pool, func(tx pgx.Tx) error { ... })`     |
+| `prisma.$transaction([p1, p2])`              | Same `WithTx` — sequential repo calls inside the callback |
+| No explicit transaction (single query)       | Repository called with pool directly (auto-commit)        |
+
+Services hold the `*pgxpool.Pool` and create repositories per call. For transactions, they use `db.WithTx` and pass the `pgx.Tx` to repository constructors:
+
+```go
+// Non-transactional — repo uses pool (auto-commit)
+func (s *TagService) GetTags(ctx context.Context) ([]model.Tag, error) {
+    repo := repository.NewTagRepository(s.pool)
+    return repo.FindAll(ctx)
+}
+
+// Transactional — repo uses tx
+func (s *AccountService) TransferBalance(ctx context.Context, req TransferRequest) error {
+    return db.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+        repo := repository.NewAccountRepository(tx)
+        if err := repo.UpdateBalance(ctx, req.FromID, req.FromUserID, -req.Amount); err != nil {
+            return err
+        }
+        return repo.UpdateBalance(ctx, req.ToID, req.ToUserID, req.Amount)
+    })
+}
+```
+
+### Models
+
+Go structs in `internal/model/` map 1:1 to the 14 Prisma models. Conventions:
+
+- `db:"columnName"` tags match PostgreSQL column names (camelCase, as Prisma preserves them)
+- Nullable DB columns → Go pointer types (`*string`, `*time.Time`)
+- `Float` in Prisma → `float64` in Go (`shopspring/decimal` deferred to calculator layer)
+- JSON columns → `json.RawMessage` (defer parsing to service layer)
+- Enums → Go `string` types with constants (e.g., `model.Role`, `model.OrderType`)
+- M:M relations (Order↔Tag) → not embedded; loaded via separate queries
+
+### Repositories
+
+Each repository is constructed with a `db.DBTX` and provides typed query methods:
+
+```go
+repo := repository.NewTagRepository(pool) // or tx
+tags, err := repo.FindAll(ctx)
+tag, err := repo.FindByID(ctx, id)
+tag, err := repo.Create(ctx, tag)
+```
+
+Scanning uses `pgx.CollectRows(rows, pgx.RowToStructByName[T])` — no manual field scanning.
+
 ### Differences vs legacy NestJS API
 
-- Legacy uses Prisma (`PrismaClient`) and its own connection/pooling behavior.
-- Legacy attempts to connect during module init and logs errors, but does not hard-fail process startup in the same way.
-- The Go server currently fail-fasts on missing `DATABASE_URL`, connection errors, or ping failures.
-- DB is currently wired at infrastructure level only; route business logic is still mostly stubbed.
+- Legacy uses Prisma (`PrismaClient`) with its own connection/pooling behavior
+- Legacy attempts to connect during module init and logs errors, but does not hard-fail process startup
+- Go server fail-fasts on missing `DATABASE_URL`, connection errors, or ping failures
+- Go uses raw SQL with `pgx` instead of Prisma's query builder — more explicit, no codegen
 
 ## Running
 

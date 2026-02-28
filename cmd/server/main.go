@@ -9,6 +9,7 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/handler"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
 )
 
 func main() {
@@ -28,6 +29,16 @@ func main() {
 	}
 
 	log.Printf("database connected")
+
+	// Wire services
+	deps := &handler.Deps{
+		AccountService:  service.NewAccountService(pool),
+		AccessService:   service.NewAccessService(pool),
+		OrderService:    service.NewOrderService(pool),
+		PlatformService: service.NewPlatformService(pool),
+		TagService:      service.NewTagService(pool),
+		UserService:     service.NewUserService(pool),
+	}
 
 	mux := http.NewServeMux()
 
@@ -194,10 +205,10 @@ func main() {
 	mux.HandleFunc("GET /api/v1/symbol/{dataSource}/{symbol}/{dateString}", handler.HandleGetSymbolByDate)
 
 	// Tags
-	mux.HandleFunc("GET /api/v1/tags", handler.HandleGetTags)
-	mux.HandleFunc("POST /api/v1/tags", handler.HandleCreateTag)
-	mux.HandleFunc("DELETE /api/v1/tags/{id}", handler.HandleDeleteTag)
-	mux.HandleFunc("PUT /api/v1/tags/{id}", handler.HandleUpdateTag)
+	mux.HandleFunc("GET /api/v1/tags", handler.GetTags(deps))
+	mux.HandleFunc("POST /api/v1/tags", handler.CreateTag(deps))
+	mux.HandleFunc("DELETE /api/v1/tags/{id}", handler.DeleteTag(deps))
+	mux.HandleFunc("PUT /api/v1/tags/{id}", handler.UpdateTag(deps))
 
 	// User
 	mux.HandleFunc("DELETE /api/v1/user", handler.HandleDeleteUser)

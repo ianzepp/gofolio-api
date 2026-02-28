@@ -1,0 +1,59 @@
+package repository
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
+	"github.com/jackc/pgx/v5"
+)
+
+type MarketDataRepository struct {
+	db db.DBTX
+}
+
+func NewMarketDataRepository(db db.DBTX) *MarketDataRepository {
+	return &MarketDataRepository{db: db}
+}
+
+const marketDataColumns = `id, "createdAt", "dataSource", date,
+	"marketPrice", state, symbol`
+
+func (r *MarketDataRepository) FindBySymbol(ctx context.Context, dataSource string, symbol string) ([]model.MarketData, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT `+marketDataColumns+`
+		 FROM "MarketData"
+		 WHERE "dataSource" = $1 AND symbol = $2
+		 ORDER BY date DESC`, dataSource, symbol)
+	if err != nil {
+		return nil, fmt.Errorf("query market data: %w", err)
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByName[model.MarketData])
+}
+
+func (r *MarketDataRepository) FindBySymbolAndDateRange(ctx context.Context, dataSource string, symbol string, from time.Time, to time.Time) ([]model.MarketData, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT `+marketDataColumns+`
+		 FROM "MarketData"
+		 WHERE "dataSource" = $1 AND symbol = $2
+		   AND date >= $3 AND date <= $4
+		 ORDER BY date ASC`, dataSource, symbol, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("query market data range: %w", err)
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByName[model.MarketData])
+}
+
+func (r *MarketDataRepository) Create(ctx context.Context, md model.MarketData) (model.MarketData, error) {
+	rows, err := r.db.Query(ctx,
+		`INSERT INTO "MarketData" (id, "dataSource", date, "marketPrice", state, symbol)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING `+marketDataColumns,
+		md.ID, md.DataSource, md.Date, md.MarketPrice, md.State, md.Symbol)
+	if err != nil {
+		return model.MarketData{}, fmt.Errorf("insert market data: %w", err)
+	}
+	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.MarketData])
+}
