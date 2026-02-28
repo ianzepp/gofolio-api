@@ -2,8 +2,8 @@ package handler
 
 import (
 	"crypto/rand"
-	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
@@ -64,19 +64,24 @@ func CreateApiKey(deps *Deps) http.HandlerFunc {
 // chars separated by dashes (e.g., "a1b2-c3d4-e5f6-..."), matching the
 // NestJS ApiKeyService format.
 func generateApiKey() (string, error) {
-	b := make([]byte, 16) // 16 bytes = 32 hex chars
+	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	hex := fmt.Sprintf("%x", b)
-	// Format as xxxx-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx
-	parts := make([]string, 8)
-	for i := 0; i < 8; i++ {
-		parts[i] = hex[i*4 : (i+1)*4]
+
+	var keyChars [32]byte
+	for i := range b {
+		keyChars[i] = alphabet[int(b[i])%len(alphabet)]
 	}
-	result := parts[0]
-	for _, p := range parts[1:] {
-		result += "-" + p
+
+	var sb strings.Builder
+	sb.Grow(39)
+	for i := 0; i < len(keyChars); i += 4 {
+		if i > 0 {
+			sb.WriteByte('-')
+		}
+		sb.Write(keyChars[i : i+4])
 	}
-	return result, nil
+	return sb.String(), nil
 }

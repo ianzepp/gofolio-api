@@ -4,6 +4,10 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"os"
+
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
 )
 
 // GetPublicPortfolio handles GET /api/v1/public/{accessId}/portfolio.
@@ -12,7 +16,7 @@ import (
 // whose owner's portfolio is then computed and returned with limited detail.
 func GetPublicPortfolio(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if deps == nil || deps.AccessService == nil || deps.PortfolioService == nil || deps.UserService == nil {
+		if deps == nil || deps.AccessService == nil || deps.PortfolioService == nil || deps.UserService == nil || deps.DB == nil {
 			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
 			return
 		}
@@ -31,6 +35,18 @@ func GetPublicPortfolio(deps *Deps) http.HandlerFunc {
 		}
 
 		ownerID := access.UserId
+		hasDetails := true
+		if os.Getenv("ENABLE_FEATURE_SUBSCRIPTION") == "true" {
+			subscriptionRepo := repository.NewSubscriptionRepository(deps.DB)
+			if _, err := subscriptionRepo.FindActiveByUserID(r.Context(), ownerID); err != nil {
+				if errors.Is(err, db.ErrNoRows) {
+					hasDetails = false
+				} else {
+					Error(w, http.StatusInternalServerError, err.Error())
+					return
+				}
+			}
+		}
 
 		// Get portfolio details (holdings map)
 		details, err := deps.PortfolioService.GetDetails(r.Context(), ownerID, "max", nil)
@@ -88,19 +104,19 @@ func GetPublicPortfolio(deps *Deps) http.HandlerFunc {
 			}
 
 			publicHoldings[symbol] = map[string]any{
-				"allocationInPercentage":                    allocation,
-				"assetClass":                                h.AssetClass,
-				"countries":                                 h.Countries,
-				"currency":                                  h.Currency,
-				"dataSource":                                h.DataSource,
-				"dateOfFirstActivity":                       h.DateOfFirstActivity,
-				"markets":                                   nil,
-				"name":                                      h.Name,
-				"netPerformancePercentWithCurrencyEffect":    netPerfPctCE,
-				"sectors":                                   h.Sectors,
-				"symbol":                                    h.Symbol,
-				"url":                                       h.URL,
-				"valueInPercentage":                         allocation,
+				"allocationInPercentage": allocation,
+				"assetClass":             h.AssetClass,
+				"countries":              h.Countries,
+				"currency":               h.Currency,
+				"dataSource":             h.DataSource,
+				"dateOfFirstActivity":    h.DateOfFirstActivity,
+				"markets":                nil,
+				"name":                   h.Name,
+				"netPerformancePercentWithCurrencyEffect": netPerfPctCE,
+				"sectors":           h.Sectors,
+				"symbol":            h.Symbol,
+				"url":               h.URL,
+				"valueInPercentage": allocation,
 			}
 		}
 
@@ -112,7 +128,7 @@ func GetPublicPortfolio(deps *Deps) http.HandlerFunc {
 		JSON(w, http.StatusOK, map[string]any{
 			"alias":            alias,
 			"createdAt":        access.CreatedAt,
-			"hasDetails":       true,
+			"hasDetails":       hasDetails,
 			"holdings":         publicHoldings,
 			"latestActivities": []any{},
 			"markets":          map[string]any{},

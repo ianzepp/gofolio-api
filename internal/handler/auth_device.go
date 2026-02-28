@@ -24,9 +24,10 @@ func DeleteAuthDevice(deps *Deps) http.HandlerFunc {
 
 		id := r.PathValue("id")
 
+		// Legacy parity: delete is keyed by device id only.
 		_, err := deps.DB.ExecContext(r.Context(),
-			`DELETE FROM "AuthDevice" WHERE id = $1 AND "userId" = $2`,
-			id, userID)
+			`DELETE FROM "AuthDevice" WHERE id = $1`,
+			id)
 		if err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
 			return

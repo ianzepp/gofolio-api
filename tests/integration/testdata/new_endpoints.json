@@ -1,0 +1,206 @@
+[
+  {
+    "name": "auth-anonymous-post-valid-json-parity",
+    "method": "POST",
+    "path": "/api/v1/auth/anonymous",
+    "mode": "json",
+    "requiredEnv": ["LEGACY_BOOTSTRAP_ACCESS_TOKEN"],
+    "body": {
+      "accessToken": "${LEGACY_BOOTSTRAP_ACCESS_TOKEN}"
+    },
+    "ignoreJsonPaths": ["authToken"]
+  },
+  {
+    "name": "auth-anonymous-post-invalid-forbidden-parity",
+    "method": "POST",
+    "path": "/api/v1/auth/anonymous",
+    "mode": "status",
+    "body": {
+      "accessToken": "integration-invalid-access-token"
+    }
+  },
+  {
+    "name": "auth-anonymous-get-valid-json-parity",
+    "method": "GET",
+    "path": "/api/v1/auth/anonymous/${LEGACY_BOOTSTRAP_ACCESS_TOKEN}",
+    "mode": "json",
+    "requiredEnv": ["LEGACY_BOOTSTRAP_ACCESS_TOKEN"],
+    "ignoreJsonPaths": ["authToken"]
+  },
+  {
+    "name": "auth-anonymous-get-invalid-forbidden-parity",
+    "method": "GET",
+    "path": "/api/v1/auth/anonymous/integration-invalid-access-token",
+    "mode": "status"
+  },
+  {
+    "name": "api-keys-post-no-auth-unauthorized",
+    "method": "POST",
+    "path": "/api/v1/api-keys",
+    "mode": "status"
+  },
+  {
+    "name": "api-keys-post-user-json-parity",
+    "method": "POST",
+    "path": "/api/v1/api-keys",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "ignoreJsonPaths": ["apiKey"]
+  },
+  {
+    "name": "ai-prompt-portfolio-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/ai/prompt/portfolio",
+    "mode": "status"
+  },
+  {
+    "name": "ai-prompt-portfolio-user-status-parity",
+    "method": "GET",
+    "path": "/api/v1/ai/prompt/portfolio",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "ai-prompt-analysis-user-status-parity",
+    "method": "GET",
+    "path": "/api/v1/ai/prompt/analysis",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "cache-flush-no-auth-unauthorized",
+    "method": "POST",
+    "path": "/api/v1/cache/flush",
+    "mode": "status"
+  },
+  {
+    "name": "cache-flush-user-forbidden-parity",
+    "method": "POST",
+    "path": "/api/v1/cache/flush",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "cache-flush-admin-status-parity",
+    "method": "POST",
+    "path": "/api/v1/cache/flush",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"]
+  },
+  {
+    "name": "auth-device-delete-no-auth-unauthorized",
+    "method": "DELETE",
+    "path": "/api/v1/auth-device/${ADMIN_USER_ID}",
+    "mode": "status",
+    "requiredEnv": ["ADMIN_USER_ID"]
+  },
+  {
+    "name": "auth-device-delete-user-status-parity",
+    "method": "DELETE",
+    "path": "/api/v1/auth-device/${AUTH_DEVICE_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "AUTH_DEVICE_ID"]
+  },
+  {
+    "name": "public-portfolio-missing-not-found-parity",
+    "method": "GET",
+    "path": "/api/v1/public/integration-missing-access-id/portfolio",
+    "mode": "status"
+  },
+  {
+    "name": "admin-queue-job-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/admin/queue/job",
+    "mode": "status"
+  },
+  {
+    "name": "admin-queue-job-get-user-forbidden-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/queue/job",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "admin-queue-job-get-admin-status-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/queue/job",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"]
+  },
+  {
+    "name": "admin-queue-job-delete-no-auth-unauthorized",
+    "method": "DELETE",
+    "path": "/api/v1/admin/queue/job",
+    "mode": "status"
+  },
+  {
+    "name": "admin-queue-job-delete-user-forbidden-parity",
+    "method": "DELETE",
+    "path": "/api/v1/admin/queue/job",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "admin-queue-job-delete-admin-status-parity",
+    "method": "DELETE",
+    "path": "/api/v1/admin/queue/job",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"]
+  },
+  {
+    "name": "admin-queue-job-id-delete-no-auth-unauthorized",
+    "method": "DELETE",
+    "path": "/api/v1/admin/queue/job/${ADMIN_USER_ID}",
+    "mode": "status",
+    "requiredEnv": ["ADMIN_USER_ID"]
+  },
+  {
+    "name": "admin-queue-job-id-delete-user-forbidden-parity",
+    "method": "DELETE",
+    "path": "/api/v1/admin/queue/job/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["ADMIN_USER_ID", "JWT_USER_TOKEN"]
+  },
+  {
+    "name": "admin-queue-job-id-delete-admin-status-parity",
+    "method": "DELETE",
+    "path": "/api/v1/admin/queue/job/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["ADMIN_USER_ID", "JWT_ADMIN_TOKEN"]
+  },
+  {
+    "name": "admin-queue-job-execute-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/admin/queue/job/${ADMIN_USER_ID}/execute",
+    "mode": "status",
+    "requiredEnv": ["ADMIN_USER_ID"]
+  },
+  {
+    "name": "admin-queue-job-execute-user-forbidden-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/queue/job/${ADMIN_USER_ID}/execute",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["ADMIN_USER_ID", "JWT_USER_TOKEN"]
+  },
+  {
+    "name": "admin-queue-job-execute-admin-status-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/queue/job/${ADMIN_USER_ID}/execute",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["ADMIN_USER_ID", "JWT_ADMIN_TOKEN"]
+  }
+]

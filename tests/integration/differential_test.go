@@ -50,7 +50,8 @@ func TestDifferentialAPI(t *testing.T) {
 		goBaseURL = "http://localhost:3334"
 	}
 
-	client := &http.Client{Timeout: 20 * time.Second}
+	// Legacy can occasionally take longer than 20s under cold-cache/seeded load.
+	client := &http.Client{Timeout: 60 * time.Second}
 	if !isReachable(client, legacyBaseURL+"/api/v1/health") || !isReachable(client, goBaseURL+"/api/v1/health") {
 		t.Skipf("differential APIs not reachable (legacy=%s go=%s)", legacyBaseURL, goBaseURL)
 	}

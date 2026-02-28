@@ -418,6 +418,18 @@ bootstrap_legacy_user() {
     export API_KEY_USER="integration-dummy-api-key"
   fi
 
+  # Bootstrap one auth-device record for delete endpoint parity.
+  if [[ -n "${resolved_database_url}" && -n "${user_id}" ]]; then
+    local auth_device_id
+    auth_device_id="$(uuidgen 2>/dev/null || true)"
+    if [[ -n "${auth_device_id}" ]]; then
+      if psql "${resolved_database_url}" -Atqc \
+        "INSERT INTO \"AuthDevice\" (id, \"createdAt\", \"credentialId\", \"credentialPublicKey\", counter, \"updatedAt\", \"userId\") VALUES ('${auth_device_id}', NOW(), decode('00','hex'), decode('00','hex'), 0, NOW(), '${user_id}');" >/dev/null 2>&1; then
+        export AUTH_DEVICE_ID="${auth_device_id}"
+      fi
+    fi
+  fi
+
   # Fallback for demo-tag parity checks when /info lacks demoAuthToken.
   if [[ -z "${JWT_DEMO_TOKEN:-}" || -z "${DEMO_USER_ID:-}" ]]; then
     bootstrap_demo_from_db || true

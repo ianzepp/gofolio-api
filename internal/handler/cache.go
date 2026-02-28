@@ -7,5 +7,6 @@ import "net/http"
 // maintains API contract compatibility with the NestJS server.
 // Auth: admin-only (accessAdminControl), enforced at the routing layer.
 func HandleFlushCache(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNoContent)
+	// NestJS @Post handlers default to 201 when no explicit HttpCode is set.
+	w.WriteHeader(http.StatusCreated)
 }
