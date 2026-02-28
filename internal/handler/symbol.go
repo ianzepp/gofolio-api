@@ -18,10 +18,13 @@ Routes + request/response shape:
 */
 
 import (
+	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
 )
 
 // GetSymbol returns a closure that handles GET /api/v1/symbol/{dataSource}/{symbol}.
@@ -35,10 +38,25 @@ func GetSymbol(deps *Deps) http.HandlerFunc {
 		dataSource := model.DataSource(r.PathValue("dataSource"))
 		symbol := r.PathValue("symbol")
 
-		includeHistorical := r.URL.Query().Get("includeHistoricalData") == "true"
+		if !isValidDataSource(dataSource) {
+			Error(w, http.StatusNotFound, http.StatusText(http.StatusNotFound))
+			return
+		}
 
-		item, err := deps.SymbolService.Get(r.Context(), dataSource, symbol, includeHistorical)
+		includeHistoricalDays := 0
+		if includeHistoricalRaw := r.URL.Query().Get("includeHistoricalData"); includeHistoricalRaw != "" {
+			includeHistoricalDays, _ = strconv.Atoi(includeHistoricalRaw)
+			if includeHistoricalDays < 0 {
+				includeHistoricalDays = 0
+			}
+		}
+
+		item, err := deps.SymbolService.Get(r.Context(), dataSource, symbol, includeHistoricalDays)
 		if err != nil {
+			if errors.Is(err, service.ErrSymbolNotFound) {
+				Error(w, http.StatusNotFound, http.StatusText(http.StatusNotFound))
+				return
+			}
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -58,6 +76,10 @@ func GetSymbolByDate(deps *Deps) http.HandlerFunc {
 		dataSource := model.DataSource(r.PathValue("dataSource"))
 		symbol := r.PathValue("symbol")
 		dateString := r.PathValue("dateString")
+		if !isValidDataSource(dataSource) {
+			Error(w, http.StatusNotFound, http.StatusText(http.StatusNotFound))
+			return
+		}
 
 		date, err := time.Parse("2006-01-02", dateString)
 		if err != nil {
@@ -72,6 +94,23 @@ func GetSymbolByDate(deps *Deps) http.HandlerFunc {
 		}
 
 		JSON(w, http.StatusOK, result)
+	}
+}
+
+func isValidDataSource(dataSource model.DataSource) bool {
+	switch dataSource {
+	case model.DataSourceAlphaVantage,
+		model.DataSourceCoinGecko,
+		model.DataSourceEODHistoricalData,
+		model.DataSourceFinancialModelingPrep,
+		model.DataSourceGhostfolio,
+		model.DataSourceGoogleSheets,
+		model.DataSourceManual,
+		model.DataSourceRapidAPI,
+		model.DataSourceYahoo:
+		return true
+	default:
+		return false
 	}
 }
 

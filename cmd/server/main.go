@@ -1,3 +1,27 @@
+// Package main is the entrypoint for the api-go server, a Go port of the
+// Ghostfolio NestJS API. It wires together infrastructure (Postgres connection
+// pool, JWT auth config) and all HTTP route handlers, then starts a
+// net/http server on the configured port (default 3334).
+//
+// Architecture overview:
+//
+//	┌─────────────────────────────────────────────────────┐
+//	│  main()                                             │
+//	│   PHASE 1: DB connection (graceful-degraded start)  │
+//	│   PHASE 2: Service layer wiring                     │
+//	│   PHASE 3: Auth config                              │
+//	│   PHASE 4: Route registration                       │
+//	│   PHASE 5: HTTP server start                        │
+//	└─────────────────────────────────────────────────────┘
+//
+// Graceful degradation: if DATABASE_URL is missing or the initial ping fails,
+// the server still starts. Handlers that receive a nil Pool will return errors
+// for database-backed requests while health checks remain available. This
+// mirrors the NestJS server's behavior of starting before all providers are
+// ready, and keeps the process alive so orchestrators can detect and restart it.
+//
+// Port selection: defaults to 3334 (one above the NestJS server at 3333) so
+// both servers can run side-by-side during the parity testing phase.
 package main
 
 import (
@@ -15,12 +39,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// defaultPort runs one above the NestJS server (3333) so both can coexist
+// during the parity-testing phase.
 const defaultPort = "3334"
 
 func main() {
 	var poolCloser func()
 	deps := &handler.Deps{}
 
+	// PHASE 1: DATABASE CONNECTION
+	// WHY: Non-fatal on startup — the server degrades gracefully so that
+	// liveness probes and health endpoints remain available even when the
+	// database is temporarily unreachable.
 	var dbPool *pgxpool.Pool
 	cfg, err := db.LoadConfigFromEnv()
 	if err != nil {
@@ -31,12 +61,18 @@ func main() {
 			log.Printf("database connection warning: %v", dbErr)
 		} else if pingErr := db.Ping(context.Background(), pool, 5*time.Second); pingErr != nil {
 			log.Printf("database ping warning: %v", pingErr)
+			// WHY: Close the pool here — a pool that cannot reach the server
+			// wastes OS file descriptors and confuses health checks downstream.
 			pool.Close()
 		} else {
 			log.Printf("database connected")
 			dbPool = pool
 			poolCloser = pool.Close
-			// Initialize data providers
+
+			// PHASE 2: SERVICE LAYER WIRING
+			// WHY: DataProviderService depends on a concrete provider list, and
+			// SymbolService depends on DataProviderService, so those two must be
+			// constructed first before the flat Deps struct is filled in.
 			yahooProvider := provider.NewYahooFinanceProvider()
 			manualProvider := provider.NewManualProvider(pool)
 			providers := []provider.DataProvider{yahooProvider, manualProvider}
@@ -44,6 +80,7 @@ func main() {
 			symbolSvc := service.NewSymbolService(pool, dataProviderSvc)
 
 			deps = &handler.Deps{
+				Pool:                  pool,
 				AccountBalanceService: service.NewAccountBalanceService(pool),
 				AccountService:        service.NewAccountService(pool),
 				AccessService:         service.NewAccessService(pool),
@@ -66,12 +103,21 @@ func main() {
 		defer poolCloser()
 	}
 
+	// PHASE 3: AUTH CONFIG
+	// WHY: authCfg holds the JWT secret and pool reference used by every
+	// auth middleware closure. Constructing it once here avoids each
+	// handler capturing the secret string independently.
 	jwtSecret := os.Getenv("JWT_SECRET_KEY")
 	if jwtSecret == "" {
 		log.Printf("warning: JWT_SECRET_KEY not set, auth will reject all requests")
 	}
 	authCfg := auth.Config{JWTSecret: jwtSecret, Pool: dbPool}
 
+	// PHASE 4: ROUTE REGISTRATION
+	// WHY: net/http ServeMux uses method+path patterns (Go 1.22+). Each route
+	// is wrapped with either auth.Authenticate (validates JWT, no permission
+	// check) or auth.RequirePermission (validates JWT + checks a specific
+	// permission string). Unprotected routes are registered directly.
 	mux := http.NewServeMux()
 
 	// Access
@@ -159,12 +205,10 @@ func main() {
 	mux.HandleFunc("POST /api/v1/cache/flush", handler.HandleFlushCache)
 
 	// Data Providers
-	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/asset-profile/{symbol}", handler.GetDataProviderAssetProfile(deps))
-	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/dividends/{symbol}", handler.GetDataProviderDividends(deps))
-	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/historical/{symbol}", handler.GetDataProviderHistorical(deps))
-	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/lookup", handler.DataProviderLookup(deps))
-	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/quotes", handler.GetDataProviderQuotes(deps))
-	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/status", handler.GetDataProviderStatus(deps))
+	mux.HandleFunc(
+		"GET /api/v1/data-providers/ghostfolio/asset-profile/{symbol}",
+		auth.RequirePermission(authCfg, auth.EnableDataProviderGhostfolio, handler.GetDataProviderAssetProfile(deps)),
+	)
 
 	// Exchange Rate
 	mux.HandleFunc("GET /api/v1/exchange-rate/{symbol}/{dateString}", handler.HandleGetExchangeRate)
@@ -256,6 +300,11 @@ func main() {
 	mux.HandleFunc("POST /api/v1/watchlist", auth.RequirePermission(authCfg, auth.CreateWatchlistItem, handler.HandleCreateWatchlistItem))
 	mux.HandleFunc("DELETE /api/v1/watchlist/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.DeleteWatchlistItem, handler.HandleDeleteWatchlistItem))
 
+	// PHASE 5: HTTP SERVER START
+	// WHY: Explicit timeouts are set on all phases of a request lifecycle to
+	// prevent slow-client attacks and runaway queries from exhausting goroutines.
+	// ReadHeaderTimeout is intentionally shorter than ReadTimeout to stop
+	// header-smuggling probes quickly.
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = defaultPort

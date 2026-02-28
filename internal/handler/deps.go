@@ -1,9 +1,26 @@
 package handler
 
-import "github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
+import (
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
 
-// Deps holds service dependencies injected into handlers.
+// Deps is the dependency container passed to every handler factory function.
+// It is constructed once in main() and shared (read-only) across all request
+// goroutines — all fields must be safe for concurrent use.
+//
+// WHY a single struct rather than per-handler injection: The NestJS codebase
+// uses Angular-style module-scoped dependency injection, which naturally groups
+// all services at the module level. A flat Deps struct approximates that
+// structure without introducing a DI framework, keeping handler factories
+// simple (func GetOrders(deps *Deps) http.HandlerFunc).
+//
+// Pool is exposed directly alongside the typed services because some handlers
+// need ad-hoc queries or transactions that do not belong in a specific service.
+// It may be nil if the server started without a reachable database — callers
+// must guard against this.
 type Deps struct {
+	Pool                  *pgxpool.Pool
 	AccountBalanceService *service.AccountBalanceService
 	AccountService        *service.AccountService
 	AccessService         *service.AccessService

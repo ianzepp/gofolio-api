@@ -21,12 +21,17 @@ Routes + request/response shape:
 */
 
 import (
+	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/provider"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
+	"github.com/jackc/pgx/v5"
 )
 
 // GetDataProviderAssetProfile returns a handler for GET /api/v1/data-providers/ghostfolio/asset-profile/{symbol}.
@@ -74,16 +79,7 @@ func GetDataProviderDividends(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Convert map to sorted array
-		items := make([]map[string]any, 0, len(dividends))
-		for date, div := range dividends {
-			items = append(items, map[string]any{
-				"date":        date,
-				"marketPrice": div.MarketPrice,
-			})
-		}
-
-		JSON(w, http.StatusOK, map[string]any{"dividends": items})
+		JSON(w, http.StatusOK, map[string]any{"dividends": dividends})
 	}
 }
 
@@ -109,15 +105,9 @@ func GetDataProviderHistorical(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Convert to array
-		data := make([]map[string]any, 0)
+		data := map[string]provider.HistoricalResponse{}
 		if h, ok := historical[symbol]; ok {
-			for date, point := range h {
-				data = append(data, map[string]any{
-					"date":        date,
-					"marketPrice": point.MarketPrice,
-				})
-			}
+			data = h
 		}
 
 		JSON(w, http.StatusOK, map[string]any{"historicalData": data})
@@ -133,7 +123,7 @@ func DataProviderLookup(deps *Deps) http.HandlerFunc {
 		}
 
 		query := r.URL.Query().Get("query")
-		if query == "" {
+		if query == "" || len(strings.TrimSpace(query)) < 2 {
 			JSON(w, http.StatusOK, map[string]any{"items": []any{}})
 			return
 		}
@@ -191,14 +181,43 @@ func GetDataProviderStatus(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Return provider info for all registered providers
-		p, ok := deps.DataProviderService.GetProvider(model.DataSourceYahoo)
-		if !ok {
-			JSON(w, http.StatusOK, map[string]any{})
+		authInfo := auth.GetAuthInfo(r.Context())
+		if authInfo == nil || authInfo.UserID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
 			return
 		}
 
-		JSON(w, http.StatusOK, p.GetDataProviderInfo())
+		dailyRequests := 0
+		dailyRequestsMax := 0
+		subscription := map[string]any{"type": "Basic"}
+
+		if deps.Pool != nil {
+			analyticsRepo := repository.NewAnalyticsRepository(deps.Pool)
+			if analytics, err := analyticsRepo.FindByUserID(r.Context(), authInfo.UserID); err == nil {
+				dailyRequests = analytics.DataProviderGhostfolioDailyRequests
+			}
+
+			propRepo := repository.NewPropertyRepository(deps.Pool)
+			if prop, err := propRepo.FindByKey(r.Context(), "DATA_SOURCES_GHOSTFOLIO_DATA_PROVIDER_MAX_REQUESTS"); err == nil {
+				if parsed, parseErr := strconv.Atoi(strings.TrimSpace(prop.Value)); parseErr == nil {
+					dailyRequestsMax = parsed
+				}
+			}
+
+			subscriptionRepo := repository.NewSubscriptionRepository(deps.Pool)
+			if _, err := subscriptionRepo.FindActiveByUserID(r.Context(), authInfo.UserID); err == nil {
+				subscription = map[string]any{"type": "Premium"}
+			} else if err != nil && !isNotFoundError(err) {
+				Error(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
+
+		JSON(w, http.StatusOK, map[string]any{
+			"dailyRequests":    dailyRequests,
+			"dailyRequestsMax": dailyRequestsMax,
+			"subscription":     subscription,
+		})
 	}
 }
 
@@ -212,4 +231,8 @@ func parseQueryTime(r *http.Request, key string, defaultVal time.Time) time.Time
 		return defaultVal
 	}
 	return t
+}
+
+func isNotFoundError(err error) bool {
+	return errors.Is(err, pgx.ErrNoRows)
 }
