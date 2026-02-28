@@ -55,13 +55,44 @@ apps/api-go/
 - **Decimal math:** `shopspring/decimal`
 - **No frameworks.** Standard library + minimal dependencies.
 
+## Database
+
+The Go server now initializes a PostgreSQL connection pool at startup using
+`pgxpool` and the existing `DATABASE_URL` value.
+
+### Current behavior
+
+- Reads `DATABASE_URL` from the environment (required)
+- Creates a shared `pgxpool` at startup
+- Performs a startup ping to fail early on invalid DB connectivity
+- Closes the pool on process shutdown
+
+Optional pool tuning env vars (all optional):
+
+- `DB_CONNECT_TIMEOUT` (duration, default `10s`)
+- `DB_MAX_CONNS` (default `10`)
+- `DB_MIN_CONNS` (default `1`)
+- `DB_MAX_CONN_LIFETIME` (duration, default `1h`)
+- `DB_MAX_CONN_IDLE_TIME` (duration, default `15m`)
+- `DB_HEALTH_CHECK_PERIOD` (duration, default `1m`)
+
+### Differences vs legacy NestJS API
+
+- Legacy uses Prisma (`PrismaClient`) and its own connection/pooling behavior.
+- Legacy attempts to connect during module init and logs errors, but does not hard-fail process startup in the same way.
+- The Go server currently fail-fasts on missing `DATABASE_URL`, connection errors, or ping failures.
+- DB is currently wired at infrastructure level only; route business logic is still mostly stubbed.
+
 ## Running
 
 ```bash
 cd apps/api-go
+export DATABASE_URL="postgresql://user:password@localhost:5432/ghostfolio?sslmode=prefer"
 go run ./cmd/server
 # Listens on :3333 — same port as the NestJS backend
 ```
+
+Startup now opens a PostgreSQL connection pool via `pgxpool` and fails fast if DB connect/ping fails.
 
 ## Testing
 

@@ -1,14 +1,34 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/handler"
 )
 
 func main() {
+	cfg, err := db.LoadConfigFromEnv()
+	if err != nil {
+		log.Fatalf("database config error: %v", err)
+	}
+
+	pool, err := db.Open(context.Background(), cfg)
+	if err != nil {
+		log.Fatalf("database connection error: %v", err)
+	}
+	defer pool.Close()
+
+	if err := db.Ping(context.Background(), pool, 5*time.Second); err != nil {
+		log.Fatalf("database ping error: %v", err)
+	}
+
+	log.Printf("database connected")
+
 	mux := http.NewServeMux()
 
 	// Access
