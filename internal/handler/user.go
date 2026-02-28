@@ -204,7 +204,18 @@ func DeleteUserById(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		currentUserID := auth.UserID(r)
+		if currentUserID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
 		id := r.PathValue("id")
+		if id == currentUserID {
+			// Legacy parity: delete-by-id cannot target self.
+			Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+			return
+		}
 		if err := deps.UserService.DeleteUser(r.Context(), id); err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
 			return

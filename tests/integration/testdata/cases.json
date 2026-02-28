@@ -385,6 +385,82 @@
     "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_USER_ID"]
   },
   {
+    "name": "watchlist-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/watchlist",
+    "mode": "status"
+  },
+  {
+    "name": "watchlist-post-no-auth-unauthorized",
+    "method": "POST",
+    "path": "/api/v1/watchlist",
+    "mode": "status",
+    "body": {
+      "dataSource": "YAHOO",
+      "symbol": "AAPL"
+    }
+  },
+  {
+    "name": "watchlist-delete-no-auth-unauthorized",
+    "method": "DELETE",
+    "path": "/api/v1/watchlist/YAHOO/AAPL",
+    "mode": "status"
+  },
+  {
+    "name": "symbol-lookup-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/symbol/lookup?query=apple",
+    "mode": "status"
+  },
+  {
+    "name": "symbol-by-date-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/symbol/YAHOO/AAPL/2024-01-01",
+    "mode": "status"
+  },
+  {
+    "name": "benchmarks-post-no-auth-unauthorized",
+    "method": "POST",
+    "path": "/api/v1/benchmarks",
+    "mode": "status",
+    "body": {
+      "dataSource": "YAHOO",
+      "symbol": "AAPL"
+    }
+  },
+  {
+    "name": "benchmarks-post-user-forbidden-parity",
+    "method": "POST",
+    "path": "/api/v1/benchmarks",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": {
+      "dataSource": "YAHOO",
+      "symbol": "AAPL"
+    }
+  },
+  {
+    "name": "benchmarks-delete-no-auth-unauthorized",
+    "method": "DELETE",
+    "path": "/api/v1/benchmarks/YAHOO/AAPL",
+    "mode": "status"
+  },
+  {
+    "name": "benchmarks-detail-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/benchmarks/YAHOO/AAPL/2024-01-01",
+    "mode": "status"
+  },
+  {
+    "name": "user-delete-self-by-id-admin-forbidden-parity",
+    "method": "DELETE",
+    "path": "/api/v1/user/${ADMIN_DB_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_DB_USER_ID"]
+  },
+  {
     "name": "user-get-json-parity",
     "method": "GET",
     "path": "/api/v1/user",

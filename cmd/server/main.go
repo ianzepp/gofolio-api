@@ -134,9 +134,9 @@ func main() {
 
 	// Benchmarks
 	mux.HandleFunc("GET /api/v1/benchmarks", handler.HandleGetBenchmarks)
-	mux.HandleFunc("POST /api/v1/benchmarks", handler.HandleCreateBenchmark)
-	mux.HandleFunc("DELETE /api/v1/benchmarks/{dataSource}/{symbol}", handler.HandleDeleteBenchmark)
-	mux.HandleFunc("GET /api/v1/benchmarks/{dataSource}/{symbol}/{startDateString}", handler.HandleGetBenchmarkDetail)
+	mux.HandleFunc("POST /api/v1/benchmarks", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleCreateBenchmark))
+	mux.HandleFunc("DELETE /api/v1/benchmarks/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleDeleteBenchmark))
+	mux.HandleFunc("GET /api/v1/benchmarks/{dataSource}/{symbol}/{startDateString}", auth.Authenticate(authCfg, handler.HandleGetBenchmarkDetail))
 
 	// Cache
 	mux.HandleFunc("POST /api/v1/cache/flush", handler.HandleFlushCache)
@@ -215,9 +215,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/subscription/stripe/checkout-session", handler.HandleCreateStripeCheckoutSession)
 
 	// Symbol
-	mux.HandleFunc("GET /api/v1/symbol/lookup", handler.HandleSymbolLookup)
+	mux.HandleFunc("GET /api/v1/symbol/lookup", auth.Authenticate(authCfg, handler.HandleSymbolLookup))
 	mux.HandleFunc("GET /api/v1/symbol/{dataSource}/{symbol}", handler.HandleGetSymbol)
-	mux.HandleFunc("GET /api/v1/symbol/{dataSource}/{symbol}/{dateString}", handler.HandleGetSymbolByDate)
+	mux.HandleFunc("GET /api/v1/symbol/{dataSource}/{symbol}/{dateString}", auth.Authenticate(authCfg, handler.HandleGetSymbolByDate))
 
 	// Tags
 	mux.HandleFunc("GET /api/v1/tags", auth.RequirePermission(authCfg, auth.ReadTags, handler.GetTags(deps)))
@@ -235,9 +235,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/user/{id}/access-token", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.CreateUserAccessTokenById(deps)))
 
 	// Watchlist
-	mux.HandleFunc("GET /api/v1/watchlist", handler.HandleGetWatchlist)
-	mux.HandleFunc("POST /api/v1/watchlist", handler.HandleCreateWatchlistItem)
-	mux.HandleFunc("DELETE /api/v1/watchlist/{dataSource}/{symbol}", handler.HandleDeleteWatchlistItem)
+	mux.HandleFunc("GET /api/v1/watchlist", auth.RequirePermission(authCfg, auth.ReadWatchlist, handler.HandleGetWatchlist))
+	mux.HandleFunc("POST /api/v1/watchlist", auth.RequirePermission(authCfg, auth.CreateWatchlistItem, handler.HandleCreateWatchlistItem))
+	mux.HandleFunc("DELETE /api/v1/watchlist/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.DeleteWatchlistItem, handler.HandleDeleteWatchlistItem))
 
 	port := os.Getenv("PORT")
 	if port == "" {
