@@ -649,26 +649,12 @@ func (s *PortfolioService) GetInvestments(ctx context.Context, userID string, da
 }
 
 // GetHolding returns a single holding detail.
+// The response shape matches the legacy NestJS PortfolioHoldingResponse exactly:
+// top-level scalar fields + a nested SymbolProfile object (capital S key).
 func (s *PortfolioService) GetHolding(ctx context.Context, userID string, dataSource string, symbol string) (*PortfolioHoldingDetailResponse, error) {
 	calc, baseCurrency, err := s.buildCalculator(ctx, userID, nil)
 	if err != nil {
 		return nil, err
-	}
-
-	// Build profile lookup from calculator activities
-	profileMap := map[string]symbolProfileInfo{}
-	for _, a := range calc.GetActivities() {
-		key := assetKey(a.DataSource, a.Symbol)
-		if _, ok := profileMap[key]; !ok {
-			profileMap[key] = symbolProfileInfo{
-				Name:          a.Name,
-				AssetClass:    a.AssetClass,
-				AssetSubClass: a.AssetSubClass,
-				URL:           a.URL,
-				Countries:     a.Countries,
-				Sectors:       a.Sectors,
-			}
-		}
 	}
 
 	snapshot, err := s.computeSnapshot(ctx, calc, baseCurrency)
@@ -689,54 +675,76 @@ func (s *PortfolioService) GetHolding(ctx context.Context, userID string, dataSo
 		return nil, nil // not found
 	}
 
-	// Enrich with profile data
-	displayName := found.Symbol
-	var assetClass, assetSubClass, url *string
-	countries := []any{}
-	sectors := []any{}
-	if info, ok := profileMap[assetKey(found.DataSource, found.Symbol)]; ok {
-		if info.Name != "" {
-			displayName = info.Name
-		}
-		if info.AssetClass != "" {
-			assetClass = &info.AssetClass
-		}
-		if info.AssetSubClass != "" {
-			assetSubClass = &info.AssetSubClass
-		}
-		if info.URL != "" {
-			url = &info.URL
-		}
-		if len(info.Countries) > 0 {
-			countries = info.Countries
-		}
-		if len(info.Sectors) > 0 {
-			sectors = info.Sectors
-		}
+	// Load SymbolProfile from DB to build the nested object
+	repo := repository.NewSymbolProfileRepository(s.db)
+	profile, err := repo.FindByDataSourceAndSymbol(ctx, dataSource, symbol)
+	if err != nil {
+		return nil, fmt.Errorf("load symbol profile for holding: %w", err)
+	}
+
+	// Build the nested SymbolProfile matching legacy EnhancedSymbolProfile
+	var assetClass, assetSubClass *string
+	if profile.AssetClass != nil {
+		ac := string(*profile.AssetClass)
+		assetClass = &ac
+	}
+	if profile.AssetSubClass != nil {
+		asc := string(*profile.AssetSubClass)
+		assetSubClass = &asc
+	}
+
+	var currency *string
+	if profile.Currency != "" {
+		currency = &profile.Currency
+	}
+
+	symProfile := &HoldingSymbolProfile{
+		ActivitiesCount: found.ActivitiesCount,
+		AssetClass:      assetClass,
+		AssetSubClass:   assetSubClass,
+		Comment:         profile.Comment,
+		Countries:       ensureJSONArray(profile.Countries),
+		CreatedAt:       profile.CreatedAt.Format("2006-01-02T15:04:05.000Z"),
+		Currency:        currency,
+		Cusip:           profile.Cusip,
+		DataSource:      string(profile.DataSource),
+		Figi:            profile.Figi,
+		FigiComposite:   profile.FigiComposite,
+		FigiShareClass:  profile.FigiShareClass,
+		Holdings:        ensureJSONArray(profile.Holdings),
+		ID:              profile.ID,
+		IsActive:        profile.IsActive,
+		Isin:            profile.Isin,
+		Name:            profile.Name,
+		Sectors:         ensureJSONArray(profile.Sectors),
+		Symbol:          profile.Symbol,
+		SymbolMapping:   ensureJSONObject(profile.SymbolMapping),
+		UpdatedAt:       profile.UpdatedAt.Format("2006-01-02T15:04:05.000Z"),
+		URL:             profile.Url,
 	}
 
 	resp := &PortfolioHoldingDetailResponse{
-		ActivitiesCount:        found.ActivitiesCount,
-		AssetClass:             assetClass,
-		AssetSubClass:          assetSubClass,
-		AveragePrice:           found.AveragePrice.InexactFloat64(),
-		Countries:              countries,
-		Currency:               found.Currency,
-		DataSource:             found.DataSource,
-		DateOfFirstActivity:    found.DateOfFirstActivity,
-		DividendInBaseCurrency: found.DividendInBaseCurrency.InexactFloat64(),
-		FeeInBaseCurrency:      found.FeeInBaseCurrency.InexactFloat64(),
-		HistoricalData:         []map[string]any{},
-		Holdings:               []any{},
-		Investment:             found.Investment.InexactFloat64(),
-		MarketPrice:            found.MarketPrice,
-		Name:                   displayName,
-		Quantity:               found.Quantity.InexactFloat64(),
-		Sectors:                sectors,
-		Symbol:                 found.Symbol,
-		Tags:                   tagsToAny(found.Tags),
-		URL:                    url,
-		ValueInBaseCurrency:    found.ValueInBaseCurrency.InexactFloat64(),
+		ActivitiesCount:                            found.ActivitiesCount,
+		AveragePrice:                               found.AveragePrice.InexactFloat64(),
+		DateOfFirstActivity:                        found.DateOfFirstActivity,
+		DividendInBaseCurrency:                     found.DividendInBaseCurrency.InexactFloat64(),
+		DividendYieldPercent:                       0,
+		DividendYieldPercentWithCurrencyEffect:     0,
+		FeeInBaseCurrency:                          found.FeeInBaseCurrency.InexactFloat64(),
+		HistoricalData:                             []map[string]any{},
+		InvestmentInBaseCurrencyWithCurrencyEffect: found.InvestmentWithCurrencyEffect.InexactFloat64(),
+		MarketPrice:                                found.MarketPrice,
+		MarketPriceMax:                             found.MarketPrice,
+		MarketPriceMin:                             found.MarketPrice,
+		Quantity:                                   found.Quantity.InexactFloat64(),
+		SymbolProfile:                              symProfile,
+		Tags:                                       tagsToAny(found.Tags),
+		Value:                                      found.ValueInBaseCurrency.InexactFloat64(),
+		Performances: &HoldingPerformances{
+			AllTimeHigh: HoldingAllTimeHigh{
+				PerformancePercent: 0,
+			},
+		},
 	}
 
 	if found.GrossPerformance != nil {
@@ -790,4 +798,20 @@ func tagsToAny(tags []calculator.Tag) []any {
 		result[i] = map[string]string{"id": t.ID, "name": t.Name}
 	}
 	return result
+}
+
+// ensureJSONArray returns the raw JSON if non-nil and non-empty, otherwise []byte("[]").
+func ensureJSONArray(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return json.RawMessage("[]")
+	}
+	return raw
+}
+
+// ensureJSONObject returns the raw JSON if non-nil and non-empty, otherwise []byte("{}").
+func ensureJSONObject(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return json.RawMessage("{}")
+	}
+	return raw
 }

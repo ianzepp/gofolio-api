@@ -1,5 +1,7 @@
 package service
 
+import "encoding/json"
+
 // PortfolioFilter holds parsed filter criteria for portfolio queries.
 // Empty slices / zero-value strings mean "no filter" (include everything).
 type PortfolioFilter struct {
@@ -133,34 +135,78 @@ type PortfolioReportResponse struct {
 }
 
 // PortfolioHoldingDetailResponse is the JSON shape for GET /portfolio/holding/:ds/:sym.
+// This matches the legacy NestJS PortfolioHoldingResponse interface exactly.
 type PortfolioHoldingDetailResponse struct {
-	ActivitiesCount                           int              `json:"activitiesCount"`
-	AssetClass                                *string          `json:"assetClass"`
-	AssetSubClass                             *string          `json:"assetSubClass"`
-	AveragePrice                              float64          `json:"averagePrice"`
-	Countries                                 []any            `json:"countries"`
-	Currency                                  string           `json:"currency"`
-	DataSource                                string           `json:"dataSource"`
-	DateOfFirstActivity                       string           `json:"dateOfFirstActivity"`
-	DividendInBaseCurrency                    float64          `json:"dividendInBaseCurrency"`
-	FeeInBaseCurrency                         float64          `json:"feeInBaseCurrency"`
-	GrossPerformance                          *float64         `json:"grossPerformance"`
-	GrossPerformancePercent                   *float64         `json:"grossPerformancePercent"`
-	GrossPerformancePercentWithCurrencyEffect *float64         `json:"grossPerformancePercentWithCurrencyEffect"`
-	GrossPerformanceWithCurrencyEffect        *float64         `json:"grossPerformanceWithCurrencyEffect"`
-	HistoricalData                            []map[string]any `json:"historicalData"`
-	Holdings                                  []any            `json:"holdings"`
-	Investment                                float64          `json:"investment"`
-	MarketPrice                               float64          `json:"marketPrice"`
-	Name                                      string           `json:"name"`
-	NetPerformance                            *float64         `json:"netPerformance"`
-	NetPerformancePercent                     *float64         `json:"netPerformancePercent"`
-	NetPerformancePercentWithCurrencyEffect   *float64         `json:"netPerformancePercentWithCurrencyEffect"`
-	NetPerformanceWithCurrencyEffect          *float64         `json:"netPerformanceWithCurrencyEffect"`
-	Quantity                                  float64          `json:"quantity"`
-	Sectors                                   []any            `json:"sectors"`
-	Symbol                                    string           `json:"symbol"`
-	Tags                                      []any            `json:"tags"`
-	URL                                       *string          `json:"url"`
-	ValueInBaseCurrency                       float64          `json:"valueInBaseCurrency"`
+	ActivitiesCount                           int                          `json:"activitiesCount"`
+	AveragePrice                              float64                      `json:"averagePrice"`
+	DataProviderInfo                          *HoldingDataProviderInfo     `json:"dataProviderInfo"`
+	DateOfFirstActivity                       string                       `json:"dateOfFirstActivity"`
+	DividendInBaseCurrency                    float64                      `json:"dividendInBaseCurrency"`
+	DividendYieldPercent                      float64                      `json:"dividendYieldPercent"`
+	DividendYieldPercentWithCurrencyEffect    float64                      `json:"dividendYieldPercentWithCurrencyEffect"`
+	FeeInBaseCurrency                         float64                      `json:"feeInBaseCurrency"`
+	GrossPerformance                          *float64                     `json:"grossPerformance"`
+	GrossPerformancePercent                   *float64                     `json:"grossPerformancePercent"`
+	GrossPerformancePercentWithCurrencyEffect *float64                     `json:"grossPerformancePercentWithCurrencyEffect"`
+	GrossPerformanceWithCurrencyEffect        *float64                     `json:"grossPerformanceWithCurrencyEffect"`
+	HistoricalData                            []map[string]any             `json:"historicalData"`
+	InvestmentInBaseCurrencyWithCurrencyEffect float64                     `json:"investmentInBaseCurrencyWithCurrencyEffect"`
+	MarketPrice                               float64                      `json:"marketPrice"`
+	MarketPriceMax                            float64                      `json:"marketPriceMax"`
+	MarketPriceMin                            float64                      `json:"marketPriceMin"`
+	NetPerformance                            *float64                     `json:"netPerformance"`
+	NetPerformancePercent                     *float64                     `json:"netPerformancePercent"`
+	NetPerformancePercentWithCurrencyEffect   *float64                     `json:"netPerformancePercentWithCurrencyEffect"`
+	NetPerformanceWithCurrencyEffect          *float64                     `json:"netPerformanceWithCurrencyEffect"`
+	Performances                              *HoldingPerformances         `json:"performances"`
+	Quantity                                  float64                      `json:"quantity"`
+	SymbolProfile                             *HoldingSymbolProfile        `json:"SymbolProfile"`
+	Tags                                      []any                        `json:"tags"`
+	Value                                     float64                      `json:"value"`
+}
+
+// HoldingDataProviderInfo mirrors the legacy DataProviderInfo interface.
+type HoldingDataProviderInfo struct {
+	DataSource *string `json:"dataSource,omitempty"`
+	IsPremium  bool    `json:"isPremium"`
+	Name       *string `json:"name,omitempty"`
+	URL        *string `json:"url,omitempty"`
+}
+
+// HoldingPerformances mirrors the legacy Benchmark['performances'] shape.
+type HoldingPerformances struct {
+	AllTimeHigh HoldingAllTimeHigh `json:"allTimeHigh"`
+}
+
+// HoldingAllTimeHigh is the all-time-high sub-object in performances.
+type HoldingAllTimeHigh struct {
+	Date             *string  `json:"date"`
+	PerformancePercent float64 `json:"performancePercent"`
+}
+
+// HoldingSymbolProfile is the nested SymbolProfile in the holding detail response.
+// Matches the legacy EnhancedSymbolProfile interface.
+type HoldingSymbolProfile struct {
+	ActivitiesCount int             `json:"activitiesCount"`
+	AssetClass      *string         `json:"assetClass"`
+	AssetSubClass   *string         `json:"assetSubClass"`
+	Comment         *string         `json:"comment"`
+	Countries       json.RawMessage `json:"countries"`
+	CreatedAt       string          `json:"createdAt"`
+	Currency        *string         `json:"currency"`
+	Cusip           *string         `json:"cusip"`
+	DataSource      string          `json:"dataSource"`
+	Figi            *string         `json:"figi"`
+	FigiComposite   *string         `json:"figiComposite"`
+	FigiShareClass  *string         `json:"figiShareClass"`
+	Holdings        json.RawMessage `json:"holdings"`
+	ID              string          `json:"id"`
+	IsActive        bool            `json:"isActive"`
+	Isin            *string         `json:"isin"`
+	Name            *string         `json:"name"`
+	Sectors         json.RawMessage `json:"sectors"`
+	Symbol          string          `json:"symbol"`
+	SymbolMapping   json.RawMessage `json:"symbolMapping"`
+	UpdatedAt       string          `json:"updatedAt"`
+	URL             *string         `json:"url"`
 }
