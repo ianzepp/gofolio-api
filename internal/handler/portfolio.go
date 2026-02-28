@@ -5,13 +5,26 @@ import (
 	"strings"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
 )
+
+// filtersToPortfolioFilter converts handler.Filters to service.PortfolioFilter.
+func filtersToPortfolioFilter(f Filters) *service.PortfolioFilter {
+	return &service.PortfolioFilter{
+		AccountIDs:   f.Accounts,
+		AssetClasses: f.AssetClasses,
+		DataSource:   f.DataSource,
+		Symbol:       f.Symbol,
+		Tags:         f.Tags,
+	}
+}
 
 // GET /portfolio/details
 func GetPortfolioDetails(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := resolveUserID(r)
-		dateRange := r.URL.Query().Get("range")
+		filters := ParseFilters(r)
+		dateRange := filters.Range
 		if dateRange == "" {
 			dateRange = "max"
 		}
@@ -21,7 +34,7 @@ func GetPortfolioDetails(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		result, err := deps.PortfolioService.GetDetails(r.Context(), userID, dateRange)
+		result, err := deps.PortfolioService.GetDetails(r.Context(), userID, dateRange, filtersToPortfolioFilter(filters))
 		if err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
@@ -34,7 +47,8 @@ func GetPortfolioDetails(deps *Deps) http.HandlerFunc {
 func GetPortfolioDividends(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := resolveUserID(r)
-		dateRange := r.URL.Query().Get("range")
+		filters := ParseFilters(r)
+		dateRange := filters.Range
 		if dateRange == "" {
 			dateRange = "max"
 		}
@@ -45,7 +59,7 @@ func GetPortfolioDividends(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		result, err := deps.PortfolioService.GetDividends(r.Context(), userID, dateRange, groupBy)
+		result, err := deps.PortfolioService.GetDividends(r.Context(), userID, dateRange, groupBy, filtersToPortfolioFilter(filters))
 		if err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
@@ -102,7 +116,8 @@ func HandleUpdatePortfolioHoldingTags(w http.ResponseWriter, r *http.Request) {
 func GetPortfolioHoldings(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := resolveUserID(r)
-		dateRange := r.URL.Query().Get("range")
+		filters := ParseFilters(r)
+		dateRange := filters.Range
 		if dateRange == "" {
 			dateRange = "max"
 		}
@@ -112,7 +127,7 @@ func GetPortfolioHoldings(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		result, err := deps.PortfolioService.GetHoldings(r.Context(), userID, dateRange)
+		result, err := deps.PortfolioService.GetHoldings(r.Context(), userID, dateRange, filtersToPortfolioFilter(filters))
 		if err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
@@ -125,7 +140,8 @@ func GetPortfolioHoldings(deps *Deps) http.HandlerFunc {
 func GetPortfolioInvestments(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := resolveUserID(r)
-		dateRange := r.URL.Query().Get("range")
+		filters := ParseFilters(r)
+		dateRange := filters.Range
 		if dateRange == "" {
 			dateRange = "max"
 		}
@@ -136,7 +152,7 @@ func GetPortfolioInvestments(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		result, err := deps.PortfolioService.GetInvestments(r.Context(), userID, dateRange, groupBy)
+		result, err := deps.PortfolioService.GetInvestments(r.Context(), userID, dateRange, groupBy, filtersToPortfolioFilter(filters))
 		if err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
@@ -149,7 +165,8 @@ func GetPortfolioInvestments(deps *Deps) http.HandlerFunc {
 func GetPortfolioPerformance(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := resolveUserID(r)
-		dateRange := r.URL.Query().Get("range")
+		filters := ParseFilters(r)
+		dateRange := filters.Range
 		if dateRange == "" {
 			dateRange = "max"
 		}
@@ -163,7 +180,7 @@ func GetPortfolioPerformance(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		result, err := deps.PortfolioService.GetPerformance(r.Context(), userID, dateRange)
+		result, err := deps.PortfolioService.GetPerformance(r.Context(), userID, dateRange, filtersToPortfolioFilter(filters))
 		if err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
 			return

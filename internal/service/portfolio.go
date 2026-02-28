@@ -30,7 +30,9 @@ func NewPortfolioService(db *sqlx.DB, exchangeRate *ExchangeRateService, userSer
 }
 
 // buildCalculator creates a calculator from the user's orders and account balances.
-func (s *PortfolioService) buildCalculator(ctx context.Context, userID string) (*calculator.Calculator, string, error) {
+// When filters is non-nil and non-empty, activities are filtered before being
+// passed to the calculator so that the snapshot reflects only matching orders.
+func (s *PortfolioService) buildCalculator(ctx context.Context, userID string, filters *PortfolioFilter) (*calculator.Calculator, string, error) {
 	// Get user settings for base currency
 	baseCurrency := "USD"
 	settings, err := s.userService.GetSettings(ctx, userID)
@@ -51,8 +53,12 @@ func (s *PortfolioService) buildCalculator(ctx context.Context, userID string) (
 	}
 
 	// Convert to calculator activities
-	activities := make([]calculator.Activity, len(ordersWithProfile))
-	for i, o := range ordersWithProfile {
+	activities := make([]calculator.Activity, 0, len(ordersWithProfile))
+	for _, o := range ordersWithProfile {
+		assetClass := ""
+		if o.SPAssetClass != nil {
+			assetClass = *o.SPAssetClass
+		}
 		assetSubClass := ""
 		if o.SPAssetSubClass != nil {
 			assetSubClass = *o.SPAssetSubClass
@@ -61,7 +67,27 @@ func (s *PortfolioService) buildCalculator(ctx context.Context, userID string) (
 		if o.SPUserID != nil {
 			spUserID = *o.SPUserID
 		}
-		activities[i] = calculator.Activity{
+		accountID := ""
+		if o.AccountId != nil {
+			accountID = *o.AccountId
+		}
+		name := ""
+		if o.SPName != nil {
+			name = *o.SPName
+		}
+		url := ""
+		if o.SPUrl != nil {
+			url = *o.SPUrl
+		}
+		var countries []any
+		if len(o.SPCountries) > 0 {
+			_ = json.Unmarshal(o.SPCountries, &countries)
+		}
+		var sectors []any
+		if len(o.SPSectors) > 0 {
+			_ = json.Unmarshal(o.SPSectors, &sectors)
+		}
+		a := calculator.Activity{
 			Date:              calculator.FormatDate(o.Date),
 			Fee:               decimal.NewFromFloat(o.Fee),
 			FeeInBaseCurrency: decimal.NewFromFloat(o.Fee), // Will be converted by calculator
@@ -71,10 +97,21 @@ func (s *PortfolioService) buildCalculator(ctx context.Context, userID string) (
 			Symbol:            o.SPSymbol,
 			DataSource:        o.SPDataSource,
 			Currency:          o.SPCurrency,
+			AssetClass:        assetClass,
 			AssetSubClass:     assetSubClass,
 			UserID:            spUserID,
 			Tags:              []calculator.Tag{},
+			AccountID:         accountID,
+			Name:              name,
+			URL:               url,
+			Countries:         countries,
+			Sectors:           sectors,
 		}
+
+		if !matchesFilter(a, filters) {
+			continue
+		}
+		activities = append(activities, a)
 	}
 
 	// Get account balances
@@ -94,6 +131,49 @@ func (s *PortfolioService) buildCalculator(ctx context.Context, userID string) (
 
 	calc := calculator.NewCalculator(activities, balanceItems, baseCurrency)
 	return calc, baseCurrency, nil
+}
+
+// matchesFilter returns true if the activity passes all non-empty filter criteria.
+func matchesFilter(a calculator.Activity, f *PortfolioFilter) bool {
+	if f.IsEmpty() {
+		return true
+	}
+	if len(f.AccountIDs) > 0 {
+		if a.AccountID == "" {
+			return false
+		}
+		found := false
+		for _, id := range f.AccountIDs {
+			if a.AccountID == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	if len(f.AssetClasses) > 0 {
+		found := false
+		for _, ac := range f.AssetClasses {
+			if a.AssetClass == ac {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	if f.DataSource != "" && a.DataSource != f.DataSource {
+		return false
+	}
+	if f.Symbol != "" && a.Symbol != f.Symbol {
+		return false
+	}
+	// Tag filtering requires tags on activities; skip for now since tags aren't
+	// populated on activities yet (would need order↔tag join in repository).
+	return true
 }
 
 // computeSnapshot fetches market data and exchange rates, then runs the calculator.
@@ -163,11 +243,36 @@ func (s *PortfolioService) computeSnapshot(ctx context.Context, calc *calculator
 	return snapshot, nil
 }
 
+// symbolProfileInfo holds enrichment data extracted from activities.
+type symbolProfileInfo struct {
+	Name          string
+	AssetClass    string
+	AssetSubClass string
+	URL           string
+	Countries     []any
+	Sectors       []any
+}
+
 // GetHoldings returns portfolio holdings.
-func (s *PortfolioService) GetHoldings(ctx context.Context, userID string, dateRange string) (*PortfolioHoldingsResponse, error) {
-	calc, baseCurrency, err := s.buildCalculator(ctx, userID)
+func (s *PortfolioService) GetHoldings(ctx context.Context, userID string, dateRange string, filters *PortfolioFilter) (*PortfolioHoldingsResponse, error) {
+	calc, baseCurrency, err := s.buildCalculator(ctx, userID, filters)
 	if err != nil {
 		return nil, err
+	}
+
+	// Build profile lookup from calculator activities
+	profileMap := map[string]symbolProfileInfo{}
+	for _, a := range calc.GetActivities() {
+		if _, ok := profileMap[a.Symbol]; !ok {
+			profileMap[a.Symbol] = symbolProfileInfo{
+				Name:          a.Name,
+				AssetClass:    a.AssetClass,
+				AssetSubClass: a.AssetSubClass,
+				URL:           a.URL,
+				Countries:     a.Countries,
+				Sectors:       a.Sectors,
+			}
+		}
 	}
 
 	snapshot, err := s.computeSnapshot(ctx, calc, baseCurrency)
@@ -188,22 +293,51 @@ func (s *PortfolioService) GetHoldings(ctx context.Context, userID string, dateR
 			allocation = pos.ValueInBaseCurrency.InexactFloat64() / totalValue
 		}
 
+		// Enrich with profile data
+		displayName := pos.Symbol
+		var assetClass, assetSubClass, url *string
+		countries := []any{}
+		sectors := []any{}
+		if info, ok := profileMap[pos.Symbol]; ok {
+			if info.Name != "" {
+				displayName = info.Name
+			}
+			if info.AssetClass != "" {
+				assetClass = &info.AssetClass
+			}
+			if info.AssetSubClass != "" {
+				assetSubClass = &info.AssetSubClass
+			}
+			if info.URL != "" {
+				url = &info.URL
+			}
+			if len(info.Countries) > 0 {
+				countries = info.Countries
+			}
+			if len(info.Sectors) > 0 {
+				sectors = info.Sectors
+			}
+		}
+
 		h := PortfolioHolding{
 			ActivitiesCount:        pos.ActivitiesCount,
 			AllocationInPercentage: allocation,
+			AssetClass:             assetClass,
+			AssetSubClass:          assetSubClass,
 			Currency:               pos.Currency,
 			DataSource:             pos.DataSource,
 			DateOfFirstActivity:    pos.DateOfFirstActivity,
 			Dividend:               pos.Dividend.InexactFloat64(),
 			Investment:             pos.Investment.InexactFloat64(),
 			MarketPrice:            pos.MarketPrice,
-			Name:                   pos.Symbol, // Will be enhanced with profile data
+			Name:                   displayName,
 			Quantity:               pos.Quantity.InexactFloat64(),
 			Symbol:                 pos.Symbol,
-			Countries:              []any{},
+			Countries:              countries,
 			Holdings:               []any{},
-			Sectors:                []any{},
+			Sectors:                sectors,
 			Tags:                   tagsToAny(pos.Tags),
+			URL:                    url,
 		}
 
 		vib := pos.ValueInBaseCurrency.InexactFloat64()
@@ -255,8 +389,8 @@ func (s *PortfolioService) GetHoldings(ctx context.Context, userID string, dateR
 }
 
 // GetDetails returns portfolio details.
-func (s *PortfolioService) GetDetails(ctx context.Context, userID string, dateRange string) (*PortfolioDetailsResponse, error) {
-	holdingsResp, err := s.GetHoldings(ctx, userID, dateRange)
+func (s *PortfolioService) GetDetails(ctx context.Context, userID string, dateRange string, filters *PortfolioFilter) (*PortfolioDetailsResponse, error) {
+	holdingsResp, err := s.GetHoldings(ctx, userID, dateRange, filters)
 	if err != nil {
 		return nil, err
 	}
@@ -274,8 +408,8 @@ func (s *PortfolioService) GetDetails(ctx context.Context, userID string, dateRa
 }
 
 // GetPerformance returns portfolio performance data.
-func (s *PortfolioService) GetPerformance(ctx context.Context, userID string, dateRange string) (*PortfolioPerformanceResponse, error) {
-	calc, baseCurrency, err := s.buildCalculator(ctx, userID)
+func (s *PortfolioService) GetPerformance(ctx context.Context, userID string, dateRange string, filters *PortfolioFilter) (*PortfolioPerformanceResponse, error) {
+	calc, baseCurrency, err := s.buildCalculator(ctx, userID, filters)
 	if err != nil {
 		return nil, err
 	}
@@ -338,8 +472,8 @@ func (s *PortfolioService) GetPerformance(ctx context.Context, userID string, da
 }
 
 // GetDividends returns portfolio dividends grouped by date.
-func (s *PortfolioService) GetDividends(ctx context.Context, userID string, dateRange string, groupBy string) (*PortfolioDividendsResponse, error) {
-	calc, _, err := s.buildCalculator(ctx, userID)
+func (s *PortfolioService) GetDividends(ctx context.Context, userID string, dateRange string, groupBy string, filters *PortfolioFilter) (*PortfolioDividendsResponse, error) {
+	calc, _, err := s.buildCalculator(ctx, userID, filters)
 	if err != nil {
 		return nil, err
 	}
@@ -366,6 +500,28 @@ func (s *PortfolioService) GetDividends(ctx context.Context, userID string, date
 		if order.Date.Before(start) || order.Date.After(end) {
 			continue
 		}
+
+		// Apply filters to dividend orders too
+		if !filters.IsEmpty() {
+			accountID := ""
+			if order.AccountId != nil {
+				accountID = *order.AccountId
+			}
+			assetClass := ""
+			if order.SPAssetClass != nil {
+				assetClass = *order.SPAssetClass
+			}
+			a := calculator.Activity{
+				AccountID:  accountID,
+				AssetClass: assetClass,
+				DataSource: order.SPDataSource,
+				Symbol:     order.SPSymbol,
+			}
+			if !matchesFilter(a, filters) {
+				continue
+			}
+		}
+
 		// Legacy parity: NestJS formats JS Date in local timezone. Mirror that by
 		// formatting with time.Local instead of UTC-normalized calculator dates.
 		date := order.Date.In(time.Local).Format("2006-01-02")
@@ -395,8 +551,8 @@ func (s *PortfolioService) GetDividends(ctx context.Context, userID string, date
 }
 
 // GetInvestments returns portfolio investment timeline.
-func (s *PortfolioService) GetInvestments(ctx context.Context, userID string, dateRange string, groupBy string) (*PortfolioInvestmentsResponse, error) {
-	calc, baseCurrency, err := s.buildCalculator(ctx, userID)
+func (s *PortfolioService) GetInvestments(ctx context.Context, userID string, dateRange string, groupBy string, filters *PortfolioFilter) (*PortfolioInvestmentsResponse, error) {
+	calc, baseCurrency, err := s.buildCalculator(ctx, userID, filters)
 	if err != nil {
 		return nil, err
 	}
@@ -447,9 +603,24 @@ func (s *PortfolioService) GetInvestments(ctx context.Context, userID string, da
 
 // GetHolding returns a single holding detail.
 func (s *PortfolioService) GetHolding(ctx context.Context, userID string, dataSource string, symbol string) (*PortfolioHoldingDetailResponse, error) {
-	calc, baseCurrency, err := s.buildCalculator(ctx, userID)
+	calc, baseCurrency, err := s.buildCalculator(ctx, userID, nil)
 	if err != nil {
 		return nil, err
+	}
+
+	// Build profile lookup from calculator activities
+	profileMap := map[string]symbolProfileInfo{}
+	for _, a := range calc.GetActivities() {
+		if _, ok := profileMap[a.Symbol]; !ok {
+			profileMap[a.Symbol] = symbolProfileInfo{
+				Name:          a.Name,
+				AssetClass:    a.AssetClass,
+				AssetSubClass: a.AssetSubClass,
+				URL:           a.URL,
+				Countries:     a.Countries,
+				Sectors:       a.Sectors,
+			}
+		}
 	}
 
 	snapshot, err := s.computeSnapshot(ctx, calc, baseCurrency)
@@ -470,18 +641,53 @@ func (s *PortfolioService) GetHolding(ctx context.Context, userID string, dataSo
 		return nil, nil // not found
 	}
 
+	// Enrich with profile data
+	displayName := found.Symbol
+	var assetClass, assetSubClass, url *string
+	countries := []any{}
+	sectors := []any{}
+	if info, ok := profileMap[found.Symbol]; ok {
+		if info.Name != "" {
+			displayName = info.Name
+		}
+		if info.AssetClass != "" {
+			assetClass = &info.AssetClass
+		}
+		if info.AssetSubClass != "" {
+			assetSubClass = &info.AssetSubClass
+		}
+		if info.URL != "" {
+			url = &info.URL
+		}
+		if len(info.Countries) > 0 {
+			countries = info.Countries
+		}
+		if len(info.Sectors) > 0 {
+			sectors = info.Sectors
+		}
+	}
+
 	resp := &PortfolioHoldingDetailResponse{
 		ActivitiesCount:        found.ActivitiesCount,
+		AssetClass:             assetClass,
+		AssetSubClass:          assetSubClass,
 		AveragePrice:           found.AveragePrice.InexactFloat64(),
+		Countries:              countries,
+		Currency:               found.Currency,
+		DataSource:             found.DataSource,
 		DateOfFirstActivity:    found.DateOfFirstActivity,
 		DividendInBaseCurrency: found.DividendInBaseCurrency.InexactFloat64(),
 		FeeInBaseCurrency:      found.FeeInBaseCurrency.InexactFloat64(),
 		HistoricalData:         []map[string]any{},
+		Holdings:               []any{},
 		Investment:             found.Investment.InexactFloat64(),
 		MarketPrice:            found.MarketPrice,
+		Name:                   displayName,
 		Quantity:               found.Quantity.InexactFloat64(),
+		Sectors:                sectors,
 		Symbol:                 found.Symbol,
 		Tags:                   tagsToAny(found.Tags),
+		URL:                    url,
 		ValueInBaseCurrency:    found.ValueInBaseCurrency.InexactFloat64(),
 	}
 

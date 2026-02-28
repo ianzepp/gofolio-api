@@ -24,9 +24,15 @@ type Activity struct {
 	Symbol            string
 	DataSource        string
 	Currency          string
+	AssetClass        string
 	AssetSubClass     string
 	UserID            string // non-empty for custom asset profiles (skip errors)
 	Tags              []Tag
+	AccountID         string // nullable in DB; empty string means no account
+	Name              string // symbol profile name, for response enrichment
+	URL               string // symbol profile URL
+	Countries         []any  // symbol profile countries JSON
+	Sectors           []any  // symbol profile sectors JSON
 }
 
 // Tag represents a user-defined tag attached to an activity.

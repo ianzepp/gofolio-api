@@ -1,5 +1,21 @@
 package service
 
+// PortfolioFilter holds parsed filter criteria for portfolio queries.
+// Empty slices / zero-value strings mean "no filter" (include everything).
+type PortfolioFilter struct {
+	AccountIDs   []string
+	AssetClasses []string
+	DataSource   string
+	Symbol       string
+	Tags         []string
+}
+
+// IsEmpty returns true when no filter criteria are set.
+func (f *PortfolioFilter) IsEmpty() bool {
+	return f == nil || (len(f.AccountIDs) == 0 && len(f.AssetClasses) == 0 &&
+		f.DataSource == "" && f.Symbol == "" && len(f.Tags) == 0)
+}
+
 // PortfolioHoldingsResponse is the JSON shape for GET /portfolio/holdings.
 type PortfolioHoldingsResponse struct {
 	Holdings []PortfolioHolding `json:"holdings"`
@@ -119,7 +135,12 @@ type PortfolioReportResponse struct {
 // PortfolioHoldingDetailResponse is the JSON shape for GET /portfolio/holding/:ds/:sym.
 type PortfolioHoldingDetailResponse struct {
 	ActivitiesCount                           int              `json:"activitiesCount"`
+	AssetClass                                *string          `json:"assetClass"`
+	AssetSubClass                             *string          `json:"assetSubClass"`
 	AveragePrice                              float64          `json:"averagePrice"`
+	Countries                                 []any            `json:"countries"`
+	Currency                                  string           `json:"currency"`
+	DataSource                                string           `json:"dataSource"`
 	DateOfFirstActivity                       string           `json:"dateOfFirstActivity"`
 	DividendInBaseCurrency                    float64          `json:"dividendInBaseCurrency"`
 	FeeInBaseCurrency                         float64          `json:"feeInBaseCurrency"`
@@ -128,14 +149,18 @@ type PortfolioHoldingDetailResponse struct {
 	GrossPerformancePercentWithCurrencyEffect *float64         `json:"grossPerformancePercentWithCurrencyEffect"`
 	GrossPerformanceWithCurrencyEffect        *float64         `json:"grossPerformanceWithCurrencyEffect"`
 	HistoricalData                            []map[string]any `json:"historicalData"`
+	Holdings                                  []any            `json:"holdings"`
 	Investment                                float64          `json:"investment"`
 	MarketPrice                               float64          `json:"marketPrice"`
+	Name                                      string           `json:"name"`
 	NetPerformance                            *float64         `json:"netPerformance"`
 	NetPerformancePercent                     *float64         `json:"netPerformancePercent"`
 	NetPerformancePercentWithCurrencyEffect   *float64         `json:"netPerformancePercentWithCurrencyEffect"`
 	NetPerformanceWithCurrencyEffect          *float64         `json:"netPerformanceWithCurrencyEffect"`
 	Quantity                                  float64          `json:"quantity"`
+	Sectors                                   []any            `json:"sectors"`
 	Symbol                                    string           `json:"symbol"`
 	Tags                                      []any            `json:"tags"`
+	URL                                       *string          `json:"url"`
 	ValueInBaseCurrency                       float64          `json:"valueInBaseCurrency"`
 }

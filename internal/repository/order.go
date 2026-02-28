@@ -15,6 +15,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
@@ -188,12 +189,16 @@ func (r *OrderRepository) CountByDataSourceAndSymbol(ctx context.Context, dataSo
 // portfolio calculator. Column aliases use the sp_ prefix to avoid collision.
 type OrderWithProfile struct {
 	model.Order
-	SPCurrency      string  `db:"sp_currency"`
-	SPDataSource    string  `db:"sp_dataSource"`
-	SPSymbol        string  `db:"sp_symbol"`
-	SPAssetSubClass *string `db:"sp_assetSubClass"`
-	SPUserID        *string `db:"sp_userId"`
-	SPName          *string `db:"sp_name"`
+	SPCurrency      string          `db:"sp_currency"`
+	SPDataSource    string          `db:"sp_dataSource"`
+	SPSymbol        string          `db:"sp_symbol"`
+	SPAssetClass    *string         `db:"sp_assetClass"`
+	SPAssetSubClass *string         `db:"sp_assetSubClass"`
+	SPUserID        *string         `db:"sp_userId"`
+	SPName          *string         `db:"sp_name"`
+	SPUrl           *string         `db:"sp_url"`
+	SPCountries     json.RawMessage `db:"sp_countries"`
+	SPSectors       json.RawMessage `db:"sp_sectors"`
 }
 
 // FindActiveByUserIDWithProfile returns all non-draft orders for a user, joined
@@ -209,9 +214,13 @@ func (r *OrderRepository) FindActiveByUserIDWithProfile(ctx context.Context, use
 		        sp.currency AS sp_currency,
 		        sp."dataSource" AS "sp_dataSource",
 		        sp.symbol AS sp_symbol,
+		        sp."assetClass" AS "sp_assetClass",
 		        sp."assetSubClass" AS "sp_assetSubClass",
 		        sp."userId" AS "sp_userId",
-		        sp.name AS sp_name
+		        sp.name AS sp_name,
+		        sp.url AS sp_url,
+		        sp.countries AS sp_countries,
+		        sp.sectors AS sp_sectors
 		 FROM "Order" o
 		 JOIN "SymbolProfile" sp ON o."symbolProfileId" = sp.id
 		 WHERE o."userId" = $1 AND o."isDraft" = false
