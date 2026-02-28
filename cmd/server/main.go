@@ -58,23 +58,23 @@ func main() {
 	mux := http.NewServeMux()
 
 	// Access
-	mux.HandleFunc("GET /api/v1/access", handler.HandleGetAccesses)
-	mux.HandleFunc("POST /api/v1/access", handler.HandleCreateAccess)
-	mux.HandleFunc("DELETE /api/v1/access/{id}", handler.HandleDeleteAccess)
-	mux.HandleFunc("PUT /api/v1/access/{id}", handler.HandleUpdateAccess)
+	mux.HandleFunc("GET /api/v1/access", auth.Authenticate(authCfg, handler.GetAccesses(deps)))
+	mux.HandleFunc("POST /api/v1/access", auth.RequirePermission(authCfg, auth.CreateAccess, handler.CreateAccess(deps)))
+	mux.HandleFunc("DELETE /api/v1/access/{id}", auth.RequirePermission(authCfg, auth.DeleteAccess, handler.DeleteAccess(deps)))
+	mux.HandleFunc("PUT /api/v1/access/{id}", auth.RequirePermission(authCfg, auth.UpdateAccess, handler.UpdateAccess(deps)))
 
 	// Account
-	mux.HandleFunc("GET /api/v1/account", handler.HandleGetAccounts)
-	mux.HandleFunc("POST /api/v1/account", handler.HandleCreateAccount)
-	mux.HandleFunc("POST /api/v1/account/transfer-balance", handler.HandleTransferBalance)
-	mux.HandleFunc("DELETE /api/v1/account/{id}", handler.HandleDeleteAccount)
-	mux.HandleFunc("GET /api/v1/account/{id}", handler.HandleGetAccount)
-	mux.HandleFunc("PUT /api/v1/account/{id}", handler.HandleUpdateAccount)
-	mux.HandleFunc("GET /api/v1/account/{id}/balances", handler.HandleGetAccountBalances)
+	mux.HandleFunc("GET /api/v1/account", auth.Authenticate(authCfg, handler.GetAccounts(deps)))
+	mux.HandleFunc("POST /api/v1/account", auth.RequirePermission(authCfg, auth.CreateAccount, handler.CreateAccount(deps)))
+	mux.HandleFunc("POST /api/v1/account/transfer-balance", auth.RequirePermission(authCfg, auth.UpdateAccount, handler.TransferBalance(deps)))
+	mux.HandleFunc("DELETE /api/v1/account/{id}", auth.RequirePermission(authCfg, auth.DeleteAccount, handler.DeleteAccount(deps)))
+	mux.HandleFunc("GET /api/v1/account/{id}", auth.Authenticate(authCfg, handler.GetAccount(deps)))
+	mux.HandleFunc("PUT /api/v1/account/{id}", auth.RequirePermission(authCfg, auth.UpdateAccount, handler.UpdateAccount(deps)))
+	mux.HandleFunc("GET /api/v1/account/{id}/balances", auth.Authenticate(authCfg, handler.GetAccountBalances(deps)))
 
 	// Account Balance
-	mux.HandleFunc("POST /api/v1/account-balance", handler.HandleCreateAccountBalance)
-	mux.HandleFunc("DELETE /api/v1/account-balance/{id}", handler.HandleDeleteAccountBalance)
+	mux.HandleFunc("POST /api/v1/account-balance", auth.RequirePermission(authCfg, auth.CreateAccountBalance, handler.HandleCreateAccountBalance))
+	mux.HandleFunc("DELETE /api/v1/account-balance/{id}", auth.RequirePermission(authCfg, auth.DeleteAccountBalance, handler.HandleDeleteAccountBalance))
 
 	// Admin
 	mux.HandleFunc("GET /api/v1/admin", handler.HandleGetAdmin)
@@ -177,21 +177,21 @@ func main() {
 	mux.HandleFunc("POST /api/v1/market-data/{dataSource}/{symbol}", handler.HandleCreateMarketData)
 
 	// Order
-	mux.HandleFunc("DELETE /api/v1/order", handler.HandleDeleteOrders)
-	mux.HandleFunc("GET /api/v1/order", handler.HandleGetOrders)
-	mux.HandleFunc("POST /api/v1/order", handler.HandleCreateOrder)
-	mux.HandleFunc("DELETE /api/v1/order/{id}", handler.HandleDeleteOrder)
-	mux.HandleFunc("GET /api/v1/order/{id}", handler.HandleGetOrder)
-	mux.HandleFunc("PUT /api/v1/order/{id}", handler.HandleUpdateOrder)
+	mux.HandleFunc("DELETE /api/v1/order", auth.RequirePermission(authCfg, auth.DeleteOrder, handler.DeleteOrders(deps)))
+	mux.HandleFunc("GET /api/v1/order", auth.Authenticate(authCfg, handler.GetOrders(deps)))
+	mux.HandleFunc("POST /api/v1/order", auth.RequirePermission(authCfg, auth.CreateOrder, handler.CreateOrder(deps)))
+	mux.HandleFunc("DELETE /api/v1/order/{id}", auth.RequirePermission(authCfg, auth.DeleteOrder, handler.DeleteOrder(deps)))
+	mux.HandleFunc("GET /api/v1/order/{id}", auth.Authenticate(authCfg, handler.GetOrder(deps)))
+	mux.HandleFunc("PUT /api/v1/order/{id}", auth.RequirePermission(authCfg, auth.UpdateOrder, handler.UpdateOrder(deps)))
 
 	// Platform
-	mux.HandleFunc("GET /api/v1/platform", handler.HandleGetPlatform)
-	mux.HandleFunc("POST /api/v1/platform", handler.HandleCreatePlatform)
-	mux.HandleFunc("DELETE /api/v1/platform/{id}", handler.HandleDeletePlatform)
-	mux.HandleFunc("PUT /api/v1/platform/{id}", handler.HandleUpdatePlatform)
+	mux.HandleFunc("GET /api/v1/platform", auth.RequirePermission(authCfg, auth.ReadPlatformsWithAccountCount, handler.GetPlatformsWithAccountCount(deps)))
+	mux.HandleFunc("POST /api/v1/platform", auth.RequirePermission(authCfg, auth.CreatePlatform, handler.CreatePlatform(deps)))
+	mux.HandleFunc("DELETE /api/v1/platform/{id}", auth.RequirePermission(authCfg, auth.DeletePlatform, handler.DeletePlatform(deps)))
+	mux.HandleFunc("PUT /api/v1/platform/{id}", auth.RequirePermission(authCfg, auth.UpdatePlatform, handler.UpdatePlatform(deps)))
 
 	// Platforms (read-only)
-	mux.HandleFunc("GET /api/v1/platforms", handler.HandleGetPlatforms)
+	mux.HandleFunc("GET /api/v1/platforms", auth.RequirePermission(authCfg, auth.ReadPlatforms, handler.GetPlatforms(deps)))
 
 	// Portfolio
 	mux.HandleFunc("GET /api/v1/portfolio/details", handler.HandleGetPortfolioDetails)
@@ -220,24 +220,19 @@ func main() {
 	mux.HandleFunc("GET /api/v1/symbol/{dataSource}/{symbol}/{dateString}", handler.HandleGetSymbolByDate)
 
 	// Tags
-	// Legacy API nuance:
-	// - GET/DELETE/PUT use explicit permission guards in NestJS.
-	// - POST uses jwt auth but performs custom permission logic inside handler
-	//   (createOwnTag vs createTag + owner/userId checks).
-	// Keep this split visible so parity work remains intentional.
 	mux.HandleFunc("GET /api/v1/tags", auth.RequirePermission(authCfg, auth.ReadTags, handler.GetTags(deps)))
 	mux.HandleFunc("POST /api/v1/tags", auth.RequireAnyPermission(authCfg, []string{auth.CreateOwnTag, auth.CreateTag}, handler.CreateTag(deps)))
 	mux.HandleFunc("DELETE /api/v1/tags/{id}", auth.RequirePermission(authCfg, auth.DeleteTag, handler.DeleteTag(deps)))
 	mux.HandleFunc("PUT /api/v1/tags/{id}", auth.RequirePermission(authCfg, auth.UpdateTag, handler.UpdateTag(deps)))
 
 	// User
-	mux.HandleFunc("DELETE /api/v1/user", handler.HandleDeleteUser)
-	mux.HandleFunc("GET /api/v1/user", handler.HandleGetUser)
-	mux.HandleFunc("POST /api/v1/user", handler.HandleCreateUser)
-	mux.HandleFunc("POST /api/v1/user/access-token", handler.HandleCreateUserAccessToken)
-	mux.HandleFunc("PUT /api/v1/user/setting", handler.HandleUpdateUserSetting)
-	mux.HandleFunc("DELETE /api/v1/user/{id}", handler.HandleDeleteUserById)
-	mux.HandleFunc("POST /api/v1/user/{id}/access-token", handler.HandleCreateUserAccessTokenById)
+	mux.HandleFunc("DELETE /api/v1/user", auth.RequirePermission(authCfg, auth.DeleteOwnUser, handler.DeleteUser(deps)))
+	mux.HandleFunc("GET /api/v1/user", auth.Authenticate(authCfg, handler.GetUser(deps)))
+	mux.HandleFunc("POST /api/v1/user", handler.CreateUser(deps))
+	mux.HandleFunc("POST /api/v1/user/access-token", auth.RequirePermission(authCfg, auth.UpdateOwnAccessToken, handler.CreateUserAccessToken(deps)))
+	mux.HandleFunc("PUT /api/v1/user/setting", auth.Authenticate(authCfg, handler.UpdateUserSetting(deps)))
+	mux.HandleFunc("DELETE /api/v1/user/{id}", auth.RequirePermission(authCfg, auth.DeleteUser, handler.DeleteUserById(deps)))
+	mux.HandleFunc("POST /api/v1/user/{id}/access-token", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.CreateUserAccessTokenById(deps)))
 
 	// Watchlist
 	mux.HandleFunc("GET /api/v1/watchlist", handler.HandleGetWatchlist)

@@ -87,7 +87,9 @@ const (
 	OrderTypeDividend  OrderType = "DIVIDEND"
 	OrderTypeFee       OrderType = "FEE"
 	OrderTypeInterest  OrderType = "INTEREST"
+	OrderTypeItem      OrderType = "ITEM"
 	OrderTypeLiability OrderType = "LIABILITY"
+	OrderTypeLiquidity OrderType = "LIQUIDITY"
 	OrderTypeSell      OrderType = "SELL"
 )
 

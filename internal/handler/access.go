@@ -6,56 +6,141 @@ Original NestJS controller(s):
 - apps/api/src/app/access/access.controller.ts
 
 Routes + request/response shape:
-- GET /api/v1/access (HandleGetAccesses)
-  Request: no explicit request params
+- GET /api/v1/access (GetAccesses)
   Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/access (HandleCreateAccess)
-  Request: body data: CreateAccessDto
+  Response: Access[] (unwrapped array)
+- POST /api/v1/access (CreateAccess)
   Auth/permission: jwt / permissions.createAccess
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- DELETE /api/v1/access/{id} (HandleDeleteAccess)
-  Request: path id: string (arg: 'id')
+  Response: Access
+- DELETE /api/v1/access/{id} (DeleteAccess)
   Auth/permission: jwt / permissions.deleteAccess
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- PUT /api/v1/access/{id} (HandleUpdateAccess)
-  Request: path id: string (arg: 'id'); body data: UpdateAccessDto
+  Response: Access
+- PUT /api/v1/access/{id} (UpdateAccess)
   Auth/permission: jwt / permissions.updateAccess
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
+  Response: Access
 */
 
-import "net/http"
+import (
+	"encoding/json"
+	"net/http"
 
-// HandleGetAccesses handles GET /access
-func HandleGetAccesses(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{"accesses": []any{}})
-}
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
+	"github.com/google/uuid"
+)
 
-// HandleCreateAccess handles POST /access
-func HandleCreateAccess(w http.ResponseWriter, r *http.Request) {
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+func GetAccesses(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AccessService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
+		accesses, err := deps.AccessService.GetAccesses(r.Context(), userID)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if accesses == nil {
+			accesses = []model.Access{}
+		}
+		// Legacy parity: returns unwrapped array
+		JSON(w, http.StatusOK, accesses)
 	}
-	_ = body
-	JSON(w, http.StatusCreated, map[string]any{})
 }
 
-// HandleDeleteAccess handles DELETE /access/:id
-func HandleDeleteAccess(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	_ = id
-	JSON(w, http.StatusOK, map[string]any{})
-}
+func CreateAccess(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AccessService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
 
-// HandleUpdateAccess handles PUT /access/:id
-func HandleUpdateAccess(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
+		var body struct {
+			Alias         *string          `json:"alias"`
+			GranteeUserId *string          `json:"granteeUserId"`
+			Permissions   []string         `json:"permissions"`
+			Settings      json.RawMessage  `json:"settings"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		if body.Permissions == nil {
+			body.Permissions = []string{}
+		}
+		if body.Settings == nil {
+			body.Settings = json.RawMessage(`{}`)
+		}
+
+		access := model.Access{
+			ID:            uuid.New().String(),
+			Alias:         body.Alias,
+			GranteeUserId: body.GranteeUserId,
+			Permissions:   body.Permissions,
+			Settings:      body.Settings,
+			UserId:        userID,
+		}
+
+		created, err := deps.AccessService.CreateAccess(r.Context(), access)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusCreated, created)
 	}
-	_ = id
-	_ = body
-	JSON(w, http.StatusOK, map[string]any{})
+}
+
+func DeleteAccess(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AccessService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		id := r.PathValue("id")
+		if err := deps.AccessService.DeleteAccess(r.Context(), id); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, map[string]any{})
+	}
+}
+
+func UpdateAccess(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AccessService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		id := r.PathValue("id")
+		var body struct {
+			Alias       *string          `json:"alias"`
+			Permissions []string         `json:"permissions"`
+			Settings    json.RawMessage  `json:"settings"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		updated, err := deps.AccessService.UpdateAccess(r.Context(), id, body.Alias, body.Permissions, body.Settings)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, updated)
+	}
 }

@@ -16,6 +16,11 @@ func NewUserService(pool *pgxpool.Pool) *UserService {
 	return &UserService{pool: pool}
 }
 
+func (s *UserService) CreateUser(ctx context.Context, user model.User) (model.User, error) {
+	repo := repository.NewUserRepository(s.pool)
+	return repo.Create(ctx, user)
+}
+
 func (s *UserService) GetUser(ctx context.Context, id string) (model.User, error) {
 	repo := repository.NewUserRepository(s.pool)
 	return repo.FindByID(ctx, id)

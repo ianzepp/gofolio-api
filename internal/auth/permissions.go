@@ -147,6 +147,19 @@ var rolePermissions = map[model.Role]map[string]bool{
 	model.RoleInactive: {},
 }
 
+// PermissionsForRole returns the list of permission strings for the given role.
+func PermissionsForRole(role model.Role) []string {
+	perms, ok := rolePermissions[role]
+	if !ok {
+		return []string{}
+	}
+	result := make([]string, 0, len(perms))
+	for k := range perms {
+		result = append(result, k)
+	}
+	return result
+}
+
 // HasPermission checks if the given role has the specified permission.
 func HasPermission(role model.Role, perm string) bool {
 	perms, ok := rolePermissions[role]

@@ -6,97 +6,283 @@ Original NestJS controller(s):
 - apps/api/src/app/account/account.controller.ts
 
 Routes + request/response shape:
-- GET /api/v1/account (HandleGetAccounts)
+- GET /api/v1/account (GetAccounts)
   Request: no explicit request params
   Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/account (HandleCreateAccount)
+  Response: { accounts: Account[], totalBalanceInBaseCurrency: number, ... }
+- POST /api/v1/account (CreateAccount)
   Request: body data: CreateAccountDto
   Auth/permission: jwt / permissions.createAccount
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- DELETE /api/v1/account/{id} (HandleDeleteAccount)
+  Response: Account
+- DELETE /api/v1/account/{id} (DeleteAccount)
   Request: path id: string (arg: 'id')
   Auth/permission: jwt / permissions.deleteAccount
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/account/{id} (HandleGetAccount)
+  Response: Account
+- GET /api/v1/account/{id} (GetAccount)
   Request: path id: string (arg: 'id')
   Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- PUT /api/v1/account/{id} (HandleUpdateAccount)
+  Response: Account
+- PUT /api/v1/account/{id} (UpdateAccount)
   Request: path id: string (arg: 'id'); body data: UpdateAccountDto
   Auth/permission: jwt / permissions.updateAccount
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/account/{id}/balances (HandleGetAccountBalances)
+  Response: Account
+- GET /api/v1/account/{id}/balances (GetAccountBalances)
   Request: path id: string (arg: 'id')
   Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/account/transfer-balance (HandleTransferBalance)
-  Request: no explicit request params
+  Response: { balances: AccountBalance[] }
+- POST /api/v1/account/transfer-balance (TransferBalance)
+  Request: body data: TransferBalanceDto
   Auth/permission: jwt / permissions.updateAccount
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
+  Response: void (HTTP 200)
 */
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
 
-// HandleGetAccounts handles GET /account
-func HandleGetAccounts(w http.ResponseWriter, r *http.Request) {
-	// Legacy behavior note:
-	// Account endpoints support impersonation via the "Impersonation-Id" header.
-	// Keep plumbing explicit even while this handler is stubbed.
-	impersonationId := Impersonation(r)
-	_ = impersonationId
-	JSON(w, http.StatusOK, map[string]any{"accounts": []any{}})
-}
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
+	"github.com/google/uuid"
+)
 
-// HandleCreateAccount handles POST /account
-func HandleCreateAccount(w http.ResponseWriter, r *http.Request) {
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+func GetAccounts(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AccountService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
+		// Support impersonation
+		if impID := Impersonation(r); impID != "" {
+			userID = impID
+		}
+
+		accounts, err := deps.AccountService.GetAccounts(r.Context(), userID)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if accounts == nil {
+			accounts = []model.Account{}
+		}
+
+		// Legacy parity: NestJS returns wrapped response with aggregate fields.
+		// Computed fields (valueInBaseCurrency, etc.) require portfolio calculator;
+		// return zero defaults until calculator is wired.
+		JSON(w, http.StatusOK, map[string]any{
+			"accounts":                    accounts,
+			"totalBalanceInBaseCurrency":  0,
+			"totalValueInBaseCurrency":    0,
+		})
 	}
-	_ = body
-	JSON(w, http.StatusCreated, map[string]any{})
 }
 
-// HandleDeleteAccount handles DELETE /account/:id
-func HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	_ = id
-	JSON(w, http.StatusOK, map[string]any{})
-}
+func CreateAccount(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AccountService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
 
-// HandleGetAccount handles GET /account/:id
-func HandleGetAccount(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	_ = id
-	JSON(w, http.StatusOK, map[string]any{})
-}
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
 
-// HandleUpdateAccount handles PUT /account/:id
-func HandleUpdateAccount(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+		var body struct {
+			Balance    float64 `json:"balance"`
+			Comment    *string `json:"comment"`
+			Currency   *string `json:"currency"`
+			ID         *string `json:"id"`
+			IsExcluded bool    `json:"isExcluded"`
+			Name       *string `json:"name"`
+			PlatformId *string `json:"platformId"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		id := uuid.New().String()
+		if body.ID != nil && strings.TrimSpace(*body.ID) != "" {
+			id = strings.TrimSpace(*body.ID)
+		}
+
+		acct := model.Account{
+			ID:         id,
+			UserId:     userID,
+			Balance:    body.Balance,
+			Comment:    body.Comment,
+			Currency:   body.Currency,
+			IsExcluded: body.IsExcluded,
+			Name:       body.Name,
+			PlatformId: body.PlatformId,
+		}
+
+		created, err := deps.AccountService.CreateAccount(r.Context(), acct)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusCreated, created)
 	}
-	_ = id
-	_ = body
-	JSON(w, http.StatusOK, map[string]any{})
 }
 
-// HandleGetAccountBalances handles GET /account/:id/balances
-func HandleGetAccountBalances(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	_ = id
-	JSON(w, http.StatusOK, map[string]any{"balances": []any{}})
-}
+func DeleteAccount(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AccountService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
 
-// HandleTransferBalance handles POST /account/transfer-balance
-func HandleTransferBalance(w http.ResponseWriter, r *http.Request) {
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
+		id := r.PathValue("id")
+		if err := deps.AccountService.DeleteAccount(r.Context(), id, userID); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, map[string]any{})
 	}
-	_ = body
-	JSON(w, http.StatusOK, map[string]any{})
+}
+
+func GetAccount(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AccountService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
+		if impID := Impersonation(r); impID != "" {
+			userID = impID
+		}
+
+		id := r.PathValue("id")
+		acct, err := deps.AccountService.GetAccount(r.Context(), id, userID)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, acct)
+	}
+}
+
+func UpdateAccount(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AccountService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
+		id := r.PathValue("id")
+		var body struct {
+			Balance    float64 `json:"balance"`
+			Comment    *string `json:"comment"`
+			Currency   *string `json:"currency"`
+			IsExcluded bool    `json:"isExcluded"`
+			Name       *string `json:"name"`
+			PlatformId *string `json:"platformId"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		acct := model.Account{
+			ID:         id,
+			UserId:     userID,
+			Balance:    body.Balance,
+			Comment:    body.Comment,
+			Currency:   body.Currency,
+			IsExcluded: body.IsExcluded,
+			Name:       body.Name,
+			PlatformId: body.PlatformId,
+		}
+
+		updated, err := deps.AccountService.UpdateAccount(r.Context(), acct)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, updated)
+	}
+}
+
+func GetAccountBalances(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AccountService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
+		// Legacy parity: returns { balances: [] }
+		// AccountBalance queries need a dedicated repo method; stub for now.
+		JSON(w, http.StatusOK, map[string]any{"balances": []any{}})
+	}
+}
+
+func TransferBalance(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AccountService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
+		var body struct {
+			AccountIdFrom string  `json:"accountIdFrom"`
+			AccountIdTo   string  `json:"accountIdTo"`
+			Balance       float64 `json:"balance"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		err := deps.AccountService.TransferBalance(r.Context(), service.TransferRequest{
+			FromID:     body.AccountIdFrom,
+			FromUserID: userID,
+			ToID:       body.AccountIdTo,
+			ToUserID:   userID,
+			Amount:     body.Balance,
+		})
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		// Legacy parity: transfer returns void (HTTP 200 with no body)
+		w.WriteHeader(http.StatusOK)
+	}
 }

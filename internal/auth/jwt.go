@@ -32,6 +32,14 @@ func ParseJWT(tokenStr string, secretKey string) (string, error) {
 	return id, nil
 }
 
+// SignJWT creates an HS256-signed JWT with the given user ID in the "id" claim.
+func SignJWT(userID string, secretKey string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"id": userID,
+	})
+	return token.SignedString([]byte(secretKey))
+}
+
 // ExtractBearerToken strips the "Bearer " prefix from an Authorization header value.
 func ExtractBearerToken(authHeader string) (string, bool) {
 	if len(authHeader) > 7 && strings.EqualFold(authHeader[:7], "Bearer ") {

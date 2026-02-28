@@ -31,6 +31,18 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (model.User, e
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.User])
 }
 
+func (r *UserRepository) Create(ctx context.Context, user model.User) (model.User, error) {
+	rows, err := r.db.Query(ctx,
+		`INSERT INTO "User" (id, "accessToken", provider, role)
+		 VALUES ($1, $2, $3, $4)
+		 RETURNING `+userColumns,
+		user.ID, user.AccessToken, user.Provider, user.Role)
+	if err != nil {
+		return model.User{}, fmt.Errorf("insert user: %w", err)
+	}
+	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.User])
+}
+
 func (r *UserRepository) FindByAccessToken(ctx context.Context, accessToken string) (model.User, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+userColumns+`

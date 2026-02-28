@@ -6,90 +6,234 @@ Original NestJS controller(s):
 - apps/api/src/app/order/order.controller.ts
 
 Routes + request/response shape:
-- DELETE /api/v1/order (HandleDeleteOrders)
-  Request: no explicit request params
+- DELETE /api/v1/order (DeleteOrders)
   Auth/permission: jwt / permissions.deleteOrder
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/order (HandleGetOrders)
-  Request: no explicit request params
+  Response: number (count of deleted)
+- GET /api/v1/order (GetOrders)
   Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/order (HandleCreateOrder)
-  Request: body data: CreateOrderDto
+  Response: { activities: Order[], count: number }
+- POST /api/v1/order (CreateOrder)
   Auth/permission: jwt / permissions.createOrder
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- DELETE /api/v1/order/{id} (HandleDeleteOrder)
-  Request: path id: string (arg: 'id')
+  Response: Order
+- DELETE /api/v1/order/{id} (DeleteOrder)
   Auth/permission: jwt / permissions.deleteOrder
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/order/{id} (HandleGetOrder)
-  Request: path id: string (arg: 'id')
+  Response: Order
+- GET /api/v1/order/{id} (GetOrder)
   Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- PUT /api/v1/order/{id} (HandleUpdateOrder)
-  Request: path id: string (arg: 'id'); body data: UpdateOrderDto
+  Response: Order
+- PUT /api/v1/order/{id} (UpdateOrder)
   Auth/permission: jwt / permissions.updateOrder
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
+  Response: Order
 */
 
-import "net/http"
+import (
+	"net/http"
+	"time"
 
-// DELETE /order (bulk delete)
-func HandleDeleteOrders(w http.ResponseWriter, r *http.Request) {
-	// Legacy behavior note:
-	// Bulk delete honors impersonation header and is intentionally kept as
-	// DELETE /order (not /orders) to match the existing REST contract.
-	impersonationId := Impersonation(r)
-	_ = impersonationId
-	JSON(w, http.StatusOK, map[string]any{})
-}
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
+	"github.com/google/uuid"
+)
 
-// GET /order
-func HandleGetOrders(w http.ResponseWriter, r *http.Request) {
-	// Legacy behavior note:
-	// Query semantics combine shared filter parsing, pagination, and optional
-	// impersonation in one endpoint.
-	filters := ParseFilters(r)
-	page := ParsePagination(r)
-	impersonationId := Impersonation(r)
-	_ = filters
-	_ = page
-	_ = impersonationId
-	JSON(w, http.StatusOK, map[string]any{"activities": []any{}})
-}
+func GetOrders(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.OrderService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
 
-// POST /order
-func HandleCreateOrder(w http.ResponseWriter, r *http.Request) {
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
+		if impID := Impersonation(r); impID != "" {
+			userID = impID
+		}
+
+		orders, err := deps.OrderService.GetOrders(r.Context(), userID)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if orders == nil {
+			orders = []model.Order{}
+		}
+
+		JSON(w, http.StatusOK, map[string]any{
+			"activities": orders,
+			"count":      len(orders),
+		})
 	}
-	_ = body
-	JSON(w, http.StatusCreated, map[string]any{})
 }
 
-// DELETE /order/:id
-func HandleDeleteOrder(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	_ = id
-	JSON(w, http.StatusOK, map[string]any{})
-}
+func CreateOrder(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.OrderService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
 
-// GET /order/:id
-func HandleGetOrder(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	_ = id
-	JSON(w, http.StatusOK, map[string]any{})
-}
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
 
-// PUT /order/:id
-func HandleUpdateOrder(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+		var body struct {
+			AccountId       *string        `json:"accountId"`
+			Comment         *string        `json:"comment"`
+			Currency        *string        `json:"currency"`
+			Date            time.Time      `json:"date"`
+			Fee             float64        `json:"fee"`
+			IsDraft         bool           `json:"isDraft"`
+			Quantity        float64        `json:"quantity"`
+			SymbolProfileId string         `json:"symbolProfileId"`
+			Type            model.OrderType `json:"type"`
+			UnitPrice       float64        `json:"unitPrice"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		var accountUserId *string
+		if body.AccountId != nil {
+			accountUserId = &userID
+		}
+
+		order := model.Order{
+			ID:              uuid.New().String(),
+			AccountId:       body.AccountId,
+			AccountUserId:   accountUserId,
+			Comment:         body.Comment,
+			Currency:        body.Currency,
+			Date:            body.Date,
+			Fee:             body.Fee,
+			IsDraft:         body.IsDraft,
+			Quantity:        body.Quantity,
+			SymbolProfileId: body.SymbolProfileId,
+			Type:            body.Type,
+			UnitPrice:       body.UnitPrice,
+			UserId:          userID,
+		}
+
+		created, err := deps.OrderService.CreateOrder(r.Context(), order)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusCreated, created)
 	}
-	_ = id
-	_ = body
-	JSON(w, http.StatusOK, map[string]any{})
 }
+
+func GetOrder(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.OrderService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		id := r.PathValue("id")
+		order, err := deps.OrderService.GetOrder(r.Context(), id)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, order)
+	}
+}
+
+func UpdateOrder(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.OrderService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		id := r.PathValue("id")
+		var body struct {
+			AccountId       *string        `json:"accountId"`
+			AccountUserId   *string        `json:"accountUserId"`
+			Comment         *string        `json:"comment"`
+			Currency        *string        `json:"currency"`
+			Date            time.Time      `json:"date"`
+			Fee             float64        `json:"fee"`
+			IsDraft         bool           `json:"isDraft"`
+			Quantity        float64        `json:"quantity"`
+			SymbolProfileId string         `json:"symbolProfileId"`
+			Type            model.OrderType `json:"type"`
+			UnitPrice       float64        `json:"unitPrice"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		order := model.Order{
+			ID:              id,
+			AccountId:       body.AccountId,
+			AccountUserId:   body.AccountUserId,
+			Comment:         body.Comment,
+			Currency:        body.Currency,
+			Date:            body.Date,
+			Fee:             body.Fee,
+			IsDraft:         body.IsDraft,
+			Quantity:        body.Quantity,
+			SymbolProfileId: body.SymbolProfileId,
+			Type:            body.Type,
+			UnitPrice:       body.UnitPrice,
+		}
+
+		updated, err := deps.OrderService.UpdateOrder(r.Context(), order)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, updated)
+	}
+}
+
+func DeleteOrder(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.OrderService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		id := r.PathValue("id")
+		if err := deps.OrderService.DeleteOrder(r.Context(), id); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, map[string]any{})
+	}
+}
+
+func DeleteOrders(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.OrderService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
+		if impID := Impersonation(r); impID != "" {
+			userID = impID
+		}
+
+		// Legacy parity: bulk delete accepts filter params but current impl
+		// deletes all orders for the user.
+		_ = ParseFilters(r)
+		if err := deps.OrderService.DeleteOrdersByUserID(r.Context(), userID); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, map[string]any{})
+	}
+}
+

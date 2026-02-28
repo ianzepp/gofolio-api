@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
@@ -53,6 +54,19 @@ func (r *AccessRepository) Create(ctx context.Context, a model.Access) (model.Ac
 		a.Settings, a.UserId)
 	if err != nil {
 		return model.Access{}, fmt.Errorf("insert access: %w", err)
+	}
+	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Access])
+}
+
+func (r *AccessRepository) Update(ctx context.Context, id string, alias *string, permissions []string, settings json.RawMessage) (model.Access, error) {
+	rows, err := r.db.Query(ctx,
+		`UPDATE "Access"
+		 SET alias = $2, permissions = $3, settings = $4
+		 WHERE id = $1
+		 RETURNING `+accessColumns,
+		id, alias, permissions, settings)
+	if err != nil {
+		return model.Access{}, fmt.Errorf("update access: %w", err)
 	}
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Access])
 }

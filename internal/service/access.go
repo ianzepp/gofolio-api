@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
@@ -29,6 +30,11 @@ func (s *AccessService) GetAccess(ctx context.Context, id string) (model.Access,
 func (s *AccessService) CreateAccess(ctx context.Context, a model.Access) (model.Access, error) {
 	repo := repository.NewAccessRepository(s.pool)
 	return repo.Create(ctx, a)
+}
+
+func (s *AccessService) UpdateAccess(ctx context.Context, id string, alias *string, permissions []string, settings json.RawMessage) (model.Access, error) {
+	repo := repository.NewAccessRepository(s.pool)
+	return repo.Update(ctx, id, alias, permissions, settings)
 }
 
 func (s *AccessService) DeleteAccess(ctx context.Context, id string) error {

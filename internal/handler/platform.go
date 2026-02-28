@@ -7,67 +7,154 @@ Original NestJS controller(s):
 - apps/api/src/app/endpoints/platforms/platforms.controller.ts
 
 Routes + request/response shape:
-- GET /api/v1/platform (HandleGetPlatform)
-  Request: no explicit request params
+- GET /api/v1/platform (GetPlatformsWithAccountCount)
   Auth/permission: jwt / permissions.readPlatformsWithAccountCount
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/platform (HandleCreatePlatform)
-  Request: body data: CreatePlatformDto
+  Response: Platform[] (with accountCount field)
+- POST /api/v1/platform (CreatePlatform)
   Auth/permission: jwt / permissions.createPlatform
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- DELETE /api/v1/platform/{id} (HandleDeletePlatform)
-  Request: path id: string (arg: 'id')
+  Response: Platform
+- DELETE /api/v1/platform/{id} (DeletePlatform)
   Auth/permission: jwt / permissions.deletePlatform
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- PUT /api/v1/platform/{id} (HandleUpdatePlatform)
-  Request: path id: string (arg: 'id'); body data: UpdatePlatformDto
+  Response: Platform
+- PUT /api/v1/platform/{id} (UpdatePlatform)
   Auth/permission: jwt / permissions.updatePlatform
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/platforms (HandleGetPlatforms)
-  Request: no explicit request params
+  Response: Platform
+- GET /api/v1/platforms (GetPlatforms)
   Auth/permission: jwt / permissions.readPlatforms
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
+  Response: { platforms: Platform[] }
 */
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
 
-// --- Group: platform (CRUD with account count) ---
-// Legacy behavior note:
-// NestJS exposes both /platform and /platforms from different controllers.
-// Keep both routes wired; they are not aliases.
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
+	"github.com/google/uuid"
+)
 
-func HandleGetPlatform(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, []any{})
-}
+func GetPlatformsWithAccountCount(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.PlatformService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
 
-func HandleCreatePlatform(w http.ResponseWriter, r *http.Request) {
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+		platforms, err := deps.PlatformService.GetPlatforms(r.Context())
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if platforms == nil {
+			platforms = []model.Platform{}
+		}
+		// Legacy parity: /platform returns array with accountCount.
+		// accountCount requires a join; return 0 until wired.
+		result := make([]map[string]any, len(platforms))
+		for i, p := range platforms {
+			result[i] = map[string]any{
+				"id":           p.ID,
+				"name":         p.Name,
+				"url":          p.Url,
+				"accountCount": 0,
+			}
+		}
+		JSON(w, http.StatusOK, result)
 	}
-	_ = body // TODO: pass to service
-	JSON(w, http.StatusCreated, map[string]any{})
 }
 
-func HandleDeletePlatform(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	_ = id // TODO: pass to service
-	JSON(w, http.StatusOK, map[string]any{})
-}
+func CreatePlatform(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.PlatformService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
 
-func HandleUpdatePlatform(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+		var body struct {
+			Name *string `json:"name"`
+			Url  string  `json:"url"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		p := model.Platform{
+			ID:   uuid.New().String(),
+			Name: body.Name,
+			Url:  body.Url,
+		}
+
+		created, err := deps.PlatformService.CreatePlatform(r.Context(), p)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusCreated, created)
 	}
-	_ = id   // TODO: pass to service
-	_ = body // TODO: pass to service
-	JSON(w, http.StatusOK, map[string]any{})
 }
 
-// --- Group: platforms (read-only list) ---
+func DeletePlatform(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.PlatformService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
 
-func HandleGetPlatforms(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, []any{})
+		id := r.PathValue("id")
+		if err := deps.PlatformService.DeletePlatform(r.Context(), id); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, map[string]any{})
+	}
+}
+
+func UpdatePlatform(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.PlatformService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		id := r.PathValue("id")
+		var body struct {
+			Name *string `json:"name"`
+			Url  string  `json:"url"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		p := model.Platform{
+			ID:   id,
+			Name: body.Name,
+			Url:  strings.TrimSpace(body.Url),
+		}
+
+		updated, err := deps.PlatformService.UpdatePlatform(r.Context(), p)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, updated)
+	}
+}
+
+func GetPlatforms(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.PlatformService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		platforms, err := deps.PlatformService.GetPlatforms(r.Context())
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if platforms == nil {
+			platforms = []model.Platform{}
+		}
+		// Legacy parity: /platforms wraps in { platforms: [...] }
+		JSON(w, http.StatusOK, map[string]any{"platforms": platforms})
+	}
 }
