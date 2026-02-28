@@ -52,14 +52,20 @@ func TestHealthRoutes(t *testing.T) {
 			wantKV:     map[string]string{"status": "ok"},
 		},
 		{
-			name:       "health data enhancer path param",
+			name:       "health data enhancer known name",
 			method:     http.MethodGet,
-			path:       "/api/v1/health/data-enhancer/yahoo-finance",
+			path:       "/api/v1/health/data-enhancer/YAHOO",
 			wantStatus: http.StatusOK,
 			wantKV: map[string]string{
 				"status": "ok",
-				"name":   "yahoo-finance",
+				"name":   "YAHOO",
 			},
+		},
+		{
+			name:       "health data enhancer unknown name",
+			method:     http.MethodGet,
+			path:       "/api/v1/health/data-enhancer/yahoo-finance",
+			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:       "health data provider path param",

@@ -70,6 +70,7 @@ Fields:
 - `mode`: `"status"` or `"json"` (default `"status"`)
 - `headers`: optional header map
 - `auth`: `""`, `"jwt"`, `"jwt:ENV_NAME"`, `"api-key"`, or `"api-key:ENV_NAME"`
+- `requiredEnv`: optional list of env vars required for the case; case is skipped if any are missing
 - `body`: optional JSON payload
 - `ignoreJsonPaths`: optional list of dot-paths to ignore in JSON mode
 

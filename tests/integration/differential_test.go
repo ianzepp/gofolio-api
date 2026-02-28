@@ -28,6 +28,7 @@ type testCase struct {
 	Mode            compareMode       `json:"mode"`
 	Headers         map[string]string `json:"headers"`
 	Auth            string            `json:"auth"` // "", "jwt", "api-key"
+	RequiredEnv     []string          `json:"requiredEnv"`
 	Body            json.RawMessage   `json:"body"`
 	IgnoreJSONPaths []string          `json:"ignoreJsonPaths"`
 }
@@ -62,6 +63,10 @@ func TestDifferentialAPI(t *testing.T) {
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
+			if missing, ok := missingRequiredEnv(tc); ok {
+				t.Skipf("skipping case %q: missing env %s", tc.Name, missing)
+			}
+
 			legacyResp, err := doRequest(client, legacyBaseURL, tc)
 			if err != nil {
 				t.Fatalf("legacy request failed: %v", err)
@@ -198,6 +203,43 @@ func applyAuth(req *http.Request, authMode string, caseName string) error {
 		return nil
 	default:
 		return fmt.Errorf("case %q has unsupported auth mode %q", caseName, authMode)
+	}
+}
+
+func missingRequiredEnv(tc testCase) (string, bool) {
+	for _, envName := range tc.RequiredEnv {
+		name := strings.TrimSpace(envName)
+		if name == "" {
+			continue
+		}
+		if os.Getenv(name) == "" {
+			return name, true
+		}
+	}
+
+	if authEnvName := requiredEnvForAuth(tc.Auth); authEnvName != "" && os.Getenv(authEnvName) == "" {
+		return authEnvName, true
+	}
+
+	return "", false
+}
+
+func requiredEnvForAuth(authMode string) string {
+	if authMode == "" {
+		return ""
+	}
+
+	switch {
+	case authMode == "jwt":
+		return "JWT_TOKEN"
+	case strings.HasPrefix(authMode, "jwt:"):
+		return strings.TrimSpace(strings.TrimPrefix(authMode, "jwt:"))
+	case authMode == "api-key":
+		return "API_KEY"
+	case strings.HasPrefix(authMode, "api-key:"):
+		return strings.TrimSpace(strings.TrimPrefix(authMode, "api-key:"))
+	default:
+		return ""
 	}
 }
 

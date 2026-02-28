@@ -43,7 +43,8 @@
     "method": "GET",
     "path": "/api/v1/tags",
     "mode": "status",
-    "auth": "api-key:API_KEY_USER"
+    "auth": "api-key:API_KEY_USER",
+    "requiredEnv": ["API_KEY_USER"]
   },
   {
     "name": "tags-post-user-missing-user-id-parity",
@@ -51,6 +52,7 @@
     "path": "/api/v1/tags",
     "mode": "status",
     "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
     "body": {
       "name": "integration-tag-user-missing-id"
     }
@@ -61,6 +63,7 @@
     "path": "/api/v1/tags",
     "mode": "status",
     "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "ADMIN_USER_ID"],
     "body": {
       "name": "integration-tag-user-foreign-id",
       "userId": "${ADMIN_USER_ID}"
@@ -72,6 +75,7 @@
     "path": "/api/v1/tags",
     "mode": "status",
     "auth": "jwt:JWT_DEMO_TOKEN",
+    "requiredEnv": ["JWT_DEMO_TOKEN", "DEMO_USER_ID"],
     "body": {
       "name": "integration-tag-demo",
       "userId": "${DEMO_USER_ID}"

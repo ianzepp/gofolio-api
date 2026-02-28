@@ -22,6 +22,12 @@ Routes + request/response shape:
 
 import "net/http"
 
+var knownDataEnhancers = map[string]struct{}{
+	"YAHOO":       {},
+	"OPENFIGI":    {},
+	"TRACKINSIGHT": {},
+}
+
 func HandleGetHealth(w http.ResponseWriter, r *http.Request) {
 	// Legacy behavior note:
 	// Baseline health response is a tiny JSON payload: {"status":"ok"}.
@@ -32,6 +38,10 @@ func HandleGetHealth(w http.ResponseWriter, r *http.Request) {
 
 func HandleGetHealthDataEnhancer(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
+	if _, ok := knownDataEnhancers[name]; !ok {
+		Error(w, http.StatusNotFound, http.StatusText(http.StatusNotFound))
+		return
+	}
 	JSON(w, http.StatusOK, map[string]any{
 		"name":   name,
 		"status": "ok",
