@@ -43,6 +43,8 @@ If either API is unreachable at `/api/v1/health`, tests are skipped.
     `EMPTY_USER_ID`, `EMPTY_USER_ACCESS_TOKEN` for destructive/edge cases
   - creates transfer test accounts for the bootstrapped user and exports
     `TRANSFER_ACCOUNT_FROM_ID` and `TRANSFER_ACCOUNT_TO_ID`
+  - seeds two deterministic transfer-account orders and exports
+    `SEED_ORDER_ID` and `SEED_ORDER_TWO_ID` for export filter parity cases
   - exports `ADMIN_USER_ID` as a guaranteed foreign UUID for ownership-negative cases
   - attempts DB-assisted admin bootstrap and exports `JWT_ADMIN_TOKEN` +
     `ADMIN_DB_USER_ID` for admin-control parity cases when available
@@ -101,9 +103,10 @@ Optional tools used by advanced bootstrap paths:
 
 Current fixture set (`tests/integration/testdata/cases.json`) has:
 
-- `73` total cases
-- `68` status-compare cases
-- `5` JSON-compare cases
+- `103` total cases
+- `75` status-compare cases
+- `28` JSON-compare cases
+- `12` export-focused parity cases
 
 ## Auth
 

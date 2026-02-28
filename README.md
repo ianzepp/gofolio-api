@@ -40,6 +40,12 @@ Go eliminates the ceremony. No decorators, no DI containers, no module system. F
 
 **Phase 2 — DB harness** (in progress): 3-layer architecture (handler → service → repository) with raw `pgx` queries. CRUD domains wired: tag, account, order, access, platform, user. Read-only data paths wired: info, benchmarks, admin dashboard, admin market-data, admin users, asset, market-data by symbol, export.
 
+Current parity snapshot:
+
+- Differential harness: `103` cases total (`75` status + `28` JSON)
+- Export differential coverage: `12` cases (including account/activity/symbol/dataSource intersections)
+- Remaining non-parity areas are still mostly stub handlers (notably `portfolio/*` and `symbol/*` families)
+
 ## Architecture
 
 ```
@@ -220,7 +226,7 @@ Current test pattern:
   - Run the same request fixtures against legacy NestJS and the Go API
   - Compare status (and JSON where configured) to detect parity regressions
   - Details: [`tests/integration/README.md`](./tests/integration/README.md)
-  - Current fixture count: `73` total (`68` status compare, `5` JSON compare)
+  - Current fixture count: `103` total (`75` status compare, `28` JSON compare)
 
 Run all tests:
 

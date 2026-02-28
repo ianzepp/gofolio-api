@@ -47,6 +47,14 @@
     "requiredEnv": ["API_KEY_USER"]
   },
   {
+    "name": "tags-get-user-json-parity",
+    "method": "GET",
+    "path": "/api/v1/tags",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
     "name": "tags-post-user-missing-user-id-parity",
     "method": "POST",
     "path": "/api/v1/tags",
@@ -246,10 +254,22 @@
     "mode": "status"
   },
   {
+    "name": "account-get-no-auth-unauthorized-json-parity",
+    "method": "GET",
+    "path": "/api/v1/account",
+    "mode": "json"
+  },
+  {
     "name": "order-get-no-auth-unauthorized",
     "method": "GET",
     "path": "/api/v1/order",
     "mode": "status"
+  },
+  {
+    "name": "order-get-no-auth-unauthorized-json-parity",
+    "method": "GET",
+    "path": "/api/v1/order",
+    "mode": "json"
   },
   {
     "name": "order-delete-no-auth-unauthorized",
@@ -264,6 +284,15 @@
     "mode": "status"
   },
   {
+    "name": "access-get-user-json-parity",
+    "method": "GET",
+    "path": "/api/v1/access",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "ignoreJsonPaths": ["*.createdAt", "*.updatedAt"]
+  },
+  {
     "name": "platforms-get-user-ok-parity",
     "method": "GET",
     "path": "/api/v1/platforms",
@@ -276,6 +305,14 @@
     "method": "GET",
     "path": "/api/v1/platform",
     "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "platform-get-user-forbidden-json-parity",
+    "method": "GET",
+    "path": "/api/v1/platform",
+    "mode": "json",
     "auth": "jwt:JWT_USER_TOKEN",
     "requiredEnv": ["JWT_USER_TOKEN"]
   },
@@ -304,6 +341,28 @@
     "mode": "status",
     "auth": "jwt:JWT_USER_TOKEN",
     "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"]
+  },
+  {
+    "name": "account-get-by-id-user-json-parity",
+    "method": "GET",
+    "path": "/api/v1/account/${TRANSFER_ACCOUNT_FROM_ID}",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"],
+    "ignoreJsonPaths": [
+      "createdAt",
+      "updatedAt",
+      "activitiesCount",
+      "allocationInPercentage",
+      "balanceInBaseCurrency",
+      "comment",
+      "dividendInBaseCurrency",
+      "interestInBaseCurrency",
+      "platform",
+      "platformId",
+      "value",
+      "valueInBaseCurrency"
+    ]
   },
   {
     "name": "account-balances-no-auth-unauthorized",
@@ -532,6 +591,14 @@
     "requiredEnv": ["JWT_USER_TOKEN"]
   },
   {
+    "name": "admin-get-user-forbidden-json-parity",
+    "method": "GET",
+    "path": "/api/v1/admin",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
     "name": "admin-get-admin-ok-parity",
     "method": "GET",
     "path": "/api/v1/admin",
@@ -639,6 +706,12 @@
     "mode": "status"
   },
   {
+    "name": "export-no-auth-unauthorized-json-parity",
+    "method": "GET",
+    "path": "/api/v1/export",
+    "mode": "json"
+  },
+  {
     "name": "export-user-ok-parity",
     "method": "GET",
     "path": "/api/v1/export",
@@ -653,10 +726,24 @@
     "mode": "status"
   },
   {
+    "name": "market-data-by-symbol-no-auth-unauthorized-json-parity",
+    "method": "GET",
+    "path": "/api/v1/market-data/YAHOO/AAPL",
+    "mode": "json"
+  },
+  {
     "name": "market-data-by-symbol-user-common-forbidden-parity",
     "method": "GET",
     "path": "/api/v1/market-data/YAHOO/AAPL",
     "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "market-data-by-symbol-user-common-forbidden-json-parity",
+    "method": "GET",
+    "path": "/api/v1/market-data/YAHOO/AAPL",
+    "mode": "json",
     "auth": "jwt:JWT_USER_TOKEN",
     "requiredEnv": ["JWT_USER_TOKEN"]
   },
@@ -878,6 +965,18 @@
     "method": "GET",
     "path": "/api/v1/asset/YAHOO/AAPL",
     "mode": "status"
+  },
+  {
+    "name": "asset-get-missing-symbol-json-parity",
+    "method": "GET",
+    "path": "/api/v1/asset/YAHOO/INTEGRATION_UNKNOWN_ASSET",
+    "mode": "json",
+    "ignoreJsonPaths": [
+      "assetProfile.name",
+      "marketData.*.id",
+      "marketData.*.createdAt",
+      "marketData.*.date"
+    ]
   },
   {
     "name": "asset-get-missing-symbol-fallback-parity",
