@@ -1,6 +1,11 @@
 package handler
 
-import "net/http"
+import (
+	"errors"
+	"net/http"
+
+	"github.com/jackc/pgx/v5"
+)
 
 func GetMarketData(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -14,7 +19,11 @@ func GetMarketData(deps *Deps) http.HandlerFunc {
 
 		resp, err := deps.MarketDataService.GetBySymbol(r.Context(), dataSource, symbol)
 		if err != nil {
-			JSON(w, http.StatusOK, map[string]any{})
+			if errors.Is(err, pgx.ErrNoRows) {
+				Error(w, http.StatusNotFound, "Not Found")
+				return
+			}
+			Error(w, http.StatusInternalServerError, "Internal server error")
 			return
 		}
 

@@ -71,7 +71,10 @@ func (s *ExportService) GetExport(ctx context.Context, userID string) (ExportRes
 	for id := range idSet {
 		ids = append(ids, id)
 	}
-	profiles, _ := spRepo.FindByIDs(ctx, ids)
+	profiles, err := spRepo.FindByIDs(ctx, ids)
+	if err != nil {
+		return ExportResponse{}, fmt.Errorf("find symbol profiles: %w", err)
+	}
 	profileMap := make(map[string]model.SymbolProfile, len(profiles))
 	for _, p := range profiles {
 		profileMap[p.ID] = p

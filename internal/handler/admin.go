@@ -1,6 +1,11 @@
 package handler
 
-import "net/http"
+import (
+	"errors"
+	"net/http"
+
+	"github.com/jackc/pgx/v5"
+)
 
 // GET /admin
 func GetAdmin(deps *Deps) http.HandlerFunc {
@@ -79,7 +84,11 @@ func GetAdminUser(deps *Deps) http.HandlerFunc {
 
 		user, err := deps.AdminService.GetUser(r.Context(), id)
 		if err != nil {
-			Error(w, http.StatusNotFound, "User not found")
+			if errors.Is(err, pgx.ErrNoRows) {
+				Error(w, http.StatusNotFound, "User not found")
+				return
+			}
+			Error(w, http.StatusInternalServerError, "Internal server error")
 			return
 		}
 
