@@ -27,6 +27,29 @@ func NewApiKeyRepository(db db.DBTX) *ApiKeyRepository {
 	return &ApiKeyRepository{db: db}
 }
 
+// DeleteByUserID removes all API keys for a user. Called before inserting a
+// new key to enforce the one-key-per-user invariant.
+func (r *ApiKeyRepository) DeleteByUserID(ctx context.Context, userID string) error {
+	_, err := r.db.ExecContext(ctx,
+		`DELETE FROM "ApiKey" WHERE "userId" = $1`, userID)
+	if err != nil {
+		return fmt.Errorf("delete api keys for user: %w", err)
+	}
+	return nil
+}
+
+// Create inserts a new API key record with the given hashed key.
+func (r *ApiKeyRepository) Create(ctx context.Context, id, hashedKey, userID string) error {
+	_, err := r.db.ExecContext(ctx,
+		`INSERT INTO "ApiKey" (id, "hashedKey", "userId", "createdAt", "updatedAt")
+		 VALUES ($1, $2, $3, NOW(), NOW())`,
+		id, hashedKey, userID)
+	if err != nil {
+		return fmt.Errorf("insert api key: %w", err)
+	}
+	return nil
+}
+
 // FindUserIDByHashedKey resolves the userId associated with a hashed API key.
 // The caller must hash the raw inbound key before calling here — storing and
 // comparing only hashes prevents key exposure in logs, database backups, and

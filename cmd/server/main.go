@@ -164,10 +164,10 @@ func main() {
 	mux.HandleFunc("GET /api/v1/admin/user/{id}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminUser(deps)))
 
 	// Admin Queue
-	mux.HandleFunc("DELETE /api/v1/admin/queue/job", handler.HandleDeleteQueueJobs)
-	mux.HandleFunc("GET /api/v1/admin/queue/job", handler.HandleGetQueueJobs)
-	mux.HandleFunc("DELETE /api/v1/admin/queue/job/{id}", handler.HandleDeleteQueueJob)
-	mux.HandleFunc("GET /api/v1/admin/queue/job/{id}/execute", handler.HandleExecuteQueueJob)
+	mux.HandleFunc("DELETE /api/v1/admin/queue/job", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleDeleteQueueJobs))
+	mux.HandleFunc("GET /api/v1/admin/queue/job", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGetQueueJobs))
+	mux.HandleFunc("DELETE /api/v1/admin/queue/job/{id}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleDeleteQueueJob))
+	mux.HandleFunc("GET /api/v1/admin/queue/job/{id}/execute", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleExecuteQueueJob))
 
 	// Agent
 	mux.HandleFunc("POST /api/v1/agent/chat", handler.HandleCreateAgentChat)
@@ -175,10 +175,10 @@ func main() {
 	mux.HandleFunc("GET /api/v1/agent/session/{id}", handler.HandleGetAgentSession)
 
 	// AI
-	mux.HandleFunc("GET /api/v1/ai/prompt/{mode}", handler.HandleGetAiPrompt)
+	mux.HandleFunc("GET /api/v1/ai/prompt/{mode}", auth.RequirePermission(authCfg, auth.ReadAiPrompt, handler.GetAiPrompt(deps)))
 
 	// API Keys
-	mux.HandleFunc("POST /api/v1/api-keys", handler.HandleCreateApiKey)
+	mux.HandleFunc("POST /api/v1/api-keys", auth.RequirePermission(authCfg, auth.CreateApiKey, handler.CreateApiKey(deps)))
 
 	// Asset
 	mux.HandleFunc("GET /api/v1/asset/{dataSource}/{symbol}", handler.GetAsset(deps))
@@ -187,8 +187,8 @@ func main() {
 	mux.HandleFunc("GET /assets/{languageCode}/site.webmanifest", handler.HandleGetWebManifest)
 
 	// Auth
-	mux.HandleFunc("POST /api/v1/auth/anonymous", handler.HandleAuthAnonymous)
-	mux.HandleFunc("GET /api/v1/auth/anonymous/{accessToken}", handler.HandleGetAuthAnonymous)
+	mux.HandleFunc("POST /api/v1/auth/anonymous", handler.AuthAnonymous(deps))
+	mux.HandleFunc("GET /api/v1/auth/anonymous/{accessToken}", handler.GetAuthAnonymous(deps))
 	mux.HandleFunc("GET /api/v1/auth/google", handler.HandleGetAuthGoogle)
 	mux.HandleFunc("GET /api/v1/auth/google/callback", handler.HandleGetAuthGoogleCallback)
 	mux.HandleFunc("GET /api/v1/auth/oidc", handler.HandleGetAuthOidc)
@@ -199,7 +199,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/auth/webauthn/verify-authentication", handler.HandleWebauthnVerifyAuthentication)
 
 	// Auth Device
-	mux.HandleFunc("DELETE /api/v1/auth-device/{id}", handler.HandleDeleteAuthDevice)
+	mux.HandleFunc("DELETE /api/v1/auth-device/{id}", auth.RequirePermission(authCfg, auth.DeleteAuthDevice, handler.DeleteAuthDevice(deps)))
 
 	// Benchmarks
 	mux.HandleFunc("GET /api/v1/benchmarks", handler.GetBenchmarks(deps))
@@ -208,7 +208,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/benchmarks/{dataSource}/{symbol}/{startDateString}", auth.Authenticate(authCfg, handler.HandleGetBenchmarkDetail))
 
 	// Cache
-	mux.HandleFunc("POST /api/v1/cache/flush", handler.HandleFlushCache)
+	mux.HandleFunc("POST /api/v1/cache/flush", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleFlushCache))
 
 	// Data Providers
 	mux.HandleFunc(
