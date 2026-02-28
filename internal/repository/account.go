@@ -7,7 +7,7 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
-	"github.com/jackc/pgx/v5"
+	"github.com/jmoiron/sqlx"
 )
 
 // AccountRepository handles persistence for broker/bank account records.
@@ -30,7 +30,9 @@ func NewAccountRepository(db db.DBTX) *AccountRepository {
 // FindByUserID returns all accounts owned by userID, sorted alphabetically
 // by account name.
 func (r *AccountRepository) FindByUserID(ctx context.Context, userID string) ([]model.Account, error) {
-	rows, err := r.db.Query(ctx,
+	var items []model.Account
+	err := sqlx.SelectContext(ctx, r.db,
+		&items,
 		`SELECT id, "userId", balance, comment, "createdAt", currency,
 		        "isExcluded", name, "platformId", "updatedAt"
 		 FROM "Account"
@@ -39,13 +41,15 @@ func (r *AccountRepository) FindByUserID(ctx context.Context, userID string) ([]
 	if err != nil {
 		return nil, fmt.Errorf("query accounts: %w", err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[model.Account])
+	return items, nil
 }
 
 // FindByID fetches a single account by its primary key, scoped to userID.
 // Returns ErrNoRows when the account does not exist or belongs to another user.
 func (r *AccountRepository) FindByID(ctx context.Context, id string, userID string) (model.Account, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.Account
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`SELECT id, "userId", balance, comment, "createdAt", currency,
 		        "isExcluded", name, "platformId", "updatedAt"
 		 FROM "Account"
@@ -53,14 +57,16 @@ func (r *AccountRepository) FindByID(ctx context.Context, id string, userID stri
 	if err != nil {
 		return model.Account{}, fmt.Errorf("query account: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Account])
+	return item, nil
 }
 
 // Create inserts a new account row and returns the full persisted record
 // including database-generated timestamps. The caller must supply a
 // pre-generated ID.
 func (r *AccountRepository) Create(ctx context.Context, acct model.Account) (model.Account, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.Account
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`INSERT INTO "Account" (id, "userId", balance, comment, currency,
 		                        "isExcluded", name, "platformId")
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -71,14 +77,16 @@ func (r *AccountRepository) Create(ctx context.Context, acct model.Account) (mod
 	if err != nil {
 		return model.Account{}, fmt.Errorf("insert account: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Account])
+	return item, nil
 }
 
 // Update replaces all mutable fields on an account and enforces ownership via
 // the WHERE clause. Returns ErrNoRows when the account does not exist or
 // belongs to a different user.
 func (r *AccountRepository) Update(ctx context.Context, acct model.Account) (model.Account, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.Account
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`UPDATE "Account"
 		 SET balance = $3, comment = $4, currency = $5,
 		     "isExcluded" = $6, name = $7, "platformId" = $8
@@ -90,14 +98,14 @@ func (r *AccountRepository) Update(ctx context.Context, acct model.Account) (mod
 	if err != nil {
 		return model.Account{}, fmt.Errorf("update account: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Account])
+	return item, nil
 }
 
 // Delete removes an account scoped to userID. The caller must ensure all
 // associated orders and account balances have been removed first to avoid
 // FK constraint violations.
 func (r *AccountRepository) Delete(ctx context.Context, id string, userID string) error {
-	_, err := r.db.Exec(ctx,
+	_, err := r.db.ExecContext(ctx,
 		`DELETE FROM "Account" WHERE id = $1 AND "userId" = $2`, id, userID)
 	if err != nil {
 		return fmt.Errorf("delete account: %w", err)
@@ -111,7 +119,7 @@ func (r *AccountRepository) Delete(ctx context.Context, id string, userID string
 // WHY: a delta-based update rather than a set-based update prevents the race
 // condition where two concurrent writers overwrite each other's changes.
 func (r *AccountRepository) UpdateBalance(ctx context.Context, id string, userID string, delta float64) error {
-	_, err := r.db.Exec(ctx,
+	_, err := r.db.ExecContext(ctx,
 		`UPDATE "Account" SET balance = balance + $3
 		 WHERE id = $1 AND "userId" = $2`, id, userID, delta)
 	if err != nil {

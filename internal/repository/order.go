@@ -5,12 +5,12 @@
 // the NestJS reference implementation.
 //
 // All repositories accept a db.DBTX interface so they work transparently with
-// both a plain *pgxpool.Pool and a *pgx.Tx — callers that need atomicity simply
+// both a plain *sqlx.DB and a *sqlx.Tx — callers that need atomicity simply
 // pass an active transaction.
 //
 // Column lists are defined as package-level constants (e.g. orderColumns) to
 // guarantee that SELECT and RETURNING clauses stay in sync with each other and
-// with the model struct field tags used by pgx.RowToStructByName.
+// with the model struct field tags used by sqlx struct scanning.
 package repository
 
 import (
@@ -19,7 +19,7 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
-	"github.com/jackc/pgx/v5"
+	"github.com/jmoiron/sqlx"
 )
 
 // OrderRepository provides database access for the Order entity, which
@@ -46,7 +46,9 @@ const orderColumns = `id, "accountId", "accountUserId", comment, "createdAt",
 // FindByUserID returns all orders owned by userID, sorted newest-first.
 // Returns an empty slice (not an error) when the user has no orders.
 func (r *OrderRepository) FindByUserID(ctx context.Context, userID string) ([]model.Order, error) {
-	rows, err := r.db.Query(ctx,
+	var items []model.Order
+	err := sqlx.SelectContext(ctx, r.db,
+		&items,
 		`SELECT `+orderColumns+`
 		 FROM "Order"
 		 WHERE "userId" = $1
@@ -54,42 +56,48 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID string) ([]mo
 	if err != nil {
 		return nil, fmt.Errorf("query orders: %w", err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[model.Order])
+	return items, nil
 }
 
 // FindByID fetches a single order by its primary key regardless of owner.
 // Returns pgx.ErrNoRows (wrapped) when no matching record exists.
 // WHY: admin-level operations need ID-only lookup without a user scope check.
 func (r *OrderRepository) FindByID(ctx context.Context, id string) (model.Order, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.Order
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`SELECT `+orderColumns+`
 		 FROM "Order"
 		 WHERE id = $1`, id)
 	if err != nil {
 		return model.Order{}, fmt.Errorf("query order: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
+	return item, nil
 }
 
 // FindByIDAndUserID fetches a single order scoped to a specific owner.
 // The combined WHERE clause acts as an ownership check — a non-owner receives
 // ErrNoRows rather than a permissions error, which matches NestJS behaviour.
 func (r *OrderRepository) FindByIDAndUserID(ctx context.Context, id string, userID string) (model.Order, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.Order
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`SELECT `+orderColumns+`
 		 FROM "Order"
 		 WHERE id = $1 AND "userId" = $2`, id, userID)
 	if err != nil {
 		return model.Order{}, fmt.Errorf("query order by user: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
+	return item, nil
 }
 
 // Create inserts a new Order row and returns the full persisted record,
 // including database-generated timestamps. The caller is responsible for
 // generating the ID before calling this method.
 func (r *OrderRepository) Create(ctx context.Context, order model.Order) (model.Order, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.Order
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`INSERT INTO "Order" (id, "accountId", "accountUserId", comment,
 		                      currency, date, fee, "isDraft", quantity,
 		                      "symbolProfileId", type, "unitPrice", "userId")
@@ -101,14 +109,16 @@ func (r *OrderRepository) Create(ctx context.Context, order model.Order) (model.
 	if err != nil {
 		return model.Order{}, fmt.Errorf("insert order: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
+	return item, nil
 }
 
 // Update replaces mutable fields on an existing order identified solely by ID.
 // WHY: used by admin endpoints that are allowed to update any order without
 // verifying ownership at the query level (ownership is enforced upstream).
 func (r *OrderRepository) Update(ctx context.Context, order model.Order) (model.Order, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.Order
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`UPDATE "Order"
 		 SET "accountId" = $2, "accountUserId" = $3, comment = $4,
 		     currency = $5, date = $6, fee = $7, "isDraft" = $8,
@@ -122,14 +132,16 @@ func (r *OrderRepository) Update(ctx context.Context, order model.Order) (model.
 	if err != nil {
 		return model.Order{}, fmt.Errorf("update order: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
+	return item, nil
 }
 
 // UpdateByUserID replaces mutable fields on an order only when the record
 // belongs to userID. Returns ErrNoRows (wrapped) if the order does not exist
 // or is owned by a different user, preventing cross-user mutation.
 func (r *OrderRepository) UpdateByUserID(ctx context.Context, order model.Order, userID string) (model.Order, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.Order
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`UPDATE "Order"
 		 SET "accountId" = $2, "accountUserId" = $3, comment = $4,
 		     currency = $5, date = $6, fee = $7, "isDraft" = $8,
@@ -143,14 +155,14 @@ func (r *OrderRepository) UpdateByUserID(ctx context.Context, order model.Order,
 	if err != nil {
 		return model.Order{}, fmt.Errorf("update order by user: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
+	return item, nil
 }
 
 // CountAll returns the total number of orders across all users.
 // Used by the admin dashboard to surface platform-wide activity metrics.
 func (r *OrderRepository) CountAll(ctx context.Context) (int, error) {
 	var count int
-	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM "Order"`).Scan(&count)
+	err := r.db.QueryRowxContext(ctx, `SELECT COUNT(*) FROM "Order"`).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count orders: %w", err)
 	}
@@ -162,7 +174,7 @@ func (r *OrderRepository) CountAll(ctx context.Context) (int, error) {
 // deleting a SymbolProfile to check whether any orders would be orphaned.
 func (r *OrderRepository) CountByDataSourceAndSymbol(ctx context.Context, dataSource string, symbol string) (int, error) {
 	var count int
-	err := r.db.QueryRow(ctx,
+	err := r.db.QueryRowxContext(ctx,
 		`SELECT COUNT(*) FROM "Order" o
 		 JOIN "SymbolProfile" sp ON o."symbolProfileId" = sp.id
 		 WHERE sp."dataSource" = $1 AND sp.symbol = $2`, dataSource, symbol).Scan(&count)
@@ -176,7 +188,7 @@ func (r *OrderRepository) CountByDataSourceAndSymbol(ctx context.Context, dataSo
 // WHY: admin paths need unconditional deletion; user-facing paths should use
 // DeleteByIDAndUserID instead.
 func (r *OrderRepository) Delete(ctx context.Context, id string) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM "Order" WHERE id = $1`, id)
+	_, err := r.db.ExecContext(ctx, `DELETE FROM "Order" WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("delete order: %w", err)
 	}
@@ -188,20 +200,20 @@ func (r *OrderRepository) Delete(ctx context.Context, id string) error {
 // does not exist or belongs to a different user — callers should treat this
 // as a not-found / forbidden condition.
 func (r *OrderRepository) DeleteByIDAndUserID(ctx context.Context, id string, userID string) (int64, error) {
-	tag, err := r.db.Exec(ctx, `DELETE FROM "Order" WHERE id = $1 AND "userId" = $2`, id, userID)
+	result, err := r.db.ExecContext(ctx, `DELETE FROM "Order" WHERE id = $1 AND "userId" = $2`, id, userID)
 	if err != nil {
 		return 0, fmt.Errorf("delete order by user: %w", err)
 	}
-	return tag.RowsAffected(), nil
+	return result.RowsAffected()
 }
 
 // DeleteByUserID removes all orders belonging to userID, returning the count
 // of deleted rows. Used during account deletion to cascade-remove activity
 // before the User row itself is dropped.
 func (r *OrderRepository) DeleteByUserID(ctx context.Context, userID string) (int64, error) {
-	tag, err := r.db.Exec(ctx, `DELETE FROM "Order" WHERE "userId" = $1`, userID)
+	result, err := r.db.ExecContext(ctx, `DELETE FROM "Order" WHERE "userId" = $1`, userID)
 	if err != nil {
 		return 0, fmt.Errorf("delete orders by user: %w", err)
 	}
-	return tag.RowsAffected(), nil
+	return result.RowsAffected()
 }

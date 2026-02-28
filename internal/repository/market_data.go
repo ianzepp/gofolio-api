@@ -8,7 +8,8 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
-	"github.com/jackc/pgx/v5"
+	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 )
 
 // MarketDataRepository handles persistence for daily price points scraped or
@@ -35,7 +36,9 @@ const marketDataColumns = `id, "createdAt", "dataSource", date,
 // tracked securities — callers that only need the latest price should prefer
 // FindLatestByDataSourceAndSymbol.
 func (r *MarketDataRepository) FindBySymbol(ctx context.Context, dataSource string, symbol string) ([]model.MarketData, error) {
-	rows, err := r.db.Query(ctx,
+	var items []model.MarketData
+	err := sqlx.SelectContext(ctx, r.db,
+		&items,
 		`SELECT `+marketDataColumns+`
 		 FROM "MarketData"
 		 WHERE "dataSource" = $1 AND symbol = $2
@@ -43,7 +46,7 @@ func (r *MarketDataRepository) FindBySymbol(ctx context.Context, dataSource stri
 	if err != nil {
 		return nil, fmt.Errorf("query market data: %w", err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[model.MarketData])
+	return items, nil
 }
 
 // FindBySymbolAndDateRange returns price points for a symbol within a closed
@@ -51,7 +54,9 @@ func (r *MarketDataRepository) FindBySymbol(ctx context.Context, dataSource stri
 // is important for time-series calculations (TWR, MWRR) that must process
 // data in forward chronological order.
 func (r *MarketDataRepository) FindBySymbolAndDateRange(ctx context.Context, dataSource string, symbol string, from time.Time, to time.Time) ([]model.MarketData, error) {
-	rows, err := r.db.Query(ctx,
+	var items []model.MarketData
+	err := sqlx.SelectContext(ctx, r.db,
+		&items,
 		`SELECT `+marketDataColumns+`
 		 FROM "MarketData"
 		 WHERE "dataSource" = $1 AND symbol = $2
@@ -60,7 +65,7 @@ func (r *MarketDataRepository) FindBySymbolAndDateRange(ctx context.Context, dat
 	if err != nil {
 		return nil, fmt.Errorf("query market data range: %w", err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[model.MarketData])
+	return items, nil
 }
 
 // CountByDataSourceAndSymbol returns the number of stored price points for a
@@ -68,7 +73,7 @@ func (r *MarketDataRepository) FindBySymbolAndDateRange(ctx context.Context, dat
 // needed before serving portfolio calculations.
 func (r *MarketDataRepository) CountByDataSourceAndSymbol(ctx context.Context, dataSource string, symbol string) (int, error) {
 	var count int
-	err := r.db.QueryRow(ctx,
+	err := r.db.QueryRowxContext(ctx,
 		`SELECT COUNT(*) FROM "MarketData"
 		 WHERE "dataSource" = $1 AND symbol = $2`, dataSource, symbol).Scan(&count)
 	if err != nil {
@@ -81,7 +86,9 @@ func (r *MarketDataRepository) CountByDataSourceAndSymbol(ctx context.Context, d
 // a single symbol. The LIMIT 1 with ORDER BY date DESC avoids a full scan
 // when a suitable index on (dataSource, symbol, date DESC) exists.
 func (r *MarketDataRepository) FindLatestByDataSourceAndSymbol(ctx context.Context, dataSource string, symbol string) (model.MarketData, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.MarketData
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`SELECT `+marketDataColumns+`
 		 FROM "MarketData"
 		 WHERE "dataSource" = $1 AND symbol = $2
@@ -90,47 +97,56 @@ func (r *MarketDataRepository) FindLatestByDataSourceAndSymbol(ctx context.Conte
 	if err != nil {
 		return model.MarketData{}, fmt.Errorf("query latest market data: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.MarketData])
+	return item, nil
 }
 
 // FindLatestBySymbols retrieves the latest price record for each symbol in the
 // provided list, all from the same data source. Returns an empty slice without
 // hitting the database when symbols is empty.
 //
-// PERF: DISTINCT ON (symbol) with ORDER BY symbol, date DESC is a Postgres-
-// specific optimisation that avoids a subquery or window function to select
-// the most recent row per group efficiently.
+// PERF: uses a ROW_NUMBER() window function to select the most recent row per
+// symbol, which is portable across database engines.
 func (r *MarketDataRepository) FindLatestBySymbols(ctx context.Context, dataSource string, symbols []string) ([]model.MarketData, error) {
 	if len(symbols) == 0 {
-		// EDGE: early-return avoids sending "ANY('{}')" to Postgres, which is
-		// valid SQL but produces an unhelpful empty result and wastes a round-trip.
+		// EDGE: early-return avoids sending an empty IN list to the database,
+		// which would produce an unhelpful empty result and waste a round-trip.
 		return []model.MarketData{}, nil
 	}
-	rows, err := r.db.Query(ctx,
-		`SELECT DISTINCT ON (symbol) `+marketDataColumns+`
-		 FROM "MarketData"
-		 WHERE "dataSource" = $1 AND symbol = ANY($2)
-		 ORDER BY symbol, date DESC`, dataSource, symbols)
+	query, args, err := sqlx.In(
+		`SELECT id, "createdAt", "dataSource", date, "marketPrice", state, symbol
+		 FROM (
+		   SELECT id, "createdAt", "dataSource", date, "marketPrice", state, symbol,
+		          ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) AS rn
+		   FROM "MarketData"
+		   WHERE "dataSource" = ? AND symbol IN (?)
+		 ) sub
+		 WHERE rn = 1`, dataSource, symbols)
+	if err != nil {
+		return nil, fmt.Errorf("build latest market data query: %w", err)
+	}
+	query = sqlx.Rebind(sqlx.DOLLAR, query)
+	var items []model.MarketData
+	err = sqlx.SelectContext(ctx, r.db, &items, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query latest market data by symbols: %w", err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[model.MarketData])
+	return items, nil
 }
 
 // UpsertMarketPrice inserts a new price point or updates an existing one
 // identified by the unique constraint on (dataSource, date, symbol). This is
 // the idempotent write path used by the data-provider scraper pipeline — it
 // is safe to call repeatedly with the same inputs.
-// NOTE: the ID column uses gen_random_uuid() so the caller does not need to
-// supply one.
+// NOTE: the ID is generated in Go via uuid.New() so the query is portable
+// across database engines.
 func (r *MarketDataRepository) UpsertMarketPrice(ctx context.Context, dataSource string, symbol string, date time.Time, price float64, state model.MarketDataState) error {
-	_, err := r.db.Exec(ctx,
+	_, err := r.db.ExecContext(ctx,
 		`INSERT INTO "MarketData" (id, "dataSource", date, "marketPrice", state, symbol)
-		 VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)
+		 VALUES ($1, $2, $3, $4, $5, $6)
 		 ON CONFLICT ("dataSource", date, symbol) DO UPDATE
 		   SET "marketPrice" = EXCLUDED."marketPrice",
 		       state = EXCLUDED.state`,
-		dataSource, date, price, state, symbol)
+		uuid.New().String(), dataSource, date, price, state, symbol)
 	if err != nil {
 		return fmt.Errorf("upsert market price: %w", err)
 	}
@@ -141,7 +157,9 @@ func (r *MarketDataRepository) UpsertMarketPrice(ctx context.Context, dataSource
 // on or before the given date. Used by exchange rate lookups to find the
 // closest available rate when an exact date match may not exist.
 func (r *MarketDataRepository) FindLatestOnOrBeforeDate(ctx context.Context, dataSource string, symbol string, date time.Time) (model.MarketData, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.MarketData
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`SELECT `+marketDataColumns+`
 		 FROM "MarketData"
 		 WHERE "dataSource" = $1 AND symbol = $2 AND date <= $3
@@ -150,7 +168,7 @@ func (r *MarketDataRepository) FindLatestOnOrBeforeDate(ctx context.Context, dat
 	if err != nil {
 		return model.MarketData{}, fmt.Errorf("query latest market data on or before date: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.MarketData])
+	return item, nil
 }
 
 // Create inserts a single market data row with a caller-supplied ID and returns
@@ -158,7 +176,9 @@ func (r *MarketDataRepository) FindLatestOnOrBeforeDate(ctx context.Context, dat
 // unique-constraint error if a record for the same (dataSource, date, symbol)
 // already exists — use UpsertMarketPrice for idempotent writes.
 func (r *MarketDataRepository) Create(ctx context.Context, md model.MarketData) (model.MarketData, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.MarketData
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`INSERT INTO "MarketData" (id, "dataSource", date, "marketPrice", state, symbol)
 		 VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING `+marketDataColumns,
@@ -166,5 +186,5 @@ func (r *MarketDataRepository) Create(ctx context.Context, md model.MarketData) 
 	if err != nil {
 		return model.MarketData{}, fmt.Errorf("insert market data: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.MarketData])
+	return item, nil
 }

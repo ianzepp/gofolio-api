@@ -4,10 +4,11 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
-	"github.com/jackc/pgx/v5"
+	"github.com/jmoiron/sqlx"
 )
 
 // UserRepository handles persistence for the User entity, which is the root
@@ -32,14 +33,16 @@ const userColumns = `id, "accessToken", "authChallenge", "createdAt",
 // FindByID fetches a user by primary key. Returns a wrapped pgx.ErrNoRows
 // when no matching record exists.
 func (r *UserRepository) FindByID(ctx context.Context, id string) (model.User, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.User
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`SELECT `+userColumns+`
 		 FROM "User"
 		 WHERE id = $1`, id)
 	if err != nil {
 		return model.User{}, fmt.Errorf("query user: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.User])
+	return item, nil
 }
 
 // Create inserts a new User row, letting the database set createdAt/updatedAt
@@ -47,50 +50,57 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (model.User, e
 // WHY: timestamps are set server-side so all rows share a consistent clock
 // regardless of application-layer time skew.
 func (r *UserRepository) Create(ctx context.Context, user model.User) (model.User, error) {
-	rows, err := r.db.Query(ctx,
+	now := time.Now().UTC()
+	var item model.User
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`INSERT INTO "User" (id, "accessToken", "createdAt", provider, role, "updatedAt")
-		 VALUES ($1, $2, NOW(), $3, $4, NOW())
+		 VALUES ($1, $2, $3, $4, $5, $3)
 		 RETURNING `+userColumns,
-		user.ID, user.AccessToken, user.Provider, user.Role)
+		user.ID, user.AccessToken, now, user.Provider, user.Role)
 	if err != nil {
 		return model.User{}, fmt.Errorf("insert user: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.User])
+	return item, nil
 }
 
 // FindByAccessToken resolves a user from a stored (hashed) access token.
 // This is the primary lookup path for bearer-token authentication — the
 // service layer hashes the inbound token before calling here.
 func (r *UserRepository) FindByAccessToken(ctx context.Context, accessToken string) (model.User, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.User
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`SELECT `+userColumns+`
 		 FROM "User"
 		 WHERE "accessToken" = $1`, accessToken)
 	if err != nil {
 		return model.User{}, fmt.Errorf("query user by access token: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.User])
+	return item, nil
 }
 
 // FindAll returns every user ordered by creation time, newest first.
 // Intended for admin dashboards only — should never be called from
 // user-facing endpoints.
 func (r *UserRepository) FindAll(ctx context.Context) ([]model.User, error) {
-	rows, err := r.db.Query(ctx,
+	var items []model.User
+	err := sqlx.SelectContext(ctx, r.db,
+		&items,
 		`SELECT `+userColumns+`
 		 FROM "User"
 		 ORDER BY "createdAt" DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("query users: %w", err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[model.User])
+	return items, nil
 }
 
 // CountAll returns the total number of registered users.
 // Used by the admin overview and to gate first-user registration flows.
 func (r *UserRepository) CountAll(ctx context.Context) (int, error) {
 	var count int
-	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM "User"`).Scan(&count)
+	err := r.db.QueryRowxContext(ctx, `SELECT COUNT(*) FROM "User"`).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count users: %w", err)
 	}
@@ -101,7 +111,7 @@ func (r *UserRepository) CountAll(ctx context.Context) (int, error) {
 // (orders, accounts, accesses, etc.) before calling this to avoid FK
 // constraint violations.
 func (r *UserRepository) Delete(ctx context.Context, id string) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM "User" WHERE id = $1`, id)
+	_, err := r.db.ExecContext(ctx, `DELETE FROM "User" WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}
@@ -113,16 +123,14 @@ func (r *UserRepository) Delete(ctx context.Context, id string) error {
 // EDGE: uses RETURNING + CollectExactlyOneRow so the update is verified to
 // have matched exactly one row — an implicit existence check.
 func (r *UserRepository) UpdateAccessToken(ctx context.Context, id string, hashedAccessToken string) error {
-	rows, err := r.db.Query(ctx,
+	var user model.User
+	err := sqlx.GetContext(ctx, r.db,
+		&user,
 		`UPDATE "User"
 		 SET "accessToken" = $2
 		 WHERE id = $1
 		 RETURNING `+userColumns,
 		id, hashedAccessToken)
-	if err != nil {
-		return fmt.Errorf("update user access token: %w", err)
-	}
-	_, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.User])
 	if err != nil {
 		return fmt.Errorf("update user access token: %w", err)
 	}
@@ -133,21 +141,25 @@ func (r *UserRepository) UpdateAccessToken(ctx context.Context, id string, hashe
 // separate Settings table. Returns ErrNoRows when the user has not yet saved
 // any preferences — callers should apply application defaults in that case.
 func (r *UserRepository) FindSettings(ctx context.Context, userID string) (model.Settings, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.Settings
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`SELECT "userId", settings, "updatedAt"
 		 FROM "Settings"
 		 WHERE "userId" = $1`, userID)
 	if err != nil {
 		return model.Settings{}, fmt.Errorf("query user settings: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Settings])
+	return item, nil
 }
 
 // UpsertSettings creates or replaces the settings record for a user.
 // The ON CONFLICT clause targets the userId primary key, matching Prisma's
 // upsert semantics — only the settings JSON column is overwritten on conflict.
 func (r *UserRepository) UpsertSettings(ctx context.Context, s model.Settings) (model.Settings, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.Settings
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`INSERT INTO "Settings" ("userId", settings)
 		 VALUES ($1, $2)
 		 ON CONFLICT ("userId") DO UPDATE SET settings = $2
@@ -156,5 +168,5 @@ func (r *UserRepository) UpsertSettings(ctx context.Context, s model.Settings) (
 	if err != nil {
 		return model.Settings{}, fmt.Errorf("upsert user settings: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Settings])
+	return item, nil
 }

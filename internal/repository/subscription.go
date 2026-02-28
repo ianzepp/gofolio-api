@@ -7,7 +7,7 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
-	"github.com/jackc/pgx/v5"
+	"github.com/jmoiron/sqlx"
 )
 
 // SubscriptionRepository handles persistence for Subscription records, which
@@ -37,7 +37,9 @@ const subscriptionColumns = `id, "createdAt", "expiresAt", price, "updatedAt", "
 // subscription when a user holds overlapping grants (e.g. a gift code on top
 // of a recurring subscription).
 func (r *SubscriptionRepository) FindActiveByUserID(ctx context.Context, userID string) (model.Subscription, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.Subscription
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`SELECT `+subscriptionColumns+`
 		 FROM "Subscription"
 		 WHERE "userId" = $1 AND "expiresAt" > NOW()
@@ -46,14 +48,16 @@ func (r *SubscriptionRepository) FindActiveByUserID(ctx context.Context, userID 
 	if err != nil {
 		return model.Subscription{}, fmt.Errorf("query active subscription: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Subscription])
+	return item, nil
 }
 
 // FindAllActive returns every non-expired subscription across all users,
 // ordered with the furthest-future expiry first. Used by admin dashboards to
 // audit active subscribers.
 func (r *SubscriptionRepository) FindAllActive(ctx context.Context) ([]model.Subscription, error) {
-	rows, err := r.db.Query(ctx,
+	var items []model.Subscription
+	err := sqlx.SelectContext(ctx, r.db,
+		&items,
 		`SELECT `+subscriptionColumns+`
 		 FROM "Subscription"
 		 WHERE "expiresAt" > NOW()
@@ -61,5 +65,5 @@ func (r *SubscriptionRepository) FindAllActive(ctx context.Context) ([]model.Sub
 	if err != nil {
 		return nil, fmt.Errorf("query active subscriptions: %w", err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[model.Subscription])
+	return items, nil
 }

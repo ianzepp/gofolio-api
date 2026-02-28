@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
-	"github.com/jackc/pgx/v5"
 )
 
 // ApiKeyRepository handles persistence for the ApiKey table, which stores
@@ -37,11 +36,11 @@ func NewApiKeyRepository(db db.DBTX) *ApiKeyRepository {
 // existed.
 func (r *ApiKeyRepository) FindUserIDByHashedKey(ctx context.Context, hashedKey string) (string, error) {
 	var userID string
-	err := r.db.QueryRow(ctx,
+	err := r.db.QueryRowxContext(ctx,
 		`SELECT "userId" FROM "ApiKey" WHERE "hashedKey" = $1`,
 		hashedKey).Scan(&userID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if err == db.ErrNoRows {
 			return "", fmt.Errorf("api key not found")
 		}
 		return "", fmt.Errorf("query api key: %w", err)

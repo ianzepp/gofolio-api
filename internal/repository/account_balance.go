@@ -8,7 +8,7 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
-	"github.com/jackc/pgx/v5"
+	"github.com/jmoiron/sqlx"
 )
 
 // AccountBalanceRepository handles persistence for point-in-time cash balance
@@ -33,21 +33,25 @@ func NewAccountBalanceRepository(db db.DBTX) *AccountBalanceRepository {
 // FindByID fetches a single balance snapshot by primary key, scoped to
 // userID. Returns ErrNoRows when not found or ownership does not match.
 func (r *AccountBalanceRepository) FindByID(ctx context.Context, id string, userID string) (model.AccountBalance, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.AccountBalance
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`SELECT id, "accountId", "createdAt", date, "updatedAt", "userId", value
 		 FROM "AccountBalance"
 		 WHERE id = $1 AND "userId" = $2`, id, userID)
 	if err != nil {
 		return model.AccountBalance{}, fmt.Errorf("query account-balance: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.AccountBalance])
+	return item, nil
 }
 
 // FindByAccountID returns all balance snapshots for a given account, ordered
 // chronologically ascending. The userId guard prevents cross-user data leaks
 // even when the accountId is known to an attacker.
 func (r *AccountBalanceRepository) FindByAccountID(ctx context.Context, accountID string, userID string) ([]model.AccountBalance, error) {
-	rows, err := r.db.Query(ctx,
+	var items []model.AccountBalance
+	err := sqlx.SelectContext(ctx, r.db,
+		&items,
 		`SELECT id, "accountId", "createdAt", date, "updatedAt", "userId", value
 		 FROM "AccountBalance"
 		 WHERE "accountId" = $1 AND "userId" = $2
@@ -55,37 +59,42 @@ func (r *AccountBalanceRepository) FindByAccountID(ctx context.Context, accountI
 	if err != nil {
 		return nil, fmt.Errorf("query account-balances: %w", err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[model.AccountBalance])
+	return items, nil
 }
 
 // Upsert creates or updates an AccountBalance keyed on (accountId, date).
 // Matches NestJS Prisma upsert semantics on the unique constraint.
 func (r *AccountBalanceRepository) Upsert(ctx context.Context, ab model.AccountBalance) (model.AccountBalance, error) {
-	rows, err := r.db.Query(ctx,
+	now := time.Now().UTC()
+	var item model.AccountBalance
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`INSERT INTO "AccountBalance" (id, "accountId", "createdAt", date, "updatedAt", "userId", value)
-		 VALUES ($1, $2, NOW(), $4, NOW(), $3, $5)
+		 VALUES ($1, $2, $3, $5, $3, $4, $6)
 		 ON CONFLICT ("accountId", date) DO UPDATE
-		   SET value = EXCLUDED.value, "updatedAt" = now()
+		   SET value = EXCLUDED.value, "updatedAt" = $3
 		 RETURNING id, "accountId", "createdAt", date, "updatedAt", "userId", value`,
-		ab.ID, ab.AccountId, ab.UserId, ab.Date, ab.Value)
+		ab.ID, ab.AccountId, now, ab.UserId, ab.Date, ab.Value)
 	if err != nil {
 		return model.AccountBalance{}, fmt.Errorf("upsert account-balance: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.AccountBalance])
+	return item, nil
 }
 
 // Delete removes a balance snapshot by ID, scoped to userID, and returns the
 // deleted record. Returning the deleted row avoids a subsequent SELECT to
 // confirm what was removed — useful for audit logging in the service layer.
 func (r *AccountBalanceRepository) Delete(ctx context.Context, id string, userID string) (model.AccountBalance, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.AccountBalance
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`DELETE FROM "AccountBalance"
 		 WHERE id = $1 AND "userId" = $2
 		 RETURNING id, "accountId", "createdAt", date, "updatedAt", "userId", value`, id, userID)
 	if err != nil {
 		return model.AccountBalance{}, fmt.Errorf("delete account-balance: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.AccountBalance])
+	return item, nil
 }
 
 // ResetHours truncates a time value to midnight UTC, replicating the NestJS

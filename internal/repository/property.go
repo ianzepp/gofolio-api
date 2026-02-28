@@ -7,7 +7,7 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
-	"github.com/jackc/pgx/v5"
+	"github.com/jmoiron/sqlx"
 )
 
 // PropertyRepository handles persistence for the Property key-value store,
@@ -32,22 +32,27 @@ func NewPropertyRepository(db db.DBTX) *PropertyRepository {
 // ErrNoRows when the key does not exist — callers should apply a default value
 // in that case rather than treating it as a hard error.
 func (r *PropertyRepository) FindByKey(ctx context.Context, key string) (model.Property, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.Property
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`SELECT key, value FROM "Property" WHERE key = $1`, key)
 	if err != nil {
 		return model.Property{}, fmt.Errorf("query property: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Property])
+	return item, nil
 }
 
 // FindAll retrieves every property ordered by key. Used by admin endpoints
 // to display and bulk-edit system configuration.
 func (r *PropertyRepository) FindAll(ctx context.Context) ([]model.Property, error) {
-	rows, err := r.db.Query(ctx, `SELECT key, value FROM "Property" ORDER BY key ASC`)
+	var items []model.Property
+	err := sqlx.SelectContext(ctx, r.db,
+		&items,
+		`SELECT key, value FROM "Property" ORDER BY key ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("query properties: %w", err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[model.Property])
+	return items, nil
 }
 
 // Upsert creates or overwrites a property by key. The ON CONFLICT clause
@@ -55,7 +60,9 @@ func (r *PropertyRepository) FindAll(ctx context.Context) ([]model.Property, err
 // WHY: upsert rather than separate insert/update simplifies the service layer,
 // which never needs to pre-check existence before writing a config value.
 func (r *PropertyRepository) Upsert(ctx context.Context, p model.Property) (model.Property, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.Property
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`INSERT INTO "Property" (key, value)
 		 VALUES ($1, $2)
 		 ON CONFLICT (key) DO UPDATE SET value = $2
@@ -64,13 +71,13 @@ func (r *PropertyRepository) Upsert(ctx context.Context, p model.Property) (mode
 	if err != nil {
 		return model.Property{}, fmt.Errorf("upsert property: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Property])
+	return item, nil
 }
 
 // Delete removes a property by key. Deleting a non-existent key is a no-op
 // (the Exec succeeds with zero rows affected).
 func (r *PropertyRepository) Delete(ctx context.Context, key string) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM "Property" WHERE key = $1`, key)
+	_, err := r.db.ExecContext(ctx, `DELETE FROM "Property" WHERE key = $1`, key)
 	if err != nil {
 		return fmt.Errorf("delete property: %w", err)
 	}

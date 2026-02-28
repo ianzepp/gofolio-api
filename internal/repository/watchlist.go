@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
-	"github.com/jackc/pgx/v5"
+	"github.com/jmoiron/sqlx"
 )
 
 // WatchlistItem is a lightweight projection of a SymbolProfile used for
@@ -29,7 +29,9 @@ func NewWatchlistRepository(db db.DBTX) *WatchlistRepository {
 
 // FindByUserID returns all watched symbols for a user, ordered by name.
 func (r *WatchlistRepository) FindByUserID(ctx context.Context, userID string) ([]WatchlistItem, error) {
-	rows, err := r.db.Query(ctx,
+	var items []WatchlistItem
+	err := sqlx.SelectContext(ctx, r.db,
+		&items,
 		`SELECT sp."dataSource", sp.symbol, sp.name
 		 FROM "SymbolProfile" sp
 		 JOIN "_UserWatchlist" uw ON uw."A" = sp.id
@@ -38,13 +40,13 @@ func (r *WatchlistRepository) FindByUserID(ctx context.Context, userID string) (
 	if err != nil {
 		return nil, fmt.Errorf("query watchlist: %w", err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[WatchlistItem])
+	return items, nil
 }
 
 // Add connects a SymbolProfile to a user's watchlist. Uses ON CONFLICT DO
 // NOTHING so adding the same symbol twice is a no-op.
 func (r *WatchlistRepository) Add(ctx context.Context, userID string, dataSource string, symbol string) error {
-	_, err := r.db.Exec(ctx,
+	_, err := r.db.ExecContext(ctx,
 		`INSERT INTO "_UserWatchlist" ("A", "B")
 		 SELECT sp.id, $1
 		 FROM "SymbolProfile" sp
@@ -58,7 +60,7 @@ func (r *WatchlistRepository) Add(ctx context.Context, userID string, dataSource
 
 // Remove disconnects a SymbolProfile from a user's watchlist.
 func (r *WatchlistRepository) Remove(ctx context.Context, userID string, dataSource string, symbol string) error {
-	_, err := r.db.Exec(ctx,
+	_, err := r.db.ExecContext(ctx,
 		`DELETE FROM "_UserWatchlist"
 		 WHERE "A" = (
 		   SELECT id FROM "SymbolProfile"

@@ -1,6 +1,6 @@
-// Package db provides the Postgres connection layer for api-go.
+// Package db provides the database connection layer for api-go.
 //
-// It wraps pgxpool to give callers three things:
+// It wraps jmoiron/sqlx to give callers three things:
 //
 //  1. A DBTX interface so repositories work identically inside or outside a
 //     transaction without needing separate code paths.
@@ -11,10 +11,9 @@
 //
 // Connection pool sizing defaults (overridable via env):
 //   - DB_MAX_CONNS=10    — ceiling on simultaneous Postgres connections
-//   - DB_MIN_CONNS=1     — keep at least one warm connection at idle
+//   - DB_MIN_CONNS=1     — keep at least one idle connection warm
 //   - DB_MAX_CONN_LIFETIME=1h   — recycle connections to survive PgBouncer restarts
 //   - DB_MAX_CONN_IDLE_TIME=15m — evict idle connections before server-side timeout
-//   - DB_HEALTH_CHECK_PERIOD=1m — background ping cadence for stale detection
 package db
 
 import (
@@ -25,42 +24,47 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"database/sql"
+
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
-// DBTX is the minimal Postgres execution interface shared by *pgxpool.Pool
-// and pgx.Tx. Repositories accept DBTX rather than a concrete type so that:
+// ErrNoRows is re-exported from database/sql so callers import the db package
+// instead of database/sql directly for sentinel error checks.
+var ErrNoRows = sql.ErrNoRows
+
+// DBTX is the minimal database execution interface shared by *sqlx.DB
+// and *sqlx.Tx. Repositories accept DBTX rather than a concrete type so that:
 //   - Normal calls run against the pool (connection auto-managed).
-//   - Transactional calls pass a pgx.Tx without changing repository code.
+//   - Transactional calls pass a *sqlx.Tx without changing repository code.
 //
 // TRADE-OFF: This surface area is intentionally small (Exec, Query, QueryRow).
-// Richer pgxpool features (CopyFrom, SendBatch) require a type assertion.
+// Richer sqlx features (NamedExec, Preparex) require a type assertion.
 type DBTX interface {
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	sqlx.QueryerContext
+	sqlx.ExecerContext
+	QueryRowxContext(ctx context.Context, query string, args ...any) *sqlx.Row
 }
 
-// WithTx runs fn inside a serialized database transaction, committing on
-// success and rolling back on any error. The deferred Rollback is a no-op
-// after a successful Commit, making it safe to defer unconditionally.
+// WithTx runs fn inside a database transaction, committing on success and
+// rolling back on any error. The deferred Rollback is a no-op after a
+// successful Commit, making it safe to defer unconditionally.
 //
 // WHY: Centralizing transaction management here prevents callers from
 // forgetting the rollback path, which historically causes connection leaks
-// under pgxpool when a transaction is abandoned.
-func WithTx(ctx context.Context, pool *pgxpool.Pool, fn func(tx pgx.Tx) error) error {
-	tx, err := pool.Begin(ctx)
+// when a transaction is abandoned.
+func WithTx(ctx context.Context, d *sqlx.DB, fn func(tx *sqlx.Tx) error) error {
+	tx, err := d.BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx) // no-op after commit
+	defer tx.Rollback() // no-op after commit
 
 	if err := fn(tx); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	return tx.Commit()
 }
 
 const (
@@ -71,13 +75,12 @@ const (
 // All fields except DatabaseURL have safe defaults applied by LoadConfigFromEnv,
 // so callers do not need to set them explicitly in most environments.
 type Config struct {
-	DatabaseURL       string
-	ConnectTimeout    time.Duration
-	MaxConns          int32
-	MinConns          int32
-	MaxConnLifetime   time.Duration
-	MaxConnIdleTime   time.Duration
-	HealthCheckPeriod time.Duration
+	DatabaseURL     string
+	ConnectTimeout  time.Duration
+	MaxOpenConns    int
+	MaxIdleConns    int
+	MaxConnLifetime time.Duration
+	MaxConnIdleTime time.Duration
 }
 
 // LoadConfigFromEnv reads pool configuration from environment variables,
@@ -94,51 +97,41 @@ func LoadConfigFromEnv() (Config, error) {
 	}
 
 	return Config{
-		DatabaseURL:       databaseURL,
-		ConnectTimeout:    getDurationEnv("DB_CONNECT_TIMEOUT", defaultConnectTimeout),
-		MaxConns:          getInt32Env("DB_MAX_CONNS", 10),
-		MinConns:          getInt32Env("DB_MIN_CONNS", 1),
-		MaxConnLifetime:   getDurationEnv("DB_MAX_CONN_LIFETIME", time.Hour),
-		MaxConnIdleTime:   getDurationEnv("DB_MAX_CONN_IDLE_TIME", 15*time.Minute),
-		HealthCheckPeriod: getDurationEnv("DB_HEALTH_CHECK_PERIOD", time.Minute),
+		DatabaseURL:     databaseURL,
+		ConnectTimeout:  getDurationEnv("DB_CONNECT_TIMEOUT", defaultConnectTimeout),
+		MaxOpenConns:    getIntEnv("DB_MAX_CONNS", 10),
+		MaxIdleConns:    getIntEnv("DB_MIN_CONNS", 1),
+		MaxConnLifetime: getDurationEnv("DB_MAX_CONN_LIFETIME", time.Hour),
+		MaxConnIdleTime: getDurationEnv("DB_MAX_CONN_IDLE_TIME", 15*time.Minute),
 	}, nil
 }
 
-// Open creates and returns a pgxpool.Pool configured from cfg. It does NOT
+// Open creates and returns a *sqlx.DB configured from cfg. It does NOT
 // verify connectivity — call Ping separately after Open to confirm the server
 // is reachable. This separation allows callers to apply different error-handling
 // strategies for "pool created but unreachable" versus "config is invalid".
-func Open(ctx context.Context, cfg Config) (*pgxpool.Pool, error) {
-	poolConfig, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+func Open(cfg Config) (*sqlx.DB, error) {
+	d, err := sqlx.Open("postgres", cfg.DatabaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("parse database config: %w", err)
+		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	poolConfig.MaxConns = cfg.MaxConns
-	poolConfig.MinConns = cfg.MinConns
-	poolConfig.MaxConnLifetime = cfg.MaxConnLifetime
-	poolConfig.MaxConnIdleTime = cfg.MaxConnIdleTime
-	poolConfig.HealthCheckPeriod = cfg.HealthCheckPeriod
+	d.SetMaxOpenConns(cfg.MaxOpenConns)
+	d.SetMaxIdleConns(cfg.MaxIdleConns)
+	d.SetConnMaxLifetime(cfg.MaxConnLifetime)
+	d.SetConnMaxIdleTime(cfg.MaxConnIdleTime)
 
-	connectCtx, cancel := context.WithTimeout(ctx, cfg.ConnectTimeout)
-	defer cancel()
-
-	pool, err := pgxpool.NewWithConfig(connectCtx, poolConfig)
-	if err != nil {
-		return nil, fmt.Errorf("connect database: %w", err)
-	}
-
-	return pool, nil
+	return d, nil
 }
 
-// Ping verifies that the pool can reach the Postgres server within timeout.
+// Ping verifies that the database is reachable within timeout.
 // It is intended to be called once at startup, after Open. The caller is
-// responsible for closing the pool if Ping fails.
-func Ping(ctx context.Context, pool *pgxpool.Pool, timeout time.Duration) error {
+// responsible for closing the database if Ping fails.
+func Ping(ctx context.Context, d *sqlx.DB, timeout time.Duration) error {
 	pingCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	if err := pool.Ping(pingCtx); err != nil {
+	if err := d.PingContext(pingCtx); err != nil {
 		return fmt.Errorf("ping database: %w", err)
 	}
 
@@ -159,16 +152,16 @@ func getDurationEnv(key string, fallback time.Duration) time.Duration {
 	return parsed
 }
 
-func getInt32Env(key string, fallback int32) int32 {
+func getIntEnv(key string, fallback int) int {
 	value := os.Getenv(key)
 	if value == "" {
 		return fallback
 	}
 
-	parsed, err := strconv.ParseInt(value, 10, 32)
+	parsed, err := strconv.Atoi(value)
 	if err != nil {
 		return fallback
 	}
 
-	return int32(parsed)
+	return parsed
 }

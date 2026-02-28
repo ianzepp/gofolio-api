@@ -7,7 +7,7 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
-	"github.com/jackc/pgx/v5"
+	"github.com/jmoiron/sqlx"
 )
 
 // SymbolProfileRepository handles persistence for SymbolProfile, which is the
@@ -41,35 +41,39 @@ const symbolProfileColumns = `id, "assetClass", "assetSubClass", comment,
 // FindByID retrieves a symbol profile by its primary key. Returns a wrapped
 // ErrNoRows when no matching record exists.
 func (r *SymbolProfileRepository) FindByID(ctx context.Context, id string) (model.SymbolProfile, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.SymbolProfile
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`SELECT `+symbolProfileColumns+`
 		 FROM "SymbolProfile"
 		 WHERE id = $1`, id)
 	if err != nil {
 		return model.SymbolProfile{}, fmt.Errorf("query symbol profile: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.SymbolProfile])
+	return item, nil
 }
 
 // FindByDataSourceAndSymbol looks up a profile by its natural composite key.
 // This is the lookup used when importing orders — the caller resolves the
 // ticker+source pair to a stable UUID before inserting the order row.
 func (r *SymbolProfileRepository) FindByDataSourceAndSymbol(ctx context.Context, dataSource string, symbol string) (model.SymbolProfile, error) {
-	rows, err := r.db.Query(ctx,
+	var item model.SymbolProfile
+	err := sqlx.GetContext(ctx, r.db,
+		&item,
 		`SELECT `+symbolProfileColumns+`
 		 FROM "SymbolProfile"
 		 WHERE "dataSource" = $1 AND symbol = $2`, dataSource, symbol)
 	if err != nil {
 		return model.SymbolProfile{}, fmt.Errorf("query symbol profile by source/symbol: %w", err)
 	}
-	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.SymbolProfile])
+	return item, nil
 }
 
 // CountByDataSource returns the number of profiles registered under a given
 // data source. Used to surface per-provider coverage metrics in admin views.
 func (r *SymbolProfileRepository) CountByDataSource(ctx context.Context, dataSource string) (int, error) {
 	var count int
-	err := r.db.QueryRow(ctx,
+	err := r.db.QueryRowxContext(ctx,
 		`SELECT COUNT(*) FROM "SymbolProfile" WHERE "dataSource" = $1`, dataSource).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count symbol profiles by data source: %w", err)
@@ -86,15 +90,21 @@ func (r *SymbolProfileRepository) FindByIDs(ctx context.Context, ids []string) (
 	if len(ids) == 0 {
 		return []model.SymbolProfile{}, nil
 	}
-	rows, err := r.db.Query(ctx,
+	query, args, err := sqlx.In(
 		`SELECT `+symbolProfileColumns+`
 		 FROM "SymbolProfile"
-		 WHERE id = ANY($1)
+		 WHERE id IN (?)
 		 ORDER BY name ASC`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("build symbol profiles query: %w", err)
+	}
+	query = sqlx.Rebind(sqlx.DOLLAR, query)
+	var items []model.SymbolProfile
+	err = sqlx.SelectContext(ctx, r.db, &items, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query symbol profiles by ids: %w", err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[model.SymbolProfile])
+	return items, nil
 }
 
 // SearchByQuery performs a case-insensitive substring search on name and
@@ -105,29 +115,33 @@ func (r *SymbolProfileRepository) FindByIDs(ctx context.Context, ids []string) (
 // profile table is small relative to market data or orders.
 func (r *SymbolProfileRepository) SearchByQuery(ctx context.Context, dataSource string, query string) ([]model.SymbolProfile, error) {
 	pattern := "%" + query + "%"
-	rows, err := r.db.Query(ctx,
+	var items []model.SymbolProfile
+	err := sqlx.SelectContext(ctx, r.db,
+		&items,
 		`SELECT `+symbolProfileColumns+`
 		 FROM "SymbolProfile"
 		 WHERE "dataSource" = $1
-		   AND (name ILIKE $2 OR symbol ILIKE $2)
+		   AND (LOWER(name) LIKE LOWER($2) OR LOWER(symbol) LIKE LOWER($2))
 		 ORDER BY symbol ASC
 		 LIMIT 50`, dataSource, pattern)
 	if err != nil {
 		return nil, fmt.Errorf("search symbol profiles: %w", err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[model.SymbolProfile])
+	return items, nil
 }
 
 // FindAll retrieves every symbol profile ordered by ticker symbol.
 // Used by export and admin endpoints; avoid calling from performance-sensitive
 // paths as the result set can grow large over time.
 func (r *SymbolProfileRepository) FindAll(ctx context.Context) ([]model.SymbolProfile, error) {
-	rows, err := r.db.Query(ctx,
+	var items []model.SymbolProfile
+	err := sqlx.SelectContext(ctx, r.db,
+		&items,
 		`SELECT `+symbolProfileColumns+`
 		 FROM "SymbolProfile"
 		 ORDER BY symbol ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("query symbol profiles: %w", err)
 	}
-	return pgx.CollectRows(rows, pgx.RowToStructByName[model.SymbolProfile])
+	return items, nil
 }
