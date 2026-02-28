@@ -105,9 +105,9 @@ Fixture files live in `tests/integration/testdata/`, one JSON file per handler (
 
 Current totals across all fixture files:
 
-- `161` total cases
+- `169` total cases
 - `132` status-compare cases
-- `29` JSON-compare cases
+- `37` JSON-compare cases
 - `20` fixture files (1:1 with handler files)
 
 ## Auth

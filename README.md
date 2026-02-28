@@ -42,10 +42,10 @@ Go eliminates the ceremony. No decorators, no DI containers, no module system. F
 
 Current parity snapshot:
 
-- Differential harness: `131` cases total (`102` status + `29` JSON)
-- 19 services wired into handler `Deps` struct
-- 14 repository files, 13 model files, 3 provider files
-- ~11.4K LOC of Go (target: 15-18K for full parity)
+- Differential harness: `169` cases total (`132` status + `37` JSON)
+- 18 services wired into handler `Deps` struct
+- 14 repository files, 13 model files, 3 provider files, 19 service files
+- ~11K LOC of Go (target: 15-18K for full parity)
 - Remaining stub areas: `portfolio/*` (calculator), `auth/*` (OAuth/WebAuthn), `admin/queue/*`, `agent/*`, `subscription/*`, `import`
 
 ## Architecture
@@ -231,7 +231,7 @@ Current test pattern:
   - Compare status (and JSON where configured) to detect parity regressions
   - Details: [`tests/integration/README.md`](./tests/integration/README.md)
   - Fixtures split per handler in `testdata/*.json` (e.g. `account.json`, `portfolio.json`)
-  - Current fixture count: `161` total (`132` status compare, `29` JSON compare) across `20` files
+  - Current fixture count: `169` total (`132` status compare, `37` JSON compare) across `20` files
 
 Run all tests:
 
