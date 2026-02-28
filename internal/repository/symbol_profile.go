@@ -33,9 +33,9 @@ func NewSymbolProfileRepository(db db.DBTX) *SymbolProfileRepository {
 // identifiers (ISIN, CUSIP, FIGI, etc.) into a single table to avoid joins
 // during price-calculation hot paths.
 const symbolProfileColumns = `id, "assetClass", "assetSubClass", comment,
-	countries, "createdAt", currency, cusip, "dataSource", figi,
-	"figiComposite", "figiShareClass", holdings, "isActive", isin,
-	name, "scraperConfiguration", sectors, symbol, "symbolMapping",
+	COALESCE(countries, '[]'::jsonb) AS countries, "createdAt", currency, cusip, "dataSource", figi,
+	"figiComposite", "figiShareClass", COALESCE(holdings, '[]'::jsonb) AS holdings, "isActive", isin,
+	name, COALESCE("scraperConfiguration", '{}'::jsonb) AS "scraperConfiguration", COALESCE(sectors, '[]'::jsonb) AS sectors, symbol, COALESCE("symbolMapping", '{}'::jsonb) AS "symbolMapping",
 	"updatedAt", url, "userId"`
 
 // FindByID retrieves a symbol profile by its primary key. Returns a wrapped

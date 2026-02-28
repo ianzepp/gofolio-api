@@ -1,10 +1,9 @@
 package handler
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
-
-	"database/sql"
 )
 
 func GetAsset(deps *Deps) http.HandlerFunc {

@@ -9,6 +9,7 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 // AccessRepository handles persistence for the Access entity, which models
@@ -84,10 +85,10 @@ func (r *AccessRepository) Create(ctx context.Context, a model.Access) (model.Ac
 	err := sqlx.GetContext(ctx, r.db,
 		&item,
 		`INSERT INTO "Access" (id, alias, "granteeUserId", permissions,
-		                       settings, "userId")
-		 VALUES ($1, $2, $3, $4, $5, $6)
-		 RETURNING `+accessColumns,
-		a.ID, a.Alias, a.GranteeUserId, a.Permissions,
+			                       settings, "userId")
+			 VALUES ($1, $2, $3, $4, $5, $6)
+			 RETURNING `+accessColumns,
+		a.ID, a.Alias, a.GranteeUserId, pq.Array(a.Permissions),
 		a.Settings, a.UserId)
 	if err != nil {
 		return model.Access{}, fmt.Errorf("insert access: %w", err)
@@ -103,10 +104,10 @@ func (r *AccessRepository) Update(ctx context.Context, id string, alias *string,
 	err := sqlx.GetContext(ctx, r.db,
 		&item,
 		`UPDATE "Access"
-		 SET alias = $2, permissions = $3, settings = $4
-		 WHERE id = $1
-		 RETURNING `+accessColumns,
-		id, alias, permissions, settings)
+			 SET alias = $2, permissions = $3, settings = $4
+			 WHERE id = $1
+			 RETURNING `+accessColumns,
+		id, alias, pq.Array(permissions), settings)
 	if err != nil {
 		return model.Access{}, fmt.Errorf("update access: %w", err)
 	}
@@ -120,10 +121,10 @@ func (r *AccessRepository) UpdateByUserID(ctx context.Context, id string, userID
 	err := sqlx.GetContext(ctx, r.db,
 		&item,
 		`UPDATE "Access"
-		 SET alias = $3, permissions = $4, settings = $5
-		 WHERE id = $1 AND "userId" = $2
-		 RETURNING `+accessColumns,
-		id, userID, alias, permissions, settings)
+			 SET alias = $3, permissions = $4, settings = $5
+			 WHERE id = $1 AND "userId" = $2
+			 RETURNING `+accessColumns,
+		id, userID, alias, pq.Array(permissions), settings)
 	if err != nil {
 		return model.Access{}, fmt.Errorf("update access by user: %w", err)
 	}

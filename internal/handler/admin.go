@@ -11,10 +11,9 @@
 package handler
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
-
-	"database/sql"
 )
 
 // GetAdmin handles GET /api/v1/admin and returns the admin dashboard summary.

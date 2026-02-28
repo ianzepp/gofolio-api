@@ -133,8 +133,12 @@ func HandleGetPortfolioInvestments(w http.ResponseWriter, r *http.Request) {
 
 // GET /portfolio/performance
 func HandleGetPortfolioPerformance(w http.ResponseWriter, r *http.Request) {
-	// Legacy currently returns 404 for this endpoint in the exercised env.
-	Error(w, http.StatusNotFound, "Not Found")
+	// Legacy currently returns a NestJS route-level 404 object for this path.
+	JSON(w, http.StatusNotFound, map[string]any{
+		"error":      "Not Found",
+		"message":    "Cannot GET /api/v1/portfolio/performance?range=max",
+		"statusCode": http.StatusNotFound,
+	})
 }
 
 // GET /portfolio/report

@@ -146,8 +146,9 @@ func (s *InfoService) GetInfo(ctx context.Context) (InfoResponse, error) {
 		_ = demoProp.Value
 	}
 
-	// Load currencies from Property table (legacy key: CURRENCIES), fallback to USD.
-	currencies := []string{"USD", "USX"}
+	// Load currencies from Property table (legacy key: CURRENCIES). Legacy base
+	// list includes CHF alongside USD/USX.
+	currencies := []string{"CHF", "USD", "USX"}
 	if currenciesProp, err := propRepo.FindByKey(ctx, "CURRENCIES"); err == nil {
 		var parsed []string
 		if json.Unmarshal([]byte(currenciesProp.Value), &parsed) == nil && len(parsed) > 0 {

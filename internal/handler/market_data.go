@@ -15,12 +15,12 @@
 package handler
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
-	"database/sql"
 	"golang.org/x/text/currency"
 )
 

@@ -343,8 +343,8 @@ func (s *AdminService) GetMarketData(ctx context.Context, skip int, take int, qu
 
 	// Main query with aggregates
 	mainSQL := fmt.Sprintf(`SELECT sp.id, sp."assetClass", sp."assetSubClass", sp.comment,
-	        sp.countries, sp.currency, sp."dataSource", sp."isActive",
-	        sp.name, sp.sectors, sp.symbol,
+	        COALESCE(sp.countries, '[]'::jsonb) AS countries, sp.currency, sp."dataSource", sp."isActive",
+	        sp.name, COALESCE(sp.sectors, '[]'::jsonb) AS sectors, sp.symbol,
 	        (SELECT COUNT(*) FROM "Order" o
 	         WHERE o."symbolProfileId" = sp.id) as "activitiesCount",
 	        (SELECT COUNT(*) FROM "MarketData" md

@@ -32,6 +32,7 @@ Routes + request/response shape:
 */
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -39,7 +40,6 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/google/uuid"
-	"database/sql"
 )
 
 // GetAccesses handles GET /api/v1/access and returns the caller's outbound
@@ -87,10 +87,10 @@ func CreateAccess(deps *Deps) http.HandlerFunc {
 		}
 
 		var body struct {
-			Alias         *string          `json:"alias"`
-			GranteeUserId *string          `json:"granteeUserId"`
-			Permissions   []string         `json:"permissions"`
-			Settings      json.RawMessage  `json:"settings"`
+			Alias         *string         `json:"alias"`
+			GranteeUserId *string         `json:"granteeUserId"`
+			Permissions   []string        `json:"permissions"`
+			Settings      json.RawMessage `json:"settings"`
 		}
 		if !Bind(w, r, &body) {
 			return
@@ -169,12 +169,19 @@ func UpdateAccess(deps *Deps) http.HandlerFunc {
 
 		id := r.PathValue("id")
 		var body struct {
-			Alias       *string          `json:"alias"`
-			Permissions []string         `json:"permissions"`
-			Settings    json.RawMessage  `json:"settings"`
+			Alias       *string         `json:"alias"`
+			Permissions []string        `json:"permissions"`
+			Settings    json.RawMessage `json:"settings"`
 		}
 		if !Bind(w, r, &body) {
 			return
+		}
+
+		if body.Permissions == nil {
+			body.Permissions = []string{}
+		}
+		if body.Settings == nil {
+			body.Settings = json.RawMessage(`{}`)
 		}
 
 		updated, err := deps.AccessService.UpdateAccessByUserID(r.Context(), id, userID, body.Alias, body.Permissions, body.Settings)
