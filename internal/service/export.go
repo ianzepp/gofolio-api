@@ -47,7 +47,14 @@ type ExportResponse struct {
 	Activities []ExportActivity `json:"activities"`
 }
 
-func (s *ExportService) GetExport(ctx context.Context, userID string, filterAccountIDs []string) (ExportResponse, error) {
+func (s *ExportService) GetExport(
+	ctx context.Context,
+	userID string,
+	filterAccountIDs []string,
+	filterActivityIDs []string,
+	filterDataSource string,
+	filterSymbol string,
+) (ExportResponse, error) {
 	accountRepo := repository.NewAccountRepository(s.pool)
 	orderRepo := repository.NewOrderRepository(s.pool)
 	spRepo := repository.NewSymbolProfileRepository(s.pool)
@@ -65,6 +72,11 @@ func (s *ExportService) GetExport(ctx context.Context, userID string, filterAcco
 	for _, id := range filterAccountIDs {
 		accountFilter[id] = struct{}{}
 	}
+	activityFilter := make(map[string]struct{}, len(filterActivityIDs))
+	for _, id := range filterActivityIDs {
+		activityFilter[id] = struct{}{}
+	}
+
 	if len(accountFilter) > 0 {
 		filteredOrders := make([]model.Order, 0, len(orders))
 		for _, order := range orders {
@@ -96,10 +108,47 @@ func (s *ExportService) GetExport(ctx context.Context, userID string, filterAcco
 		profileMap[p.ID] = p
 	}
 
+	if len(activityFilter) > 0 || filterDataSource != "" || filterSymbol != "" {
+		filteredOrders := make([]model.Order, 0, len(orders))
+		for _, order := range orders {
+			if len(activityFilter) > 0 {
+				if _, ok := activityFilter[order.ID]; !ok {
+					continue
+				}
+			}
+
+			profile, ok := profileMap[order.SymbolProfileId]
+			if !ok {
+				continue
+			}
+			if filterDataSource != "" && string(profile.DataSource) != filterDataSource {
+				continue
+			}
+			if filterSymbol != "" && profile.Symbol != filterSymbol {
+				continue
+			}
+
+			filteredOrders = append(filteredOrders, order)
+		}
+		orders = filteredOrders
+	}
+
+	accountsWithActivities := make(map[string]struct{}, len(orders))
+	for _, order := range orders {
+		if order.AccountId != nil {
+			accountsWithActivities[*order.AccountId] = struct{}{}
+		}
+	}
+
 	exportAccounts := make([]ExportAccount, 0, len(accounts))
 	for _, a := range accounts {
 		if len(accountFilter) > 0 {
 			if _, ok := accountFilter[a.ID]; !ok {
+				continue
+			}
+		}
+		if len(activityFilter) > 0 {
+			if _, ok := accountsWithActivities[a.ID]; !ok {
 				continue
 			}
 		}

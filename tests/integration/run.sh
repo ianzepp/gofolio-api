@@ -299,6 +299,7 @@ bootstrap_legacy_user() {
   # Bootstrap two accounts for transfer-balance parity checks.
   if [[ -n "${auth_token}" ]]; then
     local transfer_from_response transfer_to_response transfer_from_id transfer_to_id
+    local seed_order_response seed_order_id
     transfer_from_response="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/account" \
       -H "Authorization: Bearer ${auth_token}" \
       -H "Content-Type: application/json" \
@@ -314,6 +315,28 @@ bootstrap_legacy_user() {
     if [[ -n "${transfer_from_id}" && -n "${transfer_to_id}" ]]; then
       export TRANSFER_ACCOUNT_FROM_ID="${transfer_from_id}"
       export TRANSFER_ACCOUNT_TO_ID="${transfer_to_id}"
+
+      # Seed one deterministic activity for export filter parity cases.
+      seed_order_response="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/order" \
+        -H "Authorization: Bearer ${auth_token}" \
+        -H "Content-Type: application/json" \
+        -d "$(jq -nc \
+          --arg accountId "${transfer_from_id}" \
+          '{
+            accountId: $accountId,
+            currency: "USD",
+            dataSource: "YAHOO",
+            date: "2024-01-01T00:00:00.000Z",
+            fee: 0,
+            quantity: 1,
+            symbol: "AAPL",
+            type: "BUY",
+            unitPrice: 100
+          }')" 2>/dev/null || true)"
+      seed_order_id="$(printf '%s' "${seed_order_response}" | jq -r '.id // empty' 2>/dev/null || true)"
+      if [[ -n "${seed_order_id}" ]]; then
+        export SEED_ORDER_ID="${seed_order_id}"
+      fi
     fi
   fi
 

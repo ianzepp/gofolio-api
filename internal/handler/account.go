@@ -78,14 +78,40 @@ func GetAccounts(deps *Deps) http.HandlerFunc {
 			totalBalance += account.Balance
 		}
 
+		activitiesCount := 0
+		totalDividend := 0.0
+		totalInterest := 0.0
+		totalInvestment := 0.0
+		if deps.OrderService != nil {
+			orders, orderErr := deps.OrderService.GetOrders(r.Context(), userID)
+			if orderErr != nil {
+				Error(w, http.StatusInternalServerError, orderErr.Error())
+				return
+			}
+			activitiesCount = len(orders)
+			for _, order := range orders {
+				switch order.Type {
+				case model.OrderTypeBuy:
+					totalInvestment += order.Quantity * order.UnitPrice
+				case model.OrderTypeSell:
+					totalInvestment -= order.Quantity * order.UnitPrice
+				case model.OrderTypeDividend:
+					totalDividend += order.Quantity * order.UnitPrice
+				case model.OrderTypeInterest:
+					totalInterest += order.Quantity * order.UnitPrice
+				}
+			}
+		}
+		totalValue := totalBalance + totalInvestment + totalDividend + totalInterest
+
 		// Legacy parity: include aggregate keys expected by client/API contract.
 		JSON(w, http.StatusOK, map[string]any{
-			"accounts":                      accounts,
-			"activitiesCount":               0,
-			"totalBalanceInBaseCurrency":    totalBalance,
-			"totalDividendInBaseCurrency":   0,
-			"totalInterestInBaseCurrency":   0,
-			"totalValueInBaseCurrency":      totalBalance,
+			"accounts":                    accounts,
+			"activitiesCount":             activitiesCount,
+			"totalBalanceInBaseCurrency":  totalBalance,
+			"totalDividendInBaseCurrency": totalDividend,
+			"totalInterestInBaseCurrency": totalInterest,
+			"totalValueInBaseCurrency":    totalValue,
 		})
 	}
 }

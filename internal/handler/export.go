@@ -24,7 +24,15 @@ func GetExport(deps *Deps) http.HandlerFunc {
 		}
 
 		filters := ParseFilters(r)
-		resp, err := deps.ExportService.GetExport(r.Context(), userID, filters.Accounts)
+		activityIDs := splitCSV(r.URL.Query().Get("activityIds"))
+		resp, err := deps.ExportService.GetExport(
+			r.Context(),
+			userID,
+			filters.Accounts,
+			activityIDs,
+			filters.DataSource,
+			filters.Symbol,
+		)
 		if err != nil {
 			Error(w, http.StatusInternalServerError, "Internal server error")
 			return

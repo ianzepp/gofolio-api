@@ -617,6 +617,22 @@
     "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_DB_USER_ID"]
   },
   {
+    "name": "admin-user-by-id-admin-missing-not-found-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/user/${ADMIN_USER_ID}",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_USER_ID"]
+  },
+  {
+    "name": "admin-user-by-id-admin-invalid-format-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/user/not-a-uuid",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"]
+  },
+  {
     "name": "export-no-auth-unauthorized",
     "method": "GET",
     "path": "/api/v1/export",
@@ -680,6 +696,7 @@
       "tags",
       "user",
       "accounts.*.balances",
+      "activities.*.date",
       "activities.*.id",
       "activities.*.tags"
     ]
@@ -699,6 +716,51 @@
       "tags",
       "user",
       "accounts.*.balances",
+      "activities.*.date",
+      "activities.*.id",
+      "activities.*.tags"
+    ]
+  },
+  {
+    "name": "export-user-filtered-activity-id-json-parity",
+    "method": "GET",
+    "path": "/api/v1/export?activityIds=${SEED_ORDER_ID}",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "SEED_ORDER_ID"],
+    "ignoreJsonPaths": [
+      "meta.date",
+      "meta.version",
+      "assetProfiles",
+      "platforms",
+      "tags",
+      "user",
+      "accounts.*.balances",
+      "activities.*.date",
+      "activities.*.id",
+      "activities.*.tags"
+    ]
+  },
+  {
+    "name": "export-user-filtered-account-and-activity-id-json-parity",
+    "method": "GET",
+    "path": "/api/v1/export?accounts=${TRANSFER_ACCOUNT_FROM_ID}&activityIds=${SEED_ORDER_ID}",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": [
+      "JWT_USER_TOKEN",
+      "TRANSFER_ACCOUNT_FROM_ID",
+      "SEED_ORDER_ID"
+    ],
+    "ignoreJsonPaths": [
+      "meta.date",
+      "meta.version",
+      "assetProfiles",
+      "platforms",
+      "tags",
+      "user",
+      "accounts.*.balances",
+      "activities.*.date",
       "activities.*.id",
       "activities.*.tags"
     ]
