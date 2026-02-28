@@ -47,7 +47,7 @@ type ExportResponse struct {
 	Activities []ExportActivity `json:"activities"`
 }
 
-func (s *ExportService) GetExport(ctx context.Context, userID string) (ExportResponse, error) {
+func (s *ExportService) GetExport(ctx context.Context, userID string, filterAccountIDs []string) (ExportResponse, error) {
 	accountRepo := repository.NewAccountRepository(s.pool)
 	orderRepo := repository.NewOrderRepository(s.pool)
 	spRepo := repository.NewSymbolProfileRepository(s.pool)
@@ -60,6 +60,22 @@ func (s *ExportService) GetExport(ctx context.Context, userID string) (ExportRes
 	orders, err := orderRepo.FindByUserID(ctx, userID)
 	if err != nil {
 		return ExportResponse{}, fmt.Errorf("find orders: %w", err)
+	}
+	accountFilter := make(map[string]struct{}, len(filterAccountIDs))
+	for _, id := range filterAccountIDs {
+		accountFilter[id] = struct{}{}
+	}
+	if len(accountFilter) > 0 {
+		filteredOrders := make([]model.Order, 0, len(orders))
+		for _, order := range orders {
+			if order.AccountId == nil {
+				continue
+			}
+			if _, ok := accountFilter[*order.AccountId]; ok {
+				filteredOrders = append(filteredOrders, order)
+			}
+		}
+		orders = filteredOrders
 	}
 
 	// Batch-fetch symbol profiles
@@ -82,6 +98,11 @@ func (s *ExportService) GetExport(ctx context.Context, userID string) (ExportRes
 
 	exportAccounts := make([]ExportAccount, 0, len(accounts))
 	for _, a := range accounts {
+		if len(accountFilter) > 0 {
+			if _, ok := accountFilter[a.ID]; !ok {
+				continue
+			}
+		}
 		exportAccounts = append(exportAccounts, ExportAccount{
 			Balance:    a.Balance,
 			Comment:    a.Comment,

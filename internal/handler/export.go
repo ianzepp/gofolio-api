@@ -23,7 +23,8 @@ func GetExport(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		resp, err := deps.ExportService.GetExport(r.Context(), userID)
+		filters := ParseFilters(r)
+		resp, err := deps.ExportService.GetExport(r.Context(), userID, filters.Accounts)
 		if err != nil {
 			Error(w, http.StatusInternalServerError, "Internal server error")
 			return

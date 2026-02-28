@@ -619,6 +619,54 @@
     "mode": "status"
   },
   {
+    "name": "market-data-by-symbol-user-common-forbidden-parity",
+    "method": "GET",
+    "path": "/api/v1/market-data/YAHOO/AAPL",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "market-data-by-symbol-admin-common-ok-parity",
+    "method": "GET",
+    "path": "/api/v1/market-data/YAHOO/AAPL",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"]
+  },
+  {
+    "name": "benchmarks-get-json-parity",
+    "method": "GET",
+    "path": "/api/v1/benchmarks",
+    "mode": "json",
+    "ignoreJsonPaths": [
+      "benchmarks.*.allTimeHigh",
+      "benchmarks.*.marketChange",
+      "benchmarks.*.performances",
+      "benchmarks.*.trend50d",
+      "benchmarks.*.trend200d"
+    ]
+  },
+  {
+    "name": "export-user-filtered-account-json-parity",
+    "method": "GET",
+    "path": "/api/v1/export?accounts=${TRANSFER_ACCOUNT_FROM_ID}",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"],
+    "ignoreJsonPaths": [
+      "meta.date",
+      "meta.version",
+      "assetProfiles",
+      "platforms",
+      "tags",
+      "user",
+      "accounts.*.balances",
+      "activities.*.id",
+      "activities.*.tags"
+    ]
+  },
+  {
     "name": "asset-get-status-parity",
     "method": "GET",
     "path": "/api/v1/asset/YAHOO/AAPL",

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/text/currency"
 )
@@ -13,9 +14,20 @@ func GetMarketData(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dataSource := r.PathValue("dataSource")
 		symbol := r.PathValue("symbol")
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
 
-		if deps.MarketDataService == nil {
+		if deps.MarketDataService == nil || deps.UserService == nil {
 			JSON(w, http.StatusOK, map[string]any{})
+			return
+		}
+
+		user, err := deps.UserService.GetUser(r.Context(), userID)
+		if err != nil {
+			Error(w, http.StatusUnauthorized, "Unauthorized")
 			return
 		}
 
@@ -30,6 +42,19 @@ func GetMarketData(deps *Deps) http.HandlerFunc {
 				return
 			}
 			Error(w, http.StatusInternalServerError, "Internal server error")
+			return
+		}
+
+		canReadAllAssetProfiles := auth.HasPermission(user.Role, auth.ReadMarketData)
+		canReadOwnAssetProfile := resp.AssetProfile.UserId != nil &&
+			*resp.AssetProfile.UserId == userID &&
+			auth.HasPermission(user.Role, auth.ReadMarketDataOfOwnAssetProfile)
+		if !canReadAllAssetProfiles && !canReadOwnAssetProfile {
+			if resp.AssetProfile.UserId != nil {
+				Error(w, http.StatusNotFound, "Not Found")
+				return
+			}
+			Error(w, http.StatusForbidden, "Forbidden")
 			return
 		}
 
