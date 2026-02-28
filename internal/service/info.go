@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"sort"
+	"strings"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -45,25 +47,25 @@ func (s *InfoService) GetInfo(ctx context.Context) (InfoResponse, error) {
 
 	// Build global permissions from env flags
 	globalPermissions := []string{}
-	if envBool("ENABLE_FEATURE_AUTH_TOKEN") {
+	if featureEnabled("ENABLE_FEATURE_AUTH_TOKEN", true) {
 		globalPermissions = append(globalPermissions, "enableAuthToken")
 	}
-	if envBool("ENABLE_FEATURE_STATISTICS") {
+	if featureEnabled("ENABLE_FEATURE_STATISTICS", false) {
 		globalPermissions = append(globalPermissions, "enableStatistics")
 	}
-	if envBool("ENABLE_FEATURE_SUBSCRIPTION") {
+	if featureEnabled("ENABLE_FEATURE_SUBSCRIPTION", false) {
 		globalPermissions = append(globalPermissions, "enableSubscription")
 	}
-	if envBool("ENABLE_FEATURE_SYSTEM_MESSAGE") {
+	if featureEnabled("ENABLE_FEATURE_SYSTEM_MESSAGE", false) {
 		globalPermissions = append(globalPermissions, "enableSystemMessage")
 	}
-	if envBool("ENABLE_FEATURE_AUTH_GOOGLE") {
+	if featureEnabled("ENABLE_FEATURE_AUTH_GOOGLE", false) {
 		globalPermissions = append(globalPermissions, "enableAuthGoogle")
 	}
-	if envBool("ENABLE_FEATURE_AUTH_OIDC") {
+	if featureEnabled("ENABLE_FEATURE_AUTH_OIDC", false) {
 		globalPermissions = append(globalPermissions, "enableAuthOidc")
 	}
-	if envBool("ENABLE_FEATURE_FEAR_AND_GREED_INDEX") {
+	if featureEnabled("ENABLE_FEATURE_FEAR_AND_GREED_INDEX", false) {
 		globalPermissions = append(globalPermissions, "enableFearAndGreedIndex")
 	}
 
@@ -111,8 +113,16 @@ func (s *InfoService) GetInfo(ctx context.Context) (InfoResponse, error) {
 		_ = demoProp.Value
 	}
 
-	// Get currencies from SymbolProfile table (distinct currencies)
-	currencies := []string{"USD"} // fallback
+	// Load currencies from Property table (legacy key: CURRENCIES), fallback to USD.
+	currencies := []string{"USD", "USX"}
+	if currenciesProp, err := propRepo.FindByKey(ctx, "CURRENCIES"); err == nil {
+		var parsed []string
+		if json.Unmarshal([]byte(currenciesProp.Value), &parsed) == nil && len(parsed) > 0 {
+			combined := append([]string{}, currencies...)
+			combined = append(combined, parsed...)
+			currencies = uniqueSortedNonEmpty(combined)
+		}
+	}
 
 	return InfoResponse{
 		BaseCurrency:      "USD",
@@ -124,7 +134,35 @@ func (s *InfoService) GetInfo(ctx context.Context) (InfoResponse, error) {
 	}, nil
 }
 
-func envBool(key string) bool {
-	v := os.Getenv(key)
-	return v == "true" || v == "1"
+func featureEnabled(key string, defaultValue bool) bool {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return defaultValue
+	}
+
+	switch strings.ToLower(value) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func uniqueSortedNonEmpty(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	// Keep ordering deterministic for JSON parity checks.
+	sort.Strings(out)
+	return out
 }

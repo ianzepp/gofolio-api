@@ -2,12 +2,10 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -30,21 +28,7 @@ func (s *MarketDataService) GetBySymbol(ctx context.Context, dataSource string, 
 
 	profile, err := spRepo.FindByDataSourceAndSymbol(ctx, dataSource, symbol)
 	if err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return MarketDataDetailsResponse{}, fmt.Errorf("find symbol profile: %w", err)
-		}
-
-		currency := getCurrencyFromSymbol(symbol)
-		if !isCurrencyCode(currency) {
-			return MarketDataDetailsResponse{}, fmt.Errorf("find symbol profile: %w", err)
-		}
-
-		profile = model.SymbolProfile{
-			Currency:   currency,
-			DataSource: model.DataSource(dataSource),
-			IsActive:   true,
-			Symbol:     symbol,
-		}
+		return MarketDataDetailsResponse{}, fmt.Errorf("find symbol profile: %w", err)
 	}
 
 	marketData, err := mdRepo.FindBySymbol(ctx, dataSource, symbol)

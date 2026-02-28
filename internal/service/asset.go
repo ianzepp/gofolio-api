@@ -34,9 +34,9 @@ func (s *AssetService) GetAsset(ctx context.Context, dataSource string, symbol s
 			return AssetResponse{}, fmt.Errorf("find symbol profile: %w", err)
 		}
 
-		currency := getCurrencyFromSymbol(symbol)
-		if !isCurrencyCode(currency) {
-			return AssetResponse{}, fmt.Errorf("find symbol profile: %w", err)
+		currency := "-"
+		if candidate := getCurrencyFromSymbol(symbol); isCurrencyCode(candidate) {
+			currency = candidate
 		}
 
 		profile = model.SymbolProfile{
