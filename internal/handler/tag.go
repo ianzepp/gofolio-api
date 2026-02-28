@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -81,6 +82,27 @@ func CreateTag(deps *Deps) http.HandlerFunc {
 		if strings.TrimSpace(body.Name) == "" {
 			Error(w, http.StatusBadRequest, "name must be a string")
 			return
+		}
+
+		// Mirror legacy NestJS in-controller permission checks:
+		// - require createOwnTag OR createTag
+		// - if only createOwnTag, userId must exactly equal request.user.id
+		info := auth.GetAuthInfo(r.Context())
+		if info == nil || info.User == nil {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+		canCreateOwnTag := auth.HasPermission(info.User.Role, auth.CreateOwnTag)
+		canCreateTag := auth.HasPermission(info.User.Role, auth.CreateTag)
+		if !canCreateOwnTag && !canCreateTag {
+			Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+			return
+		}
+		if canCreateOwnTag && !canCreateTag {
+			if body.UserID == nil || strings.TrimSpace(*body.UserID) != info.User.ID {
+				Error(w, http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+				return
+			}
 		}
 
 		id := uuid.New().String()

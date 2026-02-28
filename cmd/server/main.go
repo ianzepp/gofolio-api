@@ -226,7 +226,7 @@ func main() {
 	//   (createOwnTag vs createTag + owner/userId checks).
 	// Keep this split visible so parity work remains intentional.
 	mux.HandleFunc("GET /api/v1/tags", auth.RequirePermission(authCfg, auth.ReadTags, handler.GetTags(deps)))
-	mux.HandleFunc("POST /api/v1/tags", auth.Authenticate(authCfg, handler.CreateTag(deps)))
+	mux.HandleFunc("POST /api/v1/tags", auth.RequireAnyPermission(authCfg, []string{auth.CreateOwnTag, auth.CreateTag}, handler.CreateTag(deps)))
 	mux.HandleFunc("DELETE /api/v1/tags/{id}", auth.RequirePermission(authCfg, auth.DeleteTag, handler.DeleteTag(deps)))
 	mux.HandleFunc("PUT /api/v1/tags/{id}", auth.RequirePermission(authCfg, auth.UpdateTag, handler.UpdateTag(deps)))
 

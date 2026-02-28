@@ -1,10 +1,11 @@
 package auth
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/handler"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -28,7 +29,7 @@ func Authenticate(cfg Config, next http.HandlerFunc) http.HandlerFunc {
 			userID, err := ParseJWT(token, cfg.JWTSecret)
 			if err != nil {
 				log.Printf("auth: invalid JWT: %v", err)
-				handler.Error(w, http.StatusUnauthorized, "Unauthorized")
+				writeError(w, http.StatusUnauthorized, "Unauthorized")
 				return
 			}
 			ctx := WithAuthInfo(r.Context(), &AuthInfo{UserID: userID})
@@ -39,7 +40,7 @@ func Authenticate(cfg Config, next http.HandlerFunc) http.HandlerFunc {
 		// Try API key.
 		if apiKey, ok := ExtractApiKey(authHeader); ok {
 			if cfg.Pool == nil {
-				handler.Error(w, http.StatusServiceUnavailable, "Service Unavailable")
+				writeError(w, http.StatusServiceUnavailable, "Service Unavailable")
 				return
 			}
 			hashedKey := HashApiKey(apiKey)
@@ -47,7 +48,7 @@ func Authenticate(cfg Config, next http.HandlerFunc) http.HandlerFunc {
 			userID, err := repo.FindUserIDByHashedKey(r.Context(), hashedKey)
 			if err != nil {
 				log.Printf("auth: invalid API key: %v", err)
-				handler.Error(w, http.StatusUnauthorized, "Unauthorized")
+				writeError(w, http.StatusUnauthorized, "Unauthorized")
 				return
 			}
 			ctx := WithAuthInfo(r.Context(), &AuthInfo{UserID: userID})
@@ -55,7 +56,7 @@ func Authenticate(cfg Config, next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		handler.Error(w, http.StatusUnauthorized, "Unauthorized")
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
 	}
 }
 
@@ -63,33 +64,56 @@ func Authenticate(cfg Config, next http.HandlerFunc) http.HandlerFunc {
 // determine their role, and checks that the role has the required permission.
 // Returns 401 if unauthenticated, 403 if the permission check fails.
 func RequirePermission(cfg Config, perm string, next http.HandlerFunc) http.HandlerFunc {
+	return RequireAnyPermission(cfg, []string{perm}, next)
+}
+
+// RequireAnyPermission authenticates the request, loads the user from DB,
+// and checks whether the user's role has at least one required permission.
+// Returns 401 if unauthenticated, 403 if the permission check fails.
+func RequireAnyPermission(cfg Config, perms []string, next http.HandlerFunc) http.HandlerFunc {
 	return Authenticate(cfg, func(w http.ResponseWriter, r *http.Request) {
-		if cfg.Pool == nil {
-			handler.Error(w, http.StatusServiceUnavailable, "Service Unavailable")
+		user, ok := authenticatedUser(w, r, cfg)
+		if !ok {
 			return
 		}
-
-		info := GetAuthInfo(r.Context())
-		if info == nil {
-			handler.Error(w, http.StatusUnauthorized, "Unauthorized")
-			return
+		for _, perm := range perms {
+			if HasPermission(user.Role, perm) {
+				next(w, r)
+				return
+			}
 		}
+		writeError(w, http.StatusForbidden, "Forbidden")
+	})
+}
 
-		userRepo := repository.NewUserRepository(cfg.Pool)
-		user, err := userRepo.FindByID(r.Context(), info.UserID)
-		if err != nil {
-			log.Printf("auth: failed to load user %s: %v", info.UserID, err)
-			handler.Error(w, http.StatusUnauthorized, "Unauthorized")
-			return
-		}
+func authenticatedUser(w http.ResponseWriter, r *http.Request, cfg Config) (*model.User, bool) {
+	if cfg.Pool == nil {
+		writeError(w, http.StatusServiceUnavailable, "Service Unavailable")
+		return nil, false
+	}
 
-		info.User = &user
+	info := GetAuthInfo(r.Context())
+	if info == nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return nil, false
+	}
 
-		if !HasPermission(user.Role, perm) {
-			handler.Error(w, http.StatusForbidden, "Forbidden")
-			return
-		}
+	userRepo := repository.NewUserRepository(cfg.Pool)
+	user, err := userRepo.FindByID(r.Context(), info.UserID)
+	if err != nil {
+		log.Printf("auth: failed to load user %s: %v", info.UserID, err)
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return nil, false
+	}
+	info.User = &user
+	return &user, true
+}
 
-		next(w, r)
+func writeError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"statusCode": status,
+		"message":    message,
 	})
 }
