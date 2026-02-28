@@ -65,6 +65,8 @@ If either API is unreachable at `/api/v1/health`, tests are skipped.
     seeded via direct DB inserts and exports `JWT_ROAI_TOKEN`, `ROAI_USER_ID`,
     `ROAI_ACCOUNT_ID`, `ROAI_BTCUSD_ORDER_ID`, `ROAI_MSFT_BUY_ORDER_ID`,
     and `ROAI_SEEDED` for ROAI calculator parity cases
+  - inserts one throwaway `AuthDevice` row and exports `AUTH_DEVICE_ID` for
+    `DELETE /api/v1/auth-device/{id}` parity checks
 - Builds a persistent Go binary and starts it on `GO_PORT` (default `3334`) if it is not already running.
 - Waits for Go health endpoint before running tests.
 - Automatically stops the Go API process it started.
@@ -105,14 +107,18 @@ Optional tools used by advanced bootstrap paths:
 
 ## Current Coverage
 
-Fixture files live in `tests/integration/testdata/`, one JSON file per handler (e.g. `account.json`, `order.json`, `portfolio.json`). The harness auto-loads all `*.json` files in that directory.
+Fixture files live in `tests/integration/testdata/` as JSON arrays (primarily
+one file per handler, plus cross-cutting files like `new_endpoints.json`). The
+harness auto-loads all `*.json` files in that directory.
 
 Current totals across all fixture files:
 
-- `169` total cases
-- `132` status-compare cases
-- `37` JSON-compare cases
-- `20` fixture files (1:1 with handler files)
+- `196` total cases
+- `156` status-compare cases
+- `40` JSON-compare cases
+- `21` fixture files
+- HTTP client timeout: `60s` per request (legacy can be slow on some seeded
+  portfolio filter cases)
 
 ## Fixture Catalog
 
@@ -241,6 +247,36 @@ Each fixture file contains an array of test-case objects. Case names and modes:
 - `market-data-by-symbol-missing-noncurrency-not-found-parity` (`status`)
 - `market-data-by-symbol-missing-currency-fallback-parity` (`status`)
 
+### `new_endpoints.json` (27)
+
+- `auth-anonymous-post-valid-json-parity` (`json`)
+- `auth-anonymous-post-invalid-forbidden-parity` (`status`)
+- `auth-anonymous-get-valid-json-parity` (`json`)
+- `auth-anonymous-get-invalid-forbidden-parity` (`status`)
+- `api-keys-post-no-auth-unauthorized` (`status`)
+- `api-keys-post-user-json-parity` (`json`)
+- `ai-prompt-portfolio-no-auth-unauthorized` (`status`)
+- `ai-prompt-portfolio-user-status-parity` (`status`)
+- `ai-prompt-analysis-user-status-parity` (`status`)
+- `cache-flush-no-auth-unauthorized` (`status`)
+- `cache-flush-user-forbidden-parity` (`status`)
+- `cache-flush-admin-status-parity` (`status`)
+- `auth-device-delete-no-auth-unauthorized` (`status`)
+- `auth-device-delete-user-status-parity` (`status`)
+- `public-portfolio-missing-not-found-parity` (`status`)
+- `admin-queue-job-get-no-auth-unauthorized` (`status`)
+- `admin-queue-job-get-user-forbidden-parity` (`status`)
+- `admin-queue-job-get-admin-status-parity` (`status`)
+- `admin-queue-job-delete-no-auth-unauthorized` (`status`)
+- `admin-queue-job-delete-user-forbidden-parity` (`status`)
+- `admin-queue-job-delete-admin-status-parity` (`status`)
+- `admin-queue-job-id-delete-no-auth-unauthorized` (`status`)
+- `admin-queue-job-id-delete-user-forbidden-parity` (`status`)
+- `admin-queue-job-id-delete-admin-status-parity` (`status`)
+- `admin-queue-job-execute-no-auth-unauthorized` (`status`)
+- `admin-queue-job-execute-user-forbidden-parity` (`status`)
+- `admin-queue-job-execute-admin-status-parity` (`status`)
+
 ### `order.json` (8)
 
 - `order-delete-empty-user-json-parity` (`json`)
@@ -360,7 +396,8 @@ Path, headers, and JSON body support env expansion via `${ENV_NAME}`.
 
 ## Case Fixture
 
-Add or edit a JSON file in `tests/integration/testdata/` (one file per handler, e.g. `portfolio.json`).
+Add or edit a JSON file in `tests/integration/testdata/` (handler-specific or
+cross-cutting, e.g. `portfolio.json` or `new_endpoints.json`).
 
 Fields:
 
