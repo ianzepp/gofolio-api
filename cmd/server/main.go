@@ -7,15 +7,18 @@ import (
 	"os"
 	"time"
 
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/handler"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
 	var poolCloser func()
 	deps := &handler.Deps{}
 
+	var dbPool *pgxpool.Pool
 	cfg, err := db.LoadConfigFromEnv()
 	if err != nil {
 		log.Printf("database config warning: %v", err)
@@ -28,6 +31,7 @@ func main() {
 			pool.Close()
 		} else {
 			log.Printf("database connected")
+			dbPool = pool
 			poolCloser = pool.Close
 			deps = &handler.Deps{
 				AccountService:  service.NewAccountService(pool),
@@ -42,6 +46,12 @@ func main() {
 	if poolCloser != nil {
 		defer poolCloser()
 	}
+
+	jwtSecret := os.Getenv("JWT_SECRET_KEY")
+	if jwtSecret == "" {
+		log.Printf("warning: JWT_SECRET_KEY not set, auth will reject all requests")
+	}
+	authCfg := auth.Config{JWTSecret: jwtSecret, Pool: dbPool}
 
 	mux := http.NewServeMux()
 
@@ -208,10 +218,10 @@ func main() {
 	mux.HandleFunc("GET /api/v1/symbol/{dataSource}/{symbol}/{dateString}", handler.HandleGetSymbolByDate)
 
 	// Tags
-	mux.HandleFunc("GET /api/v1/tags", handler.GetTags(deps))
-	mux.HandleFunc("POST /api/v1/tags", handler.CreateTag(deps))
-	mux.HandleFunc("DELETE /api/v1/tags/{id}", handler.DeleteTag(deps))
-	mux.HandleFunc("PUT /api/v1/tags/{id}", handler.UpdateTag(deps))
+	mux.HandleFunc("GET /api/v1/tags", auth.RequirePermission(authCfg, auth.ReadTags, handler.GetTags(deps)))
+	mux.HandleFunc("POST /api/v1/tags", auth.Authenticate(authCfg, handler.CreateTag(deps)))
+	mux.HandleFunc("DELETE /api/v1/tags/{id}", auth.RequirePermission(authCfg, auth.DeleteTag, handler.DeleteTag(deps)))
+	mux.HandleFunc("PUT /api/v1/tags/{id}", auth.RequirePermission(authCfg, auth.UpdateTag, handler.UpdateTag(deps)))
 
 	// User
 	mux.HandleFunc("DELETE /api/v1/user", handler.HandleDeleteUser)

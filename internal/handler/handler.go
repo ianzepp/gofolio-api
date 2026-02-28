@@ -102,7 +102,7 @@ func ParsePagination(r *http.Request) Pagination {
 
 // Impersonation returns the impersonation user ID from the request header, if present.
 func Impersonation(r *http.Request) string {
-	return r.Header.Get("x-ghostfolio-impersonation")
+	return r.Header.Get("Impersonation-Id")
 }
 
 // --- Internal utilities ---
