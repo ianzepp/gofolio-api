@@ -592,6 +592,14 @@ fi
 
 bootstrap_legacy_user
 
+# Seed ROAI calculator fixtures (requires psql + DATABASE_URL).
+if [[ -n "${resolved_database_url}" && -n "${JWT_USER_TOKEN:-}" ]]; then
+  LEGACY_BASE_URL="${LEGACY_BASE_URL}" \
+  JWT_USER_TOKEN="${JWT_USER_TOKEN}" \
+  DATABASE_URL="${resolved_database_url}" \
+  source "$(dirname "${BASH_SOURCE[0]}")/run-seed-roai.sh" || true
+fi
+
 if health_check "${GO_BASE_URL}" "${GO_HEALTH_PATH}"; then
   echo "go api already running at ${GO_BASE_URL}"
 else
