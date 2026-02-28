@@ -148,7 +148,9 @@ func (s *PortfolioService) computeSnapshot(ctx context.Context, calc *calculator
 		return nil, fmt.Errorf("fetch market data: %w", err)
 	}
 
-	// Build MarketData map
+	// Build MarketData map.
+	// Legacy parity: key by symbol (without dataSource), matching NestJS ROAI
+	// marketSymbolMap shape. This intentionally preserves legacy behavior.
 	marketData := calculator.MarketData{}
 	for _, md := range marketDataRows {
 		dateStr := calculator.FormatDate(md.Date)

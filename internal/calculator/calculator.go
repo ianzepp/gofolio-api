@@ -575,6 +575,9 @@ func (c *Calculator) GetPerformance(start, end time.Time, snapshot *PortfolioSna
 // Port of base class lines 927–1088.
 func (c *Calculator) computeTransactionPoints() {
 	c.transactionPoints = nil
+	// Legacy parity: NestJS ROAI tracks transaction-point state by symbol only.
+	// This means same-symbol positions from different data sources collapse into
+	// one stream. We intentionally preserve that behavior for compatibility.
 	symbols := map[string]TransactionPointSymbol{}
 
 	var lastDate string
@@ -665,6 +668,8 @@ func (c *Calculator) computeTransactionPoints() {
 
 		symbols[a.Symbol] = currentItem
 
+		// Legacy parity: replacement matching is symbol-only (not dataSource+symbol).
+		// Keep this aligned with NestJS behavior even though it can merge sources.
 		// Build items list: all symbols except current, then add current, sort by symbol
 		var prevItems []TransactionPointSymbol
 		if lastTP != nil {

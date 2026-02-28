@@ -57,6 +57,9 @@ func (c *Calculator) getSymbolMetrics(
 		TotalLiabilitiesInBaseCurrency:                 decimal.Zero,
 	}
 
+	// Legacy parity: filter by symbol only (not dataSource+symbol), matching the
+	// NestJS ROAI implementation. This can blend same-symbol activities across
+	// sources, but is preserved to keep response compatibility.
 	// Filter orders for this symbol
 	var orders []orderItem
 	for _, a := range c.activities {
@@ -659,7 +662,9 @@ func (c *Calculator) getSymbolMetrics(
 	}
 }
 
-// Helper: get market price from nested map
+// Helper: get market price from nested map.
+// Legacy parity: marketSymbolMap is keyed by symbol only in NestJS ROAI.
+// Keep this signature/source behavior for strict backward compatibility.
 func getMarketPrice(m MarketData, date, symbol string) *decimal.Decimal {
 	if dateMap, ok := m[date]; ok {
 		if price, ok := dateMap[symbol]; ok {
