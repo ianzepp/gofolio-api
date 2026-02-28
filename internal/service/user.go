@@ -36,6 +36,16 @@ func (s *UserService) DeleteUser(ctx context.Context, id string) error {
 	return repo.Delete(ctx, id)
 }
 
+func (s *UserService) GetUserByAccessToken(ctx context.Context, accessToken string) (model.User, error) {
+	repo := repository.NewUserRepository(s.pool)
+	return repo.FindByAccessToken(ctx, accessToken)
+}
+
+func (s *UserService) UpdateAccessToken(ctx context.Context, id string, hashedAccessToken string) error {
+	repo := repository.NewUserRepository(s.pool)
+	return repo.UpdateAccessToken(ctx, id, hashedAccessToken)
+}
+
 func (s *UserService) GetSettings(ctx context.Context, userID string) (model.Settings, error) {
 	repo := repository.NewUserRepository(s.pool)
 	return repo.FindSettings(ctx, userID)

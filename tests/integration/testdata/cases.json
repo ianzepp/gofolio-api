@@ -210,5 +210,21 @@
       "accountIdTo": "${TRANSFER_ACCOUNT_TO_ID}",
       "balance": 1000000
     }
+  },
+  {
+    "name": "user-admin-access-token-existing-user-created-parity",
+    "method": "POST",
+    "path": "/api/v1/user/${LEGACY_USER_ID}/access-token",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN", "LEGACY_USER_ID"]
+  },
+  {
+    "name": "user-admin-access-token-foreign-id-parity",
+    "method": "POST",
+    "path": "/api/v1/user/${ADMIN_USER_ID}/access-token",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_USER_ID"]
   }
 ]

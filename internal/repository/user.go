@@ -73,6 +73,23 @@ func (r *UserRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+func (r *UserRepository) UpdateAccessToken(ctx context.Context, id string, hashedAccessToken string) error {
+	rows, err := r.db.Query(ctx,
+		`UPDATE "User"
+		 SET "accessToken" = $2
+		 WHERE id = $1
+		 RETURNING `+userColumns,
+		id, hashedAccessToken)
+	if err != nil {
+		return fmt.Errorf("update user access token: %w", err)
+	}
+	_, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.User])
+	if err != nil {
+		return fmt.Errorf("update user access token: %w", err)
+	}
+	return nil
+}
+
 func (r *UserRepository) FindSettings(ctx context.Context, userID string) (model.Settings, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT "userId", settings, "updatedAt"

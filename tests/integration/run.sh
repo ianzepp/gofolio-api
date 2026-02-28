@@ -17,6 +17,7 @@ go_server_pid=""
 go_server_log="${TMPDIR:-/tmp}/api-go-integration.log"
 resolved_jwt_secret=""
 resolved_database_url=""
+resolved_access_token_salt=""
 
 health_check() {
   local base_url="$1"
@@ -140,6 +141,55 @@ resolve_database_url() {
   fi
 }
 
+resolve_access_token_salt() {
+  if [[ -n "${ACCESS_TOKEN_SALT:-}" ]]; then
+    resolved_access_token_salt="${ACCESS_TOKEN_SALT}"
+    return 0
+  fi
+
+  local dotenv_file="${REPO_ROOT}/.env"
+  if [[ ! -f "${dotenv_file}" ]]; then
+    return 0
+  fi
+
+  local sourced_candidate
+  sourced_candidate="$(bash -c '
+    set -a
+    # shellcheck disable=SC1090
+    source "$1" >/dev/null 2>&1 || true
+    set +a
+    printf "%s" "${ACCESS_TOKEN_SALT:-}"
+  ' _ "${dotenv_file}" 2>/dev/null || true)"
+  if [[ -n "${sourced_candidate}" ]]; then
+    resolved_access_token_salt="${sourced_candidate}"
+    return 0
+  fi
+
+  local candidate
+  candidate="$(awk -F= '
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*ACCESS_TOKEN_SALT[[:space:]]*=/ {
+      sub(/^[^=]*=/, "", $0)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+      print $0
+      exit
+    }
+  ' "${dotenv_file}")"
+
+  if [[ -z "${candidate}" ]]; then
+    return 0
+  fi
+
+  candidate="${candidate%\"}"
+  candidate="${candidate#\"}"
+  candidate="${candidate%\'}"
+  candidate="${candidate#\'}"
+
+  if [[ -n "${candidate}" ]]; then
+    resolved_access_token_salt="${candidate}"
+  fi
+}
+
 bootstrap_legacy_user() {
   if [[ "${BOOTSTRAP_LEGACY_USER}" != "1" ]]; then
     echo "legacy user bootstrap disabled (BOOTSTRAP_LEGACY_USER=${BOOTSTRAP_LEGACY_USER})"
@@ -212,6 +262,38 @@ bootstrap_legacy_user() {
   fi
   if [[ -n "${empty_access_token}" ]]; then
     export EMPTY_USER_ACCESS_TOKEN="${empty_access_token}"
+  fi
+
+  # Bootstrap an admin JWT/token pair for admin-control parity cases.
+  if [[ -n "${resolved_database_url}" && -n "${resolved_jwt_secret}" ]]; then
+    local admin_signup_response
+    local admin_access_token
+    local admin_auth_token
+    local admin_user_id
+    admin_signup_response="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/user" 2>/dev/null || true)"
+    admin_access_token="$(printf '%s' "${admin_signup_response}" | jq -r '.accessToken // empty' 2>/dev/null || true)"
+    admin_auth_token="$(printf '%s' "${admin_signup_response}" | jq -r '.authToken // empty' 2>/dev/null || true)"
+    if [[ -z "${admin_auth_token}" && -n "${admin_access_token}" ]]; then
+      admin_auth_token="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/auth/anonymous" \
+        -H "Content-Type: application/json" \
+        -d "$(jq -nc --arg accessToken "${admin_access_token}" '{accessToken: $accessToken}')" \
+        | jq -r '.authToken // empty' 2>/dev/null || true)"
+    fi
+    admin_user_id="$(decode_jwt_user_id "${admin_auth_token}")"
+
+    if [[ -n "${admin_user_id}" ]]; then
+      psql "${resolved_database_url}" -Atqc \
+        "UPDATE \"User\" SET role = 'ADMIN' WHERE id = '${admin_user_id}';" >/dev/null 2>&1 || true
+      local admin_jwt
+      admin_jwt="$(make_hs256_jwt "${admin_user_id}" "${resolved_jwt_secret}" || true)"
+      if [[ -n "${admin_jwt}" ]]; then
+        export JWT_ADMIN_TOKEN="${admin_jwt}"
+      fi
+      export ADMIN_DB_USER_ID="${admin_user_id}"
+    fi
+    if [[ -n "${admin_access_token}" ]]; then
+      export ADMIN_ACCESS_TOKEN="${admin_access_token}"
+    fi
   fi
 
   # Bootstrap two accounts for transfer-balance parity checks.
@@ -438,6 +520,7 @@ echo "go:     ${GO_BASE_URL}"
 
 resolve_jwt_secret
 resolve_database_url
+resolve_access_token_salt
 if [[ -n "${resolved_jwt_secret}" ]]; then
   echo "jwt secret: configured for go api startup"
 else
@@ -447,6 +530,11 @@ if [[ -n "${resolved_database_url}" ]]; then
   echo "database url: configured for go api startup"
 else
   echo "database url: not found (db-backed parity cases may fail with 503)"
+fi
+if [[ -n "${resolved_access_token_salt}" ]]; then
+  echo "access token salt: configured for go api startup"
+else
+  echo "access token salt: not found (access-token parity cases may fail)"
 fi
 
 if ! health_check "${LEGACY_BASE_URL}" "${GO_HEALTH_PATH}"; then
@@ -465,15 +553,31 @@ else
   (
     if [[ -n "${resolved_jwt_secret}" ]]; then
       if [[ -n "${resolved_database_url}" ]]; then
-        env PORT="${GO_PORT}" JWT_SECRET_KEY="${resolved_jwt_secret}" DATABASE_URL="${resolved_database_url}" "${GO_BINARY_PATH}"
+        if [[ -n "${resolved_access_token_salt}" ]]; then
+          env PORT="${GO_PORT}" JWT_SECRET_KEY="${resolved_jwt_secret}" DATABASE_URL="${resolved_database_url}" ACCESS_TOKEN_SALT="${resolved_access_token_salt}" "${GO_BINARY_PATH}"
+        else
+          env PORT="${GO_PORT}" JWT_SECRET_KEY="${resolved_jwt_secret}" DATABASE_URL="${resolved_database_url}" "${GO_BINARY_PATH}"
+        fi
       else
-        env PORT="${GO_PORT}" JWT_SECRET_KEY="${resolved_jwt_secret}" "${GO_BINARY_PATH}"
+        if [[ -n "${resolved_access_token_salt}" ]]; then
+          env PORT="${GO_PORT}" JWT_SECRET_KEY="${resolved_jwt_secret}" ACCESS_TOKEN_SALT="${resolved_access_token_salt}" "${GO_BINARY_PATH}"
+        else
+          env PORT="${GO_PORT}" JWT_SECRET_KEY="${resolved_jwt_secret}" "${GO_BINARY_PATH}"
+        fi
       fi
     else
       if [[ -n "${resolved_database_url}" ]]; then
-        env PORT="${GO_PORT}" DATABASE_URL="${resolved_database_url}" "${GO_BINARY_PATH}"
+        if [[ -n "${resolved_access_token_salt}" ]]; then
+          env PORT="${GO_PORT}" DATABASE_URL="${resolved_database_url}" ACCESS_TOKEN_SALT="${resolved_access_token_salt}" "${GO_BINARY_PATH}"
+        else
+          env PORT="${GO_PORT}" DATABASE_URL="${resolved_database_url}" "${GO_BINARY_PATH}"
+        fi
       else
-        env PORT="${GO_PORT}" "${GO_BINARY_PATH}"
+        if [[ -n "${resolved_access_token_salt}" ]]; then
+          env PORT="${GO_PORT}" ACCESS_TOKEN_SALT="${resolved_access_token_salt}" "${GO_BINARY_PATH}"
+        else
+          env PORT="${GO_PORT}" "${GO_BINARY_PATH}"
+        fi
       fi
     fi
   ) >"${go_server_log}" 2>&1 &

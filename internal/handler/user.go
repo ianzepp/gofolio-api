@@ -30,13 +30,18 @@ Routes + request/response shape:
 */
 
 import (
+	"crypto/hmac"
+	"crypto/sha512"
 	"encoding/json"
+	"encoding/hex"
+	"errors"
 	"net/http"
 	"os"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 func GetUser(deps *Deps) http.HandlerFunc {
@@ -158,6 +163,32 @@ func DeleteUser(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		var body struct {
+			AccessToken string `json:"accessToken"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		hashed, err := hashAccessToken(body.AccessToken)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		userByToken, err := deps.UserService.GetUserByAccessToken(r.Context(), hashed)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+				return
+			}
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if userByToken.ID != userID {
+			Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+			return
+		}
+
 		if err := deps.UserService.DeleteUser(r.Context(), userID); err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
@@ -195,9 +226,43 @@ func CreateUserAccessToken(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		var body struct {
+			AccessToken string `json:"accessToken"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		currentHashed, err := hashAccessToken(body.AccessToken)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		userByToken, err := deps.UserService.GetUserByAccessToken(r.Context(), currentHashed)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+				return
+			}
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if userByToken.ID != userID {
+			Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+			return
+		}
+
 		// Generate new access token
 		accessToken := uuid.New().String()
-		// TODO: persist the new access token to the user record
+		hashed, err := hashAccessToken(accessToken)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if err := deps.UserService.UpdateAccessToken(r.Context(), userID, hashed); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		JSON(w, http.StatusCreated, map[string]any{
 			"accessToken": accessToken,
 		})
@@ -211,13 +276,35 @@ func CreateUserAccessTokenById(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		_ = r.PathValue("id")
+		id := r.PathValue("id")
 		accessToken := uuid.New().String()
-		// TODO: persist the new access token to the target user record
+		hashed, err := hashAccessToken(accessToken)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if err := deps.UserService.UpdateAccessToken(r.Context(), id, hashed); err != nil {
+			// Legacy parity: prisma update on missing user propagates internal server error.
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		JSON(w, http.StatusCreated, map[string]any{
 			"accessToken": accessToken,
 		})
 	}
+}
+
+func hashAccessToken(accessToken string) (string, error) {
+	salt := os.Getenv("ACCESS_TOKEN_SALT")
+	if salt == "" {
+		return "", errors.New("ACCESS_TOKEN_SALT is required")
+	}
+	mac := hmac.New(sha512.New, []byte(salt))
+	_, err := mac.Write([]byte(accessToken))
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(mac.Sum(nil)), nil
 }
 
 func UpdateUserSetting(deps *Deps) http.HandlerFunc {
