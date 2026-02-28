@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
@@ -132,6 +133,11 @@ func (s *ExportService) GetExport(
 		}
 		orders = filteredOrders
 	}
+
+	// Legacy parity: export activities are sorted by date ascending.
+	sort.SliceStable(orders, func(i, j int) bool {
+		return orders[i].Date.Before(orders[j].Date)
+	})
 
 	accountsWithActivities := make(map[string]struct{}, len(orders))
 	for _, order := range orders {

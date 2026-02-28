@@ -300,6 +300,7 @@ bootstrap_legacy_user() {
   if [[ -n "${auth_token}" ]]; then
     local transfer_from_response transfer_to_response transfer_from_id transfer_to_id
     local seed_order_response seed_order_id
+    local seed_order_two_response seed_order_two_id
     transfer_from_response="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/account" \
       -H "Authorization: Bearer ${auth_token}" \
       -H "Content-Type: application/json" \
@@ -336,6 +337,29 @@ bootstrap_legacy_user() {
       seed_order_id="$(printf '%s' "${seed_order_response}" | jq -r '.id // empty' 2>/dev/null || true)"
       if [[ -n "${seed_order_id}" ]]; then
         export SEED_ORDER_ID="${seed_order_id}"
+      fi
+
+      # Seed a second deterministic activity on the destination account so
+      # multi-ID and intersection export filters have non-trivial coverage.
+      seed_order_two_response="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/order" \
+        -H "Authorization: Bearer ${auth_token}" \
+        -H "Content-Type: application/json" \
+        -d "$(jq -nc \
+          --arg accountId "${transfer_to_id}" \
+          '{
+            accountId: $accountId,
+            currency: "USD",
+            dataSource: "YAHOO",
+            date: "2024-01-02T00:00:00.000Z",
+            fee: 0,
+            quantity: 2,
+            symbol: "MSFT",
+            type: "BUY",
+            unitPrice: 50
+          }')" 2>/dev/null || true)"
+      seed_order_two_id="$(printf '%s' "${seed_order_two_response}" | jq -r '.id // empty' 2>/dev/null || true)"
+      if [[ -n "${seed_order_two_id}" ]]; then
+        export SEED_ORDER_TWO_ID="${seed_order_two_id}"
       fi
     fi
   fi
