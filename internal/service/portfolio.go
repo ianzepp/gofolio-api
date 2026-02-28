@@ -87,6 +87,7 @@ func (s *PortfolioService) buildCalculator(ctx context.Context, userID string, f
 		if len(o.SPCountries) > 0 {
 			_ = json.Unmarshal(o.SPCountries, &countries)
 		}
+		countries = enrichCountries(countries)
 		var sectors []any
 		if len(o.SPSectors) > 0 {
 			_ = json.Unmarshal(o.SPSectors, &sectors)
@@ -102,7 +103,8 @@ func (s *PortfolioService) buildCalculator(ctx context.Context, userID string, f
 			}
 		}
 		a := calculator.Activity{
-			Date:              calculator.FormatDate(o.Date),
+			// Legacy parity: NestJS formats dates using local-time semantics.
+			Date:              calculator.FormatDate(o.Date.In(time.Local)),
 			Fee:               decimal.NewFromFloat(o.Fee),
 			FeeInBaseCurrency: decimal.NewFromFloat(o.Fee), // Will be converted by calculator
 			Quantity:          decimal.NewFromFloat(o.Quantity),

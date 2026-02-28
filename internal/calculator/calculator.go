@@ -781,8 +781,8 @@ func (c *Calculator) getChartDateMap(startDate, endDate time.Time, step int) map
 
 	// Calendar year boundaries
 	for y := startDate.Year(); y <= endDate.Year(); y++ {
-		yearStart := time.Date(y, 1, 1, 0, 0, 0, 0, time.UTC)
-		yearEnd := time.Date(y, 12, 31, 0, 0, 0, 0, time.UTC)
+		yearStart := time.Date(y, 1, 1, 0, 0, 0, 0, time.Local)
+		yearEnd := time.Date(y, 12, 31, 0, 0, 0, 0, time.Local)
 
 		if !yearStart.Before(startDate) && !yearStart.After(endDate) {
 			chartDateMap[FormatDate(yearStart)] = true

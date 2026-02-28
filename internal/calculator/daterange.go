@@ -8,15 +8,16 @@ import (
 // GetIntervalFromDateRange returns start and end dates for a named date range.
 // Ported from libs/common/src/lib/calculation-helper.ts.
 func GetIntervalFromDateRange(dateRange string, portfolioStart ...time.Time) (start, end time.Time) {
-	pStart := time.Unix(0, 0).UTC()
+	pStart := time.Unix(0, 0).In(time.Local)
 	if len(portfolioStart) > 0 {
 		pStart = portfolioStart[0]
 	}
 
-	now := time.Now().UTC()
+	now := time.Now()
 	today := StartOfDay(now)
 	endDate := EndOfDay(now)
 	startDate := pStart
+	legacyResetUTC := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
 	switch dateRange {
 	case "1d":
@@ -40,18 +41,21 @@ func GetIntervalFromDateRange(dateRange string, portfolioStart ...time.Time) (st
 		candidate := soy.AddDate(0, 0, -1)
 		startDate = maxTime(startDate, candidate)
 	case "1y":
-		candidate := today.AddDate(-1, 0, 0)
+		// Legacy parity: resetHours(new Date()) in NestJS builds a UTC-midnight
+		// Date and then applies subYears(), which can shift the formatted local day.
+		candidate := legacyResetUTC.AddDate(-1, 0, 0)
 		startDate = maxTime(startDate, candidate)
 	case "5y":
-		candidate := today.AddDate(-5, 0, 0)
+		// Same legacy resetHours() behavior as 1y.
+		candidate := legacyResetUTC.AddDate(-5, 0, 0)
 		startDate = maxTime(startDate, candidate)
 	case "max":
 		// startDate stays as portfolioStart
 	default:
 		// Calendar year string: "2024", "2023", etc.
 		if year, err := strconv.Atoi(dateRange); err == nil {
-			endDate = EndOfDay(time.Date(year, 12, 31, 0, 0, 0, 0, time.UTC))
-			candidate := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+			endDate = EndOfDay(time.Date(year, 12, 31, 0, 0, 0, 0, time.Local))
+			candidate := time.Date(year, 1, 1, 0, 0, 0, 0, time.Local)
 			startDate = maxTime(startDate, candidate)
 		}
 	}
