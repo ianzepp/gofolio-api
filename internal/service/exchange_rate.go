@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,6 +17,8 @@ import (
 type ExchangeRateService struct {
 	db *sqlx.DB
 }
+
+var ErrInvalidExchangeRateDate = errors.New("invalid exchange-rate date")
 
 func NewExchangeRateService(db *sqlx.DB) *ExchangeRateService {
 	return &ExchangeRateService{db: db}
@@ -32,7 +36,7 @@ type ExchangeRateResponse struct {
 func (s *ExchangeRateService) GetExchangeRate(ctx context.Context, symbol string, dateString string) (*ExchangeRateResponse, error) {
 	date, err := time.Parse("2006-01-02", dateString)
 	if err != nil {
-		return nil, fmt.Errorf("invalid date: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrInvalidExchangeRateDate, err)
 	}
 
 	repo := repository.NewMarketDataRepository(s.db)
@@ -64,7 +68,10 @@ func (s *ExchangeRateService) GetExchangeRate(ctx context.Context, symbol string
 func (s *ExchangeRateService) findRate(ctx context.Context, repo *repository.MarketDataRepository, dataSource string, symbol string, date time.Time) (float64, bool, error) {
 	md, err := repo.FindLatestOnOrBeforeDate(ctx, dataSource, symbol, date)
 	if err != nil {
-		return 0, false, nil // not found is not an error
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, false, nil // not found is not an error
+		}
+		return 0, false, err
 	}
 	return md.MarketPrice, true, nil
 }

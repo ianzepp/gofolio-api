@@ -2,9 +2,15 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
 	"github.com/jmoiron/sqlx"
+)
+
+var (
+	ErrWatchlistItemNotFound = errors.New("watchlist item not found")
+	ErrSymbolProfileNotFound = errors.New("symbol profile not found")
 )
 
 // WatchlistService manages a user's symbol watchlist.
@@ -32,11 +38,19 @@ func (s *WatchlistService) GetWatchlist(ctx context.Context, userID string) ([]r
 // AddWatchlistItem adds a symbol to the user's watchlist.
 func (s *WatchlistService) AddWatchlistItem(ctx context.Context, userID string, dataSource string, symbol string) error {
 	repo := repository.NewWatchlistRepository(s.db)
-	return repo.Add(ctx, userID, dataSource, symbol)
+	err := repo.Add(ctx, userID, dataSource, symbol)
+	if errors.Is(err, repository.ErrSymbolProfileNotFound) {
+		return ErrSymbolProfileNotFound
+	}
+	return err
 }
 
 // RemoveWatchlistItem removes a symbol from the user's watchlist.
 func (s *WatchlistService) RemoveWatchlistItem(ctx context.Context, userID string, dataSource string, symbol string) error {
 	repo := repository.NewWatchlistRepository(s.db)
-	return repo.Remove(ctx, userID, dataSource, symbol)
+	err := repo.Remove(ctx, userID, dataSource, symbol)
+	if errors.Is(err, repository.ErrWatchlistItemNotFound) {
+		return ErrWatchlistItemNotFound
+	}
+	return err
 }

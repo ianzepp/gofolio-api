@@ -1146,9 +1146,9 @@
     "mode": "status"
   },
   {
-    "name": "logo-by-symbol-status-parity",
+    "name": "logo-by-url-missing-url-status-parity",
     "method": "GET",
-    "path": "/api/v1/logo/YAHOO/AAPL",
+    "path": "/api/v1/logo",
     "mode": "status"
   },
   {
@@ -1172,6 +1172,14 @@
     "requiredEnv": ["JWT_USER_TOKEN"]
   },
   {
+    "name": "watchlist-get-empty-user-json-parity",
+    "method": "GET",
+    "path": "/api/v1/watchlist",
+    "mode": "json",
+    "auth": "jwt:JWT_EMPTY_USER_TOKEN",
+    "requiredEnv": ["JWT_EMPTY_USER_TOKEN"]
+  },
+  {
     "name": "watchlist-create-no-auth-unauthorized",
     "method": "POST",
     "path": "/api/v1/watchlist",
@@ -1183,5 +1191,22 @@
     "method": "DELETE",
     "path": "/api/v1/watchlist/YAHOO/AAPL",
     "mode": "status"
+  },
+  {
+    "name": "watchlist-create-unknown-symbol-bad-request-parity",
+    "method": "POST",
+    "path": "/api/v1/watchlist",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": { "dataSource": "YAHOO", "symbol": "INTEGRATION_UNKNOWN_WATCHLIST" }
+  },
+  {
+    "name": "watchlist-delete-unknown-symbol-not-found-parity",
+    "method": "DELETE",
+    "path": "/api/v1/watchlist/YAHOO/INTEGRATION_UNKNOWN_WATCHLIST",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
   }
 ]

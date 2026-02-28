@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,6 +19,8 @@ type LogoService struct {
 	db     *sqlx.DB
 	client *http.Client
 }
+
+var ErrLogoSymbolNotFound = errors.New("logo symbol not found")
 
 func NewLogoService(db *sqlx.DB) *LogoService {
 	return &LogoService{
@@ -37,7 +40,7 @@ type LogoResult struct {
 // GetLogoByURL fetches the favicon for a given website URL.
 func (s *LogoService) GetLogoByURL(ctx context.Context, siteURL string) (*LogoResult, error) {
 	if siteURL == "" {
-		return nil, fmt.Errorf("url is required")
+		return &LogoResult{Data: []byte{}, ContentType: "image/png"}, nil
 	}
 	return s.fetchFavicon(ctx, siteURL)
 }
@@ -48,12 +51,16 @@ func (s *LogoService) GetLogoBySymbol(ctx context.Context, dataSource string, sy
 	repo := repository.NewSymbolProfileRepository(s.db)
 	profile, err := repo.FindByDataSourceAndSymbol(ctx, dataSource, symbol)
 	if err != nil {
-		return nil, nil // symbol not found
+		return nil, ErrLogoSymbolNotFound
 	}
 	if profile.Url == nil || *profile.Url == "" {
-		return nil, nil // no URL for this symbol
+		return &LogoResult{Data: []byte{}, ContentType: "image/png"}, nil
 	}
-	return s.fetchFavicon(ctx, *profile.Url)
+	result, err := s.fetchFavicon(ctx, *profile.Url)
+	if err != nil {
+		return &LogoResult{Data: []byte{}, ContentType: "image/png"}, nil
+	}
+	return result, nil
 }
 
 // fetchFavicon retrieves a favicon from Google's favicon service.

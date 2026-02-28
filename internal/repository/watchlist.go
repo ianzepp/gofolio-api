@@ -3,10 +3,16 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/jmoiron/sqlx"
+)
+
+var (
+	ErrWatchlistItemNotFound = errors.New("watchlist item not found")
+	ErrSymbolProfileNotFound = errors.New("symbol profile not found")
 )
 
 // WatchlistItem is a lightweight projection of a SymbolProfile used for
@@ -46,6 +52,18 @@ func (r *WatchlistRepository) FindByUserID(ctx context.Context, userID string) (
 // Add connects a SymbolProfile to a user's watchlist. Uses ON CONFLICT DO
 // NOTHING so adding the same symbol twice is a no-op.
 func (r *WatchlistRepository) Add(ctx context.Context, userID string, dataSource string, symbol string) error {
+	var symbolProfileExists bool
+	if err := sqlx.GetContext(ctx, r.db, &symbolProfileExists,
+		`SELECT EXISTS (
+			SELECT 1 FROM "SymbolProfile"
+			WHERE "dataSource" = $1 AND symbol = $2
+		)`, dataSource, symbol); err != nil {
+		return fmt.Errorf("check symbol profile for watchlist: %w", err)
+	}
+	if !symbolProfileExists {
+		return ErrSymbolProfileNotFound
+	}
+
 	_, err := r.db.ExecContext(ctx,
 		`INSERT INTO "_UserWatchlist" ("A", "B")
 		 SELECT sp.id, $1
@@ -60,7 +78,7 @@ func (r *WatchlistRepository) Add(ctx context.Context, userID string, dataSource
 
 // Remove disconnects a SymbolProfile from a user's watchlist.
 func (r *WatchlistRepository) Remove(ctx context.Context, userID string, dataSource string, symbol string) error {
-	_, err := r.db.ExecContext(ctx,
+	result, err := r.db.ExecContext(ctx,
 		`DELETE FROM "_UserWatchlist"
 		 WHERE "A" = (
 		   SELECT id FROM "SymbolProfile"
@@ -68,6 +86,13 @@ func (r *WatchlistRepository) Remove(ctx context.Context, userID string, dataSou
 		 ) AND "B" = $3`, dataSource, symbol, userID)
 	if err != nil {
 		return fmt.Errorf("remove watchlist item: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("remove watchlist rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return ErrWatchlistItemNotFound
 	}
 	return nil
 }

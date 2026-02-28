@@ -20,8 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"database/sql"
@@ -95,6 +97,7 @@ func LoadConfigFromEnv() (Config, error) {
 	if databaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
 	}
+	databaseURL = normalizeDatabaseURL(databaseURL)
 
 	return Config{
 		DatabaseURL:     databaseURL,
@@ -164,4 +167,24 @@ func getIntEnv(key string, fallback int) int {
 	}
 
 	return parsed
+}
+
+func normalizeDatabaseURL(raw string) string {
+	if raw == "" {
+		return raw
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return strings.ReplaceAll(raw, "sslmode=prefer", "sslmode=disable")
+	}
+
+	query := parsed.Query()
+	if strings.EqualFold(query.Get("sslmode"), "prefer") {
+		query.Set("sslmode", "disable")
+		parsed.RawQuery = query.Encode()
+		return parsed.String()
+	}
+
+	return raw
 }
