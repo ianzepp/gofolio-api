@@ -103,9 +103,9 @@ Optional tools used by advanced bootstrap paths:
 
 Current fixture set (`tests/integration/testdata/cases.json`) has:
 
-- `103` total cases
-- `75` status-compare cases
-- `28` JSON-compare cases
+- `131` total cases
+- `102` status-compare cases
+- `29` JSON-compare cases
 - `12` export-focused parity cases
 
 ## Auth
