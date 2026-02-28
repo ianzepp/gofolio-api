@@ -10,6 +10,7 @@ GO_PORT="${GO_PORT:-3334}"
 GO_HEALTH_PATH="${GO_HEALTH_PATH:-/api/v1/health}"
 START_TIMEOUT_SECONDS="${START_TIMEOUT_SECONDS:-20}"
 BOOTSTRAP_LEGACY_USER="${BOOTSTRAP_LEGACY_USER:-1}"
+GO_BINARY_PATH="${GO_BINARY_PATH:-${ROOT_DIR}/bin/api-go}"
 
 started_go_server=0
 go_server_pid=""
@@ -206,6 +207,18 @@ cleanup() {
 }
 trap cleanup EXIT
 
+build_go_binary() {
+  local binary_dir
+  binary_dir="$(dirname "${GO_BINARY_PATH}")"
+  mkdir -p "${binary_dir}"
+
+  echo "building go api binary: ${GO_BINARY_PATH}"
+  (
+    cd "${ROOT_DIR}"
+    go build -o "${GO_BINARY_PATH}" ./cmd/server
+  )
+}
+
 echo "== Differential test preflight =="
 echo "legacy: ${LEGACY_BASE_URL}"
 echo "go:     ${GO_BASE_URL}"
@@ -234,20 +247,20 @@ bootstrap_legacy_user
 if health_check "${GO_BASE_URL}" "${GO_HEALTH_PATH}"; then
   echo "go api already running at ${GO_BASE_URL}"
 else
+  build_go_binary
   echo "starting go api on port ${GO_PORT}..."
   (
-    cd "${ROOT_DIR}"
     if [[ -n "${resolved_jwt_secret}" ]]; then
       if [[ -n "${resolved_database_url}" ]]; then
-        env PORT="${GO_PORT}" JWT_SECRET_KEY="${resolved_jwt_secret}" DATABASE_URL="${resolved_database_url}" go run ./cmd/server
+        env PORT="${GO_PORT}" JWT_SECRET_KEY="${resolved_jwt_secret}" DATABASE_URL="${resolved_database_url}" "${GO_BINARY_PATH}"
       else
-        env PORT="${GO_PORT}" JWT_SECRET_KEY="${resolved_jwt_secret}" go run ./cmd/server
+        env PORT="${GO_PORT}" JWT_SECRET_KEY="${resolved_jwt_secret}" "${GO_BINARY_PATH}"
       fi
     else
       if [[ -n "${resolved_database_url}" ]]; then
-        env PORT="${GO_PORT}" DATABASE_URL="${resolved_database_url}" go run ./cmd/server
+        env PORT="${GO_PORT}" DATABASE_URL="${resolved_database_url}" "${GO_BINARY_PATH}"
       else
-        env PORT="${GO_PORT}" go run ./cmd/server
+        env PORT="${GO_PORT}" "${GO_BINARY_PATH}"
       fi
     fi
   ) >"${go_server_log}" 2>&1 &

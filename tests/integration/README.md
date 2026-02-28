@@ -39,7 +39,7 @@ If either API is unreachable at `/api/v1/health`, tests are skipped.
   - calls `POST /api/v1/user`
   - uses returned `authToken` (or exchanges `accessToken` via `POST /api/v1/auth/anonymous`)
   - exports `JWT_USER_TOKEN` and `JWT_TOKEN` for differential cases
-- Starts Go API on `GO_PORT` (default `3334`) if it is not already running.
+- Builds a persistent Go binary and starts it on `GO_PORT` (default `3334`) if it is not already running.
 - Waits for Go health endpoint before running tests.
 - Automatically stops the Go API process it started.
 - Writes Go API startup/runtime logs to `${TMPDIR:-/tmp}/api-go-integration.log`.
@@ -49,6 +49,7 @@ Useful env vars:
 - `LEGACY_BASE_URL` (default `http://127.0.0.1:3333`)
 - `GO_BASE_URL` (default `http://127.0.0.1:3334`)
 - `GO_PORT` (default `3334`)
+- `GO_BINARY_PATH` (default `apps/api-go/bin/api-go`)
 - `START_TIMEOUT_SECONDS` (default `20`)
 - `BOOTSTRAP_LEGACY_USER` (`1` default; set `0` to disable auto user bootstrap)
 
