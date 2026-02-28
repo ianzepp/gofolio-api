@@ -2,7 +2,7 @@ package handler
 
 import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 // Deps is the dependency container passed to every handler factory function.
@@ -20,7 +20,7 @@ import (
 // It may be nil if the server started without a reachable database — callers
 // must guard against this.
 type Deps struct {
-	Pool                  *pgxpool.Pool
+	DB                    *sqlx.DB
 	AccountBalanceService *service.AccountBalanceService
 	AccountService        *service.AccountService
 	AccessService         *service.AccessService

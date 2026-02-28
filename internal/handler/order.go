@@ -46,7 +46,7 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
+	"database/sql"
 )
 
 // GetOrders handles GET /api/v1/order. Results are returned under the key
@@ -167,7 +167,7 @@ func GetOrder(deps *Deps) http.HandlerFunc {
 		id := r.PathValue("id")
 		order, err := deps.OrderService.GetOrderByUserID(r.Context(), id, userID)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				// Legacy parity: returns not found when order is not visible to user.
 				Error(w, http.StatusNotFound, http.StatusText(http.StatusNotFound))
 				return
@@ -200,7 +200,7 @@ func UpdateOrder(deps *Deps) http.HandlerFunc {
 		// Legacy parity: ownership/visibility check happens before update.
 		_, err := deps.OrderService.GetOrderByUserID(r.Context(), id, userID)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 				return
 			}
@@ -242,7 +242,7 @@ func UpdateOrder(deps *Deps) http.HandlerFunc {
 
 		updated, err := deps.OrderService.UpdateOrderByUserID(r.Context(), order, userID)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 				return
 			}

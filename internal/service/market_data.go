@@ -6,7 +6,7 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 // MarketDataService retrieves historical market data paired with the asset
@@ -14,12 +14,12 @@ import (
 // endpoint where a full SymbolProfile (not just a name) is required, unlike
 // AssetService which degrades to a synthetic profile for unknown symbols.
 type MarketDataService struct {
-	pool *pgxpool.Pool
+	db *sqlx.DB
 }
 
 // NewMarketDataService constructs a MarketDataService backed by the given pool.
-func NewMarketDataService(pool *pgxpool.Pool) *MarketDataService {
-	return &MarketDataService{pool: pool}
+func NewMarketDataService(db *sqlx.DB) *MarketDataService {
+	return &MarketDataService{db: db}
 }
 
 // MarketDataDetailsResponse bundles the full SymbolProfile with all stored
@@ -35,8 +35,8 @@ type MarketDataDetailsResponse struct {
 // and returns an error if none is found, since it is only called from admin
 // flows where the symbol is known to be profiled.
 func (s *MarketDataService) GetBySymbol(ctx context.Context, dataSource string, symbol string) (MarketDataDetailsResponse, error) {
-	spRepo := repository.NewSymbolProfileRepository(s.pool)
-	mdRepo := repository.NewMarketDataRepository(s.pool)
+	spRepo := repository.NewSymbolProfileRepository(s.db)
+	mdRepo := repository.NewMarketDataRepository(s.db)
 
 	profile, err := spRepo.FindByDataSourceAndSymbol(ctx, dataSource, symbol)
 	if err != nil {

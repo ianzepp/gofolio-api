@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	"database/sql"
+
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 // AssetService retrieves the combined asset profile + market data view used by
@@ -16,12 +17,12 @@ import (
 // it degrades gracefully when no SymbolProfile exists, synthesising a minimal
 // profile from the symbol string itself (used for currency pairs).
 type AssetService struct {
-	pool *pgxpool.Pool
+	db *sqlx.DB
 }
 
-// NewAssetService constructs an AssetService backed by the given pool.
-func NewAssetService(pool *pgxpool.Pool) *AssetService {
-	return &AssetService{pool: pool}
+// NewAssetService constructs an AssetService backed by the given database.
+func NewAssetService(db *sqlx.DB) *AssetService {
+	return &AssetService{db: db}
 }
 
 // AssetResponse bundles a simplified asset profile with all stored market data
@@ -42,12 +43,12 @@ type AssetResponse struct {
 // currency code, then isCurrencyCode validates it. An unrecognised suffix
 // falls back to "-" so that the asset page still renders rather than erroring.
 func (s *AssetService) GetAsset(ctx context.Context, dataSource string, symbol string) (AssetResponse, error) {
-	spRepo := repository.NewSymbolProfileRepository(s.pool)
-	mdRepo := repository.NewMarketDataRepository(s.pool)
+	spRepo := repository.NewSymbolProfileRepository(s.db)
+	mdRepo := repository.NewMarketDataRepository(s.db)
 
 	profile, err := spRepo.FindByDataSourceAndSymbol(ctx, dataSource, symbol)
 	if err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
+		if !errors.Is(err, sql.ErrNoRows) {
 			return AssetResponse{}, fmt.Errorf("find symbol profile: %w", err)
 		}
 

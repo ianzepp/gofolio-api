@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 // InfoService assembles the public instance metadata returned by
@@ -16,12 +16,12 @@ import (
 // frontend to decide which features and auth methods to render before a user
 // has logged in, so it must never return sensitive data.
 type InfoService struct {
-	pool *pgxpool.Pool
+	db *sqlx.DB
 }
 
 // NewInfoService constructs an InfoService backed by the given pool.
-func NewInfoService(pool *pgxpool.Pool) *InfoService {
-	return &InfoService{pool: pool}
+func NewInfoService(db *sqlx.DB) *InfoService {
+	return &InfoService{db: db}
 }
 
 // BenchmarkProperty is the stored shape of a single benchmark entry in the
@@ -75,8 +75,8 @@ type InfoResponse struct {
 // NOTE: Demo auth token generation is deferred to the handler/auth layer since
 // it requires JWT signing keys that are not available in this service.
 func (s *InfoService) GetInfo(ctx context.Context) (InfoResponse, error) {
-	propRepo := repository.NewPropertyRepository(s.pool)
-	spRepo := repository.NewSymbolProfileRepository(s.pool)
+	propRepo := repository.NewPropertyRepository(s.db)
+	spRepo := repository.NewSymbolProfileRepository(s.db)
 
 	// Build global permissions from env flags
 	globalPermissions := []string{}

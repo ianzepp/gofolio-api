@@ -49,7 +49,7 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
+	"database/sql"
 )
 
 // GetPlatformsWithAccountCount handles GET /api/v1/platform. Emits accountCount=0
@@ -127,7 +127,7 @@ func DeletePlatform(deps *Deps) http.HandlerFunc {
 		id := r.PathValue("id")
 		_, err := deps.PlatformService.GetPlatform(r.Context(), id)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				// Legacy parity: delete missing platform returns forbidden.
 				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 				return
@@ -169,7 +169,7 @@ func UpdatePlatform(deps *Deps) http.HandlerFunc {
 
 		updated, err := deps.PlatformService.UpdatePlatform(r.Context(), p)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				// Legacy parity: update missing platform returns bad request.
 				Error(w, http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
 				return

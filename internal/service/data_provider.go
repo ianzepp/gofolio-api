@@ -9,7 +9,7 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/provider"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -22,19 +22,19 @@ import (
 // This makes dispatch O(1) and avoids reflection, at the cost of requiring an
 // explicit registration step in the composition root.
 type DataProviderService struct {
-	pool      *pgxpool.Pool
+	db        *sqlx.DB
 	providers map[model.DataSource]provider.DataProvider
 }
 
 // NewDataProviderService builds a DataProviderService from a slice of providers,
 // indexing them by their DataSource name for O(1) dispatch. Duplicate DataSource
 // registrations are silently overwritten — last writer wins.
-func NewDataProviderService(pool *pgxpool.Pool, providers []provider.DataProvider) *DataProviderService {
+func NewDataProviderService(db *sqlx.DB, providers []provider.DataProvider) *DataProviderService {
 	m := make(map[model.DataSource]provider.DataProvider, len(providers))
 	for _, p := range providers {
 		m[p.GetName()] = p
 	}
-	return &DataProviderService{pool: pool, providers: m}
+	return &DataProviderService{db: db, providers: m}
 }
 
 // GetQuotes fetches live quotes for a set of asset identifiers concurrently,
@@ -110,8 +110,8 @@ func (s *DataProviderService) GetQuotes(ctx context.Context, items []provider.As
 	}
 
 	// Upsert to MarketData
-	if s.pool != nil {
-		repo := repository.NewMarketDataRepository(s.pool)
+	if s.db != nil {
+		repo := repository.NewMarketDataRepository(s.db)
 		today := time.Now().UTC().Truncate(24 * time.Hour)
 		for _, item := range items {
 			if q, ok := result[item.Symbol]; ok && q.MarketPrice > 0 {
@@ -129,10 +129,10 @@ func (s *DataProviderService) GetQuotes(ctx context.Context, items []provider.As
 // requested range. Callers that need live provider data should use
 // GetHistoricalRaw instead.
 func (s *DataProviderService) GetHistorical(ctx context.Context, dataSource model.DataSource, symbol string, from, to time.Time) (map[string]provider.HistoricalResponse, error) {
-	if s.pool == nil {
+	if s.db == nil {
 		return nil, fmt.Errorf("database not available")
 	}
-	repo := repository.NewMarketDataRepository(s.pool)
+	repo := repository.NewMarketDataRepository(s.db)
 	data, err := repo.FindBySymbolAndDateRange(ctx, string(dataSource), symbol, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("historical: %w", err)

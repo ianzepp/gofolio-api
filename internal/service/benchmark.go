@@ -5,19 +5,19 @@ import (
 	"encoding/json"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 // BenchmarkService returns performance summaries for the market indices or
 // assets that an admin has designated as benchmarks. Benchmarks give users
 // a reference point (e.g. S&P 500) against which to compare their portfolio.
 type BenchmarkService struct {
-	pool *pgxpool.Pool
+	db *sqlx.DB
 }
 
 // NewBenchmarkService constructs a BenchmarkService backed by the given pool.
-func NewBenchmarkService(pool *pgxpool.Pool) *BenchmarkService {
-	return &BenchmarkService{pool: pool}
+func NewBenchmarkService(db *sqlx.DB) *BenchmarkService {
+	return &BenchmarkService{db: db}
 }
 
 // BenchmarkItem is a single benchmark entry in the GET /api/v1/benchmark response.
@@ -48,8 +48,8 @@ type BenchmarkResponse struct {
 // empty list rather than an error, because a misconfigured benchmark setting
 // should not degrade the rest of the application.
 func (s *BenchmarkService) GetBenchmarks(ctx context.Context) (BenchmarkResponse, error) {
-	propRepo := repository.NewPropertyRepository(s.pool)
-	spRepo := repository.NewSymbolProfileRepository(s.pool)
+	propRepo := repository.NewPropertyRepository(s.db)
+	spRepo := repository.NewSymbolProfileRepository(s.db)
 
 	benchProp, err := propRepo.FindByKey(ctx, "BENCHMARKS")
 	if err != nil {

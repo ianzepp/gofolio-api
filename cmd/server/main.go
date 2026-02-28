@@ -36,7 +36,7 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/handler"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/provider"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 // defaultPort runs one above the NestJS server (3333) so both can coexist
@@ -44,66 +44,66 @@ import (
 const defaultPort = "3334"
 
 func main() {
-	var poolCloser func()
+	var dbCloser func() error
 	deps := &handler.Deps{}
 
 	// PHASE 1: DATABASE CONNECTION
 	// WHY: Non-fatal on startup — the server degrades gracefully so that
 	// liveness probes and health endpoints remain available even when the
 	// database is temporarily unreachable.
-	var dbPool *pgxpool.Pool
+	var database *sqlx.DB
 	cfg, err := db.LoadConfigFromEnv()
 	if err != nil {
 		log.Printf("database config warning: %v", err)
 	} else {
-		pool, dbErr := db.Open(context.Background(), cfg)
+		d, dbErr := db.Open(cfg)
 		if dbErr != nil {
 			log.Printf("database connection warning: %v", dbErr)
-		} else if pingErr := db.Ping(context.Background(), pool, 5*time.Second); pingErr != nil {
+		} else if pingErr := db.Ping(context.Background(), d, 5*time.Second); pingErr != nil {
 			log.Printf("database ping warning: %v", pingErr)
-			// WHY: Close the pool here — a pool that cannot reach the server
+			// WHY: Close the database here — a handle that cannot reach the server
 			// wastes OS file descriptors and confuses health checks downstream.
-			pool.Close()
+			d.Close()
 		} else {
 			log.Printf("database connected")
-			dbPool = pool
-			poolCloser = pool.Close
+			database = d
+			dbCloser = d.Close
 
 			// PHASE 2: SERVICE LAYER WIRING
 			// WHY: DataProviderService depends on a concrete provider list, and
 			// SymbolService depends on DataProviderService, so those two must be
 			// constructed first before the flat Deps struct is filled in.
 			yahooProvider := provider.NewYahooFinanceProvider()
-			manualProvider := provider.NewManualProvider(pool)
+			manualProvider := provider.NewManualProvider(d)
 			providers := []provider.DataProvider{yahooProvider, manualProvider}
-			dataProviderSvc := service.NewDataProviderService(pool, providers)
-			symbolSvc := service.NewSymbolService(pool, dataProviderSvc)
+			dataProviderSvc := service.NewDataProviderService(d, providers)
+			symbolSvc := service.NewSymbolService(d, dataProviderSvc)
 
 			deps = &handler.Deps{
-				Pool:                  pool,
-				AccountBalanceService: service.NewAccountBalanceService(pool),
-				AccountService:        service.NewAccountService(pool),
-				AccessService:         service.NewAccessService(pool),
-				AdminService:          service.NewAdminService(pool),
-				AssetService:          service.NewAssetService(pool),
-				BenchmarkService:      service.NewBenchmarkService(pool),
+				DB:                    d,
+				AccountBalanceService: service.NewAccountBalanceService(d),
+				AccountService:        service.NewAccountService(d),
+				AccessService:         service.NewAccessService(d),
+				AdminService:          service.NewAdminService(d),
+				AssetService:          service.NewAssetService(d),
+				BenchmarkService:      service.NewBenchmarkService(d),
 				DataProviderService:   dataProviderSvc,
-				ExchangeRateService:   service.NewExchangeRateService(pool),
-				ExportService:         service.NewExportService(pool),
-				InfoService:           service.NewInfoService(pool),
-				LogoService:           service.NewLogoService(pool),
-				MarketDataService:     service.NewMarketDataService(pool),
-				OrderService:          service.NewOrderService(pool),
-				PlatformService:       service.NewPlatformService(pool),
+				ExchangeRateService:   service.NewExchangeRateService(d),
+				ExportService:         service.NewExportService(d),
+				InfoService:           service.NewInfoService(d),
+				LogoService:           service.NewLogoService(d),
+				MarketDataService:     service.NewMarketDataService(d),
+				OrderService:          service.NewOrderService(d),
+				PlatformService:       service.NewPlatformService(d),
 				SymbolService:         symbolSvc,
-				TagService:            service.NewTagService(pool),
-				UserService:           service.NewUserService(pool),
-				WatchlistService:      service.NewWatchlistService(pool),
+				TagService:            service.NewTagService(d),
+				UserService:           service.NewUserService(d),
+				WatchlistService:      service.NewWatchlistService(d),
 			}
 		}
 	}
-	if poolCloser != nil {
-		defer poolCloser()
+	if dbCloser != nil {
+		defer dbCloser()
 	}
 
 	// PHASE 3: AUTH CONFIG
@@ -114,7 +114,7 @@ func main() {
 	if jwtSecret == "" {
 		log.Printf("warning: JWT_SECRET_KEY not set, auth will reject all requests")
 	}
-	authCfg := auth.Config{JWTSecret: jwtSecret, Pool: dbPool}
+	authCfg := auth.Config{JWTSecret: jwtSecret, DB: database}
 
 	// PHASE 4: ROUTE REGISTRATION
 	// WHY: net/http ServeMux uses method+path patterns (Go 1.22+). Each route

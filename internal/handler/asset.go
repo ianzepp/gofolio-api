@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/jackc/pgx/v5"
+	"database/sql"
 )
 
 func GetAsset(deps *Deps) http.HandlerFunc {
@@ -19,7 +19,7 @@ func GetAsset(deps *Deps) http.HandlerFunc {
 
 		resp, err := deps.AssetService.GetAsset(r.Context(), dataSource, symbol)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				Error(w, http.StatusNotFound, "Not Found")
 				return
 			}

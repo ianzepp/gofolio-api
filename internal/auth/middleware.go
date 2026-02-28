@@ -20,7 +20,7 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 // Config holds the dependencies required by auth middleware. It is passed by
@@ -28,7 +28,7 @@ import (
 // testing or for routes that only need JWT validation.
 type Config struct {
 	JWTSecret string
-	Pool      *pgxpool.Pool // may be nil if DB is unavailable
+	DB        *sqlx.DB // may be nil if DB is unavailable
 }
 
 // Authenticate validates JWT or API key credentials and stores the resolved
@@ -40,7 +40,7 @@ type Config struct {
 // temporarily unavailable.
 //
 // PHASE 2: API key — hashes the supplied key and looks it up in the ApiKey
-// table. Requires a live DB connection; returns 503 if cfg.Pool is nil.
+// table. Requires a live DB connection; returns 503 if cfg.DB is nil.
 //
 // WHY JWT first: JWT validation is CPU-only (HMAC verify) while API key
 // lookup requires a DB query plus ~10ms of PBKDF2 hashing. Checking JWT
@@ -64,7 +64,7 @@ func Authenticate(cfg Config, next http.HandlerFunc) http.HandlerFunc {
 
 		// PHASE 2: API key — hash then DB lookup.
 		if apiKey, ok := ExtractApiKey(authHeader); ok {
-			if cfg.Pool == nil {
+			if cfg.DB == nil {
 				writeError(w, http.StatusServiceUnavailable, "Service Unavailable")
 				return
 			}
@@ -74,7 +74,7 @@ func Authenticate(cfg Config, next http.HandlerFunc) http.HandlerFunc {
 				writeError(w, http.StatusInternalServerError, "Internal Server Error")
 				return
 			}
-			repo := repository.NewApiKeyRepository(cfg.Pool)
+			repo := repository.NewApiKeyRepository(cfg.DB)
 			userID, err := repo.FindUserIDByHashedKey(r.Context(), hashedKey)
 			if err != nil {
 				log.Printf("auth: invalid API key: %v", err)
@@ -133,7 +133,7 @@ func RequireAnyPermission(cfg Config, perms []string, next http.HandlerFunc) htt
 // The loaded user is also cached back onto info.User so downstream handlers
 // that call GetAuthInfo can access the full model without a second DB query.
 func authenticatedUser(w http.ResponseWriter, r *http.Request, cfg Config) (*model.User, bool) {
-	if cfg.Pool == nil {
+	if cfg.DB == nil {
 		writeError(w, http.StatusServiceUnavailable, "Service Unavailable")
 		return nil, false
 	}
@@ -146,7 +146,7 @@ func authenticatedUser(w http.ResponseWriter, r *http.Request, cfg Config) (*mod
 		return nil, false
 	}
 
-	userRepo := repository.NewUserRepository(cfg.Pool)
+	userRepo := repository.NewUserRepository(cfg.DB)
 	user, err := userRepo.FindByID(r.Context(), info.UserID)
 	if err != nil {
 		log.Printf("auth: failed to load user %s: %v", info.UserID, err)

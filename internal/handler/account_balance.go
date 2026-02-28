@@ -24,7 +24,7 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
+	"database/sql"
 )
 
 // HandleCreateAccountBalance handles POST /api/v1/account-balance. It validates
@@ -64,7 +64,7 @@ func HandleCreateAccountBalance(deps *Deps) http.HandlerFunc {
 		// Validate account ownership (matches NestJS controller check).
 		_, err := deps.AccountService.GetAccount(r.Context(), body.AccountId, userID)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 				return
 			}
@@ -118,7 +118,7 @@ func HandleDeleteAccountBalance(deps *Deps) http.HandlerFunc {
 
 		id := r.PathValue("id")
 		if _, err := deps.AccountBalanceService.GetAccountBalance(r.Context(), id, userID); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 				return
 			}
@@ -128,7 +128,7 @@ func HandleDeleteAccountBalance(deps *Deps) http.HandlerFunc {
 
 		deleted, err := deps.AccountBalanceService.DeleteAccountBalance(r.Context(), id, userID)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 				return
 			}

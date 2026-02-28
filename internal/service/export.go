@@ -8,7 +8,7 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 // ExportService assembles a portable data export for a user's portfolio. The
@@ -17,12 +17,12 @@ import (
 // and re-import. Filters allow clients to export subsets (e.g. a single
 // account or a single symbol) without downloading the entire portfolio.
 type ExportService struct {
-	pool *pgxpool.Pool
+	db *sqlx.DB
 }
 
 // NewExportService constructs an ExportService backed by the given pool.
-func NewExportService(pool *pgxpool.Pool) *ExportService {
-	return &ExportService{pool: pool}
+func NewExportService(db *sqlx.DB) *ExportService {
+	return &ExportService{db: db}
 }
 
 // ExportAccount is the portable representation of a brokerage/cash account.
@@ -90,9 +90,9 @@ func (s *ExportService) GetExport(
 	filterDataSource string,
 	filterSymbol string,
 ) (ExportResponse, error) {
-	accountRepo := repository.NewAccountRepository(s.pool)
-	orderRepo := repository.NewOrderRepository(s.pool)
-	spRepo := repository.NewSymbolProfileRepository(s.pool)
+	accountRepo := repository.NewAccountRepository(s.db)
+	orderRepo := repository.NewOrderRepository(s.db)
+	spRepo := repository.NewSymbolProfileRepository(s.db)
 
 	accounts, err := accountRepo.FindByUserID(ctx, userID)
 	if err != nil {

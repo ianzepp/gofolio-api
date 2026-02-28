@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
-	"github.com/jackc/pgx/v5"
+	"database/sql"
 	"golang.org/x/text/currency"
 )
 
@@ -51,7 +51,7 @@ func GetMarketData(deps *Deps) http.HandlerFunc {
 
 		resp, err := deps.MarketDataService.GetBySymbol(r.Context(), dataSource, symbol)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				if isCurrencyLikeSymbol(symbol) {
 					Error(w, http.StatusInternalServerError, "Internal server error")
 					return

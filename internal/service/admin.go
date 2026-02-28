@@ -20,7 +20,7 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 // AdminService provides administrative operations: dashboard metrics, user
@@ -28,12 +28,12 @@ import (
 // user-facing services so that admin-only endpoints can be guarded at the
 // handler level without leaking privileged aggregates into general queries.
 type AdminService struct {
-	pool *pgxpool.Pool
+	db *sqlx.DB
 }
 
 // NewAdminService constructs an AdminService backed by the given connection pool.
-func NewAdminService(pool *pgxpool.Pool) *AdminService {
-	return &AdminService{pool: pool}
+func NewAdminService(db *sqlx.DB) *AdminService {
+	return &AdminService{db: db}
 }
 
 // AdminDashboard is the top-level response for GET /api/v1/admin. It aggregates
@@ -71,10 +71,10 @@ type AdminDataProvider struct {
 //
 //	profiles are suppressed to match NestJS dashboard parity.
 func (s *AdminService) GetDashboard(ctx context.Context) (AdminDashboard, error) {
-	orderRepo := repository.NewOrderRepository(s.pool)
-	userRepo := repository.NewUserRepository(s.pool)
-	propRepo := repository.NewPropertyRepository(s.pool)
-	spRepo := repository.NewSymbolProfileRepository(s.pool)
+	orderRepo := repository.NewOrderRepository(s.db)
+	userRepo := repository.NewUserRepository(s.db)
+	propRepo := repository.NewPropertyRepository(s.db)
+	spRepo := repository.NewSymbolProfileRepository(s.db)
 
 	activitiesCount, err := orderRepo.CountAll(ctx)
 	if err != nil {
@@ -161,7 +161,7 @@ type AdminUsersResponse struct {
 // data that the standard user query deliberately omits for privacy reasons.
 func (s *AdminService) GetUsers(ctx context.Context, skip int, take int) (AdminUsersResponse, error) {
 	// Query users joined with analytics and counts
-	rows, err := s.pool.Query(ctx,
+	rows, err := s.db.Query(ctx,
 		`SELECT u.id, u."createdAt", u.provider, u.role,
 		        a."activityCount", a.country,
 		        a."dataProviderGhostfolioDailyRequests",
@@ -218,7 +218,7 @@ func (s *AdminService) GetUsers(ctx context.Context, skip int, take int) (AdminU
 
 	// Total count
 	var total int
-	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM "User"`).Scan(&total); err != nil {
+	if err := s.db.QueryRow(ctx, `SELECT COUNT(*) FROM "User"`).Scan(&total); err != nil {
 		return AdminUsersResponse{}, fmt.Errorf("count admin users: %w", err)
 	}
 
@@ -236,7 +236,7 @@ func (s *AdminService) GetUser(ctx context.Context, id string) (AdminUser, error
 	var lastReq *time.Time
 	var accountCount int
 
-	err := s.pool.QueryRow(ctx,
+	err := s.db.QueryRow(ctx,
 		`SELECT u.id, u."createdAt", u.provider, u.role,
 		        a."activityCount", a.country,
 		        a."dataProviderGhostfolioDailyRequests",
@@ -323,7 +323,7 @@ func (s *AdminService) GetMarketData(ctx context.Context, skip int, take int, qu
 	// Count total
 	var total int
 	countSQL := `SELECT COUNT(*) FROM "SymbolProfile" sp` + whereClause
-	if err := s.pool.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
+	if err := s.db.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
 		return AdminMarketDataResponse{}, fmt.Errorf("count admin market data: %w", err)
 	}
 
@@ -359,7 +359,7 @@ func (s *AdminService) GetMarketData(ctx context.Context, skip int, take int, qu
 
 	args = append(args, take, skip)
 
-	rows, err := s.pool.Query(ctx, mainSQL, args...)
+	rows, err := s.db.Query(ctx, mainSQL, args...)
 	if err != nil {
 		return AdminMarketDataResponse{}, fmt.Errorf("query admin market data: %w", err)
 	}

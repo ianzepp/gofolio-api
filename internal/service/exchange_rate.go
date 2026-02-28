@@ -6,18 +6,18 @@ import (
 	"time"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 // ExchangeRateService looks up historical exchange rates from the MarketData
 // table. Currency pairs are stored as symbols like "USDEUR" with a known data
 // source (typically YAHOO).
 type ExchangeRateService struct {
-	pool *pgxpool.Pool
+	db *sqlx.DB
 }
 
-func NewExchangeRateService(pool *pgxpool.Pool) *ExchangeRateService {
-	return &ExchangeRateService{pool: pool}
+func NewExchangeRateService(db *sqlx.DB) *ExchangeRateService {
+	return &ExchangeRateService{db: db}
 }
 
 // ExchangeRateResponse is the JSON shape returned by GET /exchange-rate.
@@ -35,7 +35,7 @@ func (s *ExchangeRateService) GetExchangeRate(ctx context.Context, symbol string
 		return nil, fmt.Errorf("invalid date: %w", err)
 	}
 
-	repo := repository.NewMarketDataRepository(s.pool)
+	repo := repository.NewMarketDataRepository(s.db)
 
 	// Try YAHOO first — this is the primary data source for forex rates in
 	// the legacy NestJS codebase.

@@ -9,7 +9,7 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/provider"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 // ErrSymbolNotFound is returned by Get when the provider returns no quote for
@@ -44,13 +44,13 @@ type MarketDataPoint struct {
 // between the HTTP handler and DataProviderService, adding only the
 // historical-data DB enrichment step that providers cannot supply alone.
 type SymbolService struct {
-	pool                *pgxpool.Pool
+	db                  *sqlx.DB
 	dataProviderService *DataProviderService
 }
 
 // NewSymbolService creates a new SymbolService.
-func NewSymbolService(pool *pgxpool.Pool, dps *DataProviderService) *SymbolService {
-	return &SymbolService{pool: pool, dataProviderService: dps}
+func NewSymbolService(db *sqlx.DB, dps *DataProviderService) *SymbolService {
+	return &SymbolService{db: db, dataProviderService: dps}
 }
 
 // Get returns a live quote for a symbol, optionally enriched with historical
@@ -91,8 +91,8 @@ func (s *SymbolService) Get(ctx context.Context, dataSource model.DataSource, sy
 		asc := model.AssetSubClass(q.AssetSubClass)
 		item.AssetSubClass = &asc
 	}
-	if includeHistoricalDataDays > 0 && s.pool != nil {
-		repo := repository.NewMarketDataRepository(s.pool)
+	if includeHistoricalDataDays > 0 && s.db != nil {
+		repo := repository.NewMarketDataRepository(s.db)
 		from := time.Now().UTC().AddDate(0, 0, -includeHistoricalDataDays)
 		to := time.Now().UTC()
 		data, err := repo.FindBySymbolAndDateRange(ctx, string(dataSource), symbol, from, to)

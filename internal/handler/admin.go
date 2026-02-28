@@ -14,7 +14,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/jackc/pgx/v5"
+	"database/sql"
 )
 
 // GetAdmin handles GET /api/v1/admin and returns the admin dashboard summary.
@@ -102,7 +102,7 @@ func GetAdminUser(deps *Deps) http.HandlerFunc {
 
 		user, err := deps.AdminService.GetUser(r.Context(), id)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				Error(w, http.StatusNotFound, "User not found")
 				return
 			}

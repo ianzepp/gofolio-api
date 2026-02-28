@@ -33,21 +33,21 @@ import (
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 // ManualProvider serves market data from the local database for MANUAL data
 // source symbols. It is safe for concurrent use — each method creates its own
 // repository instances scoped to the request context.
 type ManualProvider struct {
-	pool   *pgxpool.Pool
+	db     *sqlx.DB
 	client *http.Client
 }
 
 // NewManualProvider creates a new manual (DB-backed) provider.
-func NewManualProvider(pool *pgxpool.Pool) *ManualProvider {
+func NewManualProvider(db *sqlx.DB) *ManualProvider {
 	return &ManualProvider{
-		pool:   pool,
+		db:     db,
 		client: &http.Client{Timeout: 15 * time.Second},
 	}
 }
@@ -80,8 +80,8 @@ func (p *ManualProvider) GetQuotes(ctx context.Context, symbols []string) (map[s
 		return map[string]DataProviderResponse{}, nil
 	}
 
-	repo := repository.NewMarketDataRepository(p.pool)
-	spRepo := repository.NewSymbolProfileRepository(p.pool)
+	repo := repository.NewMarketDataRepository(p.db)
+	spRepo := repository.NewSymbolProfileRepository(p.db)
 
 	result := make(map[string]DataProviderResponse)
 
@@ -119,7 +119,7 @@ func (p *ManualProvider) GetQuotes(ctx context.Context, symbols []string) (map[s
 
 // GetHistorical returns historical data from the DB.
 func (p *ManualProvider) GetHistorical(ctx context.Context, symbol string, from, to time.Time) (map[string]HistoricalResponse, error) {
-	repo := repository.NewMarketDataRepository(p.pool)
+	repo := repository.NewMarketDataRepository(p.db)
 	data, err := repo.FindBySymbolAndDateRange(ctx, string(model.DataSourceManual), symbol, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("manual historical: %w", err)
@@ -140,7 +140,7 @@ func (p *ManualProvider) GetDividends(_ context.Context, _ string, _, _ time.Tim
 
 // GetAssetProfile queries the symbol profile from the DB.
 func (p *ManualProvider) GetAssetProfile(ctx context.Context, symbol string) (*model.SymbolProfile, error) {
-	repo := repository.NewSymbolProfileRepository(p.pool)
+	repo := repository.NewSymbolProfileRepository(p.db)
 	sp, err := repo.FindByDataSourceAndSymbol(ctx, string(model.DataSourceManual), symbol)
 	if err != nil {
 		return nil, fmt.Errorf("manual asset profile: %w", err)
@@ -150,7 +150,7 @@ func (p *ManualProvider) GetAssetProfile(ctx context.Context, symbol string) (*m
 
 // Search performs an ILIKE search on symbol profiles with MANUAL data source.
 func (p *ManualProvider) Search(ctx context.Context, query string, _ bool) (LookupResponse, error) {
-	repo := repository.NewSymbolProfileRepository(p.pool)
+	repo := repository.NewSymbolProfileRepository(p.db)
 	profiles, err := repo.SearchByQuery(ctx, string(model.DataSourceManual), query)
 	if err != nil {
 		return LookupResponse{}, fmt.Errorf("manual search: %w", err)

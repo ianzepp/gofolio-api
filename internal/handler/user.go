@@ -63,7 +63,7 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
+	"database/sql"
 )
 
 // GetUser handles GET /api/v1/user and assembles the rich user object expected by
@@ -220,7 +220,7 @@ func DeleteUser(deps *Deps) http.HandlerFunc {
 		}
 		userByToken, err := deps.UserService.GetUserByAccessToken(r.Context(), hashed)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 				return
 			}
@@ -306,7 +306,7 @@ func CreateUserAccessToken(deps *Deps) http.HandlerFunc {
 		}
 		userByToken, err := deps.UserService.GetUserByAccessToken(r.Context(), currentHashed)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 				return
 			}

@@ -39,7 +39,7 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
+	"database/sql"
 )
 
 // GetAccesses handles GET /api/v1/access and returns the caller's outbound
@@ -179,7 +179,7 @@ func UpdateAccess(deps *Deps) http.HandlerFunc {
 
 		updated, err := deps.AccessService.UpdateAccessByUserID(r.Context(), id, userID, body.Alias, body.Permissions, body.Settings)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				// Legacy parity: non-owned/non-existent access update returns forbidden.
 				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 				return

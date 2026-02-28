@@ -46,7 +46,7 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
+	"database/sql"
 )
 
 // GetTags handles GET /api/v1/tags and returns all tags with their associated
@@ -167,7 +167,7 @@ func DeleteTag(deps *Deps) http.HandlerFunc {
 
 		id := r.PathValue("id")
 		if _, err := deps.TagService.GetTag(r.Context(), id); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 				return
 			}
@@ -214,7 +214,7 @@ func UpdateTag(deps *Deps) http.HandlerFunc {
 		}
 
 		if _, err := deps.TagService.GetTag(r.Context(), id); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 				return
 			}

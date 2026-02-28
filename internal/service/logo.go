@@ -9,19 +9,19 @@ import (
 	"time"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
 )
 
 // LogoService fetches favicon images for symbols or URLs via Google's favicon
 // service.
 type LogoService struct {
-	pool   *pgxpool.Pool
+	db     *sqlx.DB
 	client *http.Client
 }
 
-func NewLogoService(pool *pgxpool.Pool) *LogoService {
+func NewLogoService(db *sqlx.DB) *LogoService {
 	return &LogoService{
-		pool: pool,
+		db: db,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -45,7 +45,7 @@ func (s *LogoService) GetLogoByURL(ctx context.Context, siteURL string) (*LogoRe
 // GetLogoBySymbol looks up the website URL for a symbol from its SymbolProfile,
 // then fetches the favicon. Returns nil if the symbol has no URL.
 func (s *LogoService) GetLogoBySymbol(ctx context.Context, dataSource string, symbol string) (*LogoResult, error) {
-	repo := repository.NewSymbolProfileRepository(s.pool)
+	repo := repository.NewSymbolProfileRepository(s.db)
 	profile, err := repo.FindByDataSourceAndSymbol(ctx, dataSource, symbol)
 	if err != nil {
 		return nil, nil // symbol not found

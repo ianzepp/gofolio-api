@@ -47,7 +47,7 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/provider"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
-	"github.com/jackc/pgx/v5"
+	"database/sql"
 )
 
 // GetDataProviderAssetProfile handles GET /api/v1/data-providers/ghostfolio/asset-profile/{symbol}.
@@ -232,20 +232,20 @@ func GetDataProviderStatus(deps *Deps) http.HandlerFunc {
 		dailyRequestsMax := 0
 		subscription := map[string]any{"type": "Basic"}
 
-		if deps.Pool != nil {
-			analyticsRepo := repository.NewAnalyticsRepository(deps.Pool)
+		if deps.DB != nil {
+			analyticsRepo := repository.NewAnalyticsRepository(deps.DB)
 			if analytics, err := analyticsRepo.FindByUserID(r.Context(), authInfo.UserID); err == nil {
 				dailyRequests = analytics.DataProviderGhostfolioDailyRequests
 			}
 
-			propRepo := repository.NewPropertyRepository(deps.Pool)
+			propRepo := repository.NewPropertyRepository(deps.DB)
 			if prop, err := propRepo.FindByKey(r.Context(), "DATA_SOURCES_GHOSTFOLIO_DATA_PROVIDER_MAX_REQUESTS"); err == nil {
 				if parsed, parseErr := strconv.Atoi(strings.TrimSpace(prop.Value)); parseErr == nil {
 					dailyRequestsMax = parsed
 				}
 			}
 
-			subscriptionRepo := repository.NewSubscriptionRepository(deps.Pool)
+			subscriptionRepo := repository.NewSubscriptionRepository(deps.DB)
 			if _, err := subscriptionRepo.FindActiveByUserID(r.Context(), authInfo.UserID); err == nil {
 				subscription = map[string]any{"type": "Premium"}
 			} else if err != nil && !isNotFoundError(err) {
@@ -279,5 +279,5 @@ func parseQueryTime(r *http.Request, key string, defaultVal time.Time) time.Time
 // isNotFoundError reports whether err represents a "no rows" DB result,
 // used to distinguish missing-record from genuine DB errors.
 func isNotFoundError(err error) bool {
-	return errors.Is(err, pgx.ErrNoRows)
+	return errors.Is(err, sql.ErrNoRows)
 }
