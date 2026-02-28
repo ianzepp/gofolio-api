@@ -1,3 +1,38 @@
+// Package provider — yahoo.go implements a DataProvider backed by Yahoo Finance.
+//
+// # Authentication / crumb protocol
+//
+// Yahoo Finance's v7 quote and v10 quoteSummary endpoints require a "crumb"
+// anti-CSRF token that is tied to a session cookie. The flow is:
+//  1. Fetch https://finance.yahoo.com to obtain session cookies.
+//  2. Exchange those cookies for a crumb string via /v1/test/getcrumb.
+//  3. Append crumb=<value> to all subsequent API requests alongside the cookie.
+//
+// The crumb/cookie pair is cached for crumbCacheDur (1 hour) behind a mutex so
+// concurrent callers share a single session rather than each triggering a full
+// re-handshake. On HTTP 401 the crumb is invalidated and re-fetched once before
+// returning an error.
+//
+// # Symbol conversion
+//
+// Yahoo Finance uses different symbol conventions from Ghostfolio:
+//   - Forex pairs: USDCHF (6-char uppercase) → USDCHF=X
+//   - Crypto:      BTCUSD (not 6-char) → BTC-USD
+//
+// convertToYahooSymbol / convertFromYahooSymbol handle the round-trip.
+//
+// # Fallback strategy
+//
+// GetQuotes tries the v7 batch endpoint first (supports up to yahooMaxPerReq
+// symbols per call) and falls back to individual quoteSummary calls if the batch
+// endpoint fails (e.g. rate limit or crumb rejection). This avoids a total
+// blackout when the batch endpoint is temporarily unhealthy.
+//
+// # Close price preference
+//
+// Historical data prefers adjusted-close (adjclose) over raw close when both are
+// present in the chart response. This matches standard finance practice where
+// splits and dividends are reflected in the price series.
 package provider
 
 import (
@@ -15,13 +50,15 @@ import (
 )
 
 const (
-	yahooBaseURL      = "https://query2.finance.yahoo.com"
-	yahooMaxPerReq    = 50
-	crumbCacheDur     = 1 * time.Hour
-	yahooUserAgent    = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
+	yahooBaseURL   = "https://query2.finance.yahoo.com"
+	yahooMaxPerReq = 50 // batch limit for the v7 quote endpoint
+	crumbCacheDur  = 1 * time.Hour
+	// WHY: Yahoo Finance rejects requests without a browser-like UA string.
+	yahooUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
 )
 
-// YahooFinanceProvider fetches market data from Yahoo Finance.
+// YahooFinanceProvider fetches market data from Yahoo Finance. It is safe for
+// concurrent use; the crumb/cookie session is protected by an internal mutex.
 type YahooFinanceProvider struct {
 	client *http.Client
 
@@ -54,7 +91,14 @@ func (p *YahooFinanceProvider) GetDataProviderInfo() DataProviderInfo {
 	}
 }
 
-// GetQuotes fetches live quotes for symbols via the v7 quote endpoint.
+// GetQuotes fetches live quotes for the given symbols. Symbols are converted to
+// Yahoo format before the request and converted back in the response map.
+//
+// PHASE 1: Try the v7 batch endpoint (requires crumb).
+// PHASE 2: On failure, fall back to individual quoteSummary calls per symbol.
+//
+// EDGE: Symbols that fail in fallback mode are silently skipped rather than
+// failing the entire batch, to maximise the partial result returned to callers.
 func (p *YahooFinanceProvider) GetQuotes(ctx context.Context, symbols []string) (map[string]DataProviderResponse, error) {
 	if len(symbols) == 0 {
 		return map[string]DataProviderResponse{}, nil
@@ -102,6 +146,8 @@ func (p *YahooFinanceProvider) GetQuotes(ctx context.Context, symbols []string) 
 }
 
 // GetHistorical fetches daily historical prices via the v8 chart endpoint.
+// Results are keyed by YYYY-MM-DD strings and zero-price entries are skipped
+// (Yahoo returns null close prices for non-trading days in some markets).
 func (p *YahooFinanceProvider) GetHistorical(ctx context.Context, symbol string, from, to time.Time) (map[string]HistoricalResponse, error) {
 	ySym := convertToYahooSymbol(symbol)
 	u := fmt.Sprintf("%s/v8/finance/chart/%s?period1=%d&period2=%d&interval=1d",
@@ -137,7 +183,9 @@ func (p *YahooFinanceProvider) GetHistorical(ctx context.Context, symbol string,
 	return result, nil
 }
 
-// GetDividends fetches dividend events via the v8 chart endpoint.
+// GetDividends fetches dividend payment events via the v8 chart endpoint using
+// the events=div query flag. The dividend amount is returned as MarketPrice in
+// HistoricalResponse to use the same wire type as price history.
 func (p *YahooFinanceProvider) GetDividends(ctx context.Context, symbol string, from, to time.Time) (map[string]HistoricalResponse, error) {
 	ySym := convertToYahooSymbol(symbol)
 	u := fmt.Sprintf("%s/v8/finance/chart/%s?period1=%d&period2=%d&interval=1d&events=div",
@@ -170,7 +218,9 @@ func (p *YahooFinanceProvider) GetDividends(ctx context.Context, symbol string, 
 	return result, nil
 }
 
-// GetAssetProfile fetches minimal profile info from quoteSummary.
+// GetAssetProfile fetches minimal profile info (name, currency, asset class)
+// from the quoteSummary price module. Only the price module is requested to
+// minimise response size — full fundamental data is not needed for profiling.
 func (p *YahooFinanceProvider) GetAssetProfile(ctx context.Context, symbol string) (*model.SymbolProfile, error) {
 	ySym := convertToYahooSymbol(symbol)
 	q, err := p.fetchQuoteSummary(ctx, ySym)
@@ -199,7 +249,15 @@ func (p *YahooFinanceProvider) GetAssetProfile(ctx context.Context, symbol strin
 	return profile, nil
 }
 
-// Search performs a symbol search via the v1 search endpoint.
+// Search performs a symbol search via the v1/finance/search endpoint.
+// Results are filtered to the allowed asset types (EQUITY, ETF, FUTURE,
+// MUTUALFUND, CRYPTOCURRENCY) and optionally INDEX. Other types (e.g. OPTION,
+// CURRENCY) are excluded because they are not supported by Ghostfolio's
+// portfolio model.
+//
+// NOTE: The Currency field in LookupItem is populated with the Yahoo exchange
+// code (e.g. "NMS"), not a currency string, because the search endpoint does not
+// return currency. Callers must resolve currency separately if needed.
 func (p *YahooFinanceProvider) Search(ctx context.Context, query string, includeIndices bool) (LookupResponse, error) {
 	u := fmt.Sprintf("%s/v1/finance/search?q=%s&quotesCount=10&newsCount=0",
 		yahooBaseURL, url.QueryEscape(query))
@@ -251,6 +309,10 @@ func (p *YahooFinanceProvider) Search(ctx context.Context, query string, include
 
 // --- Crumb/cookie management ---
 
+// ensureCrumb returns a valid (crumb, cookie) pair for Yahoo Finance API access,
+// re-fetching from Yahoo if the cached pair has expired or been invalidated.
+// The mutex ensures only one goroutine performs the two-step handshake at a time;
+// others wait and reuse the result.
 func (p *YahooFinanceProvider) ensureCrumb(ctx context.Context) (string, string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -306,6 +368,8 @@ func (p *YahooFinanceProvider) ensureCrumb(ctx context.Context) (string, string,
 
 // --- HTTP helpers ---
 
+// doGet performs an unauthenticated GET request. Used for endpoints that do not
+// require the crumb/cookie session (e.g. v8 chart).
 func (p *YahooFinanceProvider) doGet(ctx context.Context, rawURL string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -326,6 +390,9 @@ func (p *YahooFinanceProvider) doGet(ctx context.Context, rawURL string) ([]byte
 	return io.ReadAll(resp.Body)
 }
 
+// doGetWithCrumb performs a crumb-authenticated GET. On HTTP 401 it invalidates
+// the cached crumb, re-fetches it once, and retries the request. A second 401
+// propagates as an error rather than triggering another retry to prevent loops.
 func (p *YahooFinanceProvider) doGetWithCrumb(ctx context.Context, rawURL string) ([]byte, error) {
 	crumb, cookie, err := p.ensureCrumb(ctx)
 	if err != nil {
@@ -405,6 +472,8 @@ type yahooQuote struct {
 	QuoteType          string  `json:"quoteType"`
 }
 
+// fetchQuotesV7 calls the v7 batch quote endpoint and returns raw quote structs.
+// The caller is responsible for symbol conversion before passing symbols here.
 func (p *YahooFinanceProvider) fetchQuotesV7(ctx context.Context, symbols []string) ([]yahooQuote, error) {
 	u := fmt.Sprintf("%s/v7/finance/quote?symbols=%s",
 		yahooBaseURL, url.QueryEscape(strings.Join(symbols, ",")))
@@ -442,6 +511,10 @@ type yahooRawValue struct {
 	Raw float64 `json:"raw"`
 }
 
+// fetchQuoteSummary calls the v10 quoteSummary endpoint for a single symbol,
+// requesting only the "price" module to minimise payload size. Returns an error
+// when the result set is empty (Yahoo returns a 200 with empty results on unknown
+// symbols rather than a 4xx).
 func (p *YahooFinanceProvider) fetchQuoteSummary(ctx context.Context, symbol string) (*yahooQuote, error) {
 	u := fmt.Sprintf("%s/v10/finance/quoteSummary/%s?modules=price",
 		yahooBaseURL, url.PathEscape(symbol))
@@ -503,8 +576,12 @@ type yahooDividend struct {
 	Date   int64   `json:"date"`
 }
 
+// getClosePrices extracts an ordered slice of daily closing prices from a chart
+// result. Adjusted close (post-split/dividend) is preferred over raw close to
+// produce consistent return calculations. Falls back to raw close when adjclose
+// is absent (common for assets without split history).
 func getClosePrices(r yahooChartResult) []float64 {
-	// Prefer adjclose if available
+	// WHY: adjclose gives comparable prices across split dates; raw close does not.
 	if len(r.Indicators.AdjClose) > 0 && len(r.Indicators.AdjClose[0].AdjClose) > 0 {
 		nums := r.Indicators.AdjClose[0].AdjClose
 		out := make([]float64, len(nums))
@@ -538,6 +615,9 @@ type yahooSearchResponse struct {
 
 // --- Symbol conversion ---
 
+// convertToYahooSymbol maps a Ghostfolio symbol to Yahoo Finance format.
+// Ghostfolio stores forex as "USDCHF" and crypto as "BTCUSD"; Yahoo uses
+// "USDCHF=X" and "BTC-USD" respectively.
 func convertToYahooSymbol(symbol string) string {
 	// Forex: USDCHF -> USDCHF=X
 	if len(symbol) == 6 && isAllAlpha(symbol) && !strings.Contains(symbol, "-") {
@@ -561,6 +641,8 @@ func convertToYahooSymbol(symbol string) string {
 	return symbol
 }
 
+// convertFromYahooSymbol is the inverse of convertToYahooSymbol: it maps Yahoo
+// Finance symbol format back to Ghostfolio's internal format.
 func convertFromYahooSymbol(symbol string) string {
 	// USDCHF=X -> USDCHF
 	if strings.HasSuffix(symbol, "=X") {
@@ -587,6 +669,8 @@ func isAllAlpha(s string) bool {
 
 // --- Market state mapping ---
 
+// mapMarketState converts Yahoo Finance's market state string ("REGULAR",
+// "PRE", "POST", "CLOSED") to Ghostfolio's two-value vocabulary ("open" / "closed").
 func mapMarketState(state string) string {
 	if state == "REGULAR" {
 		return "open"
@@ -596,6 +680,9 @@ func mapMarketState(state string) string {
 
 // --- Quote type mapping ---
 
+// mapYahooQuoteType translates a Yahoo Finance quoteType string to the
+// Ghostfolio (assetClass, assetSubClass) pair. Unknown types return empty strings,
+// which callers treat as "unclassified" rather than an error.
 func mapYahooQuoteType(quoteType string) (assetClass, assetSubClass string) {
 	switch quoteType {
 	case "EQUITY":

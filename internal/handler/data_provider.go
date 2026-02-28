@@ -1,3 +1,19 @@
+// Package handler — data_provider.go implements the Ghostfolio data-provider
+// proxy endpoints under /api/v1/data-providers/ghostfolio/*.
+//
+// These endpoints expose the Go server as a data-provider to external consumers
+// (e.g. other Ghostfolio instances configured to use this one as a Ghostfolio
+// data source). All routes delegate to DataProviderService which fans out to the
+// registered provider implementations (Yahoo Finance, Manual, etc.).
+//
+// Status endpoint design note: GetDataProviderStatus hits three separate DB
+// repositories (analytics, property, subscription) to assemble the quota/plan
+// response. This mirrors the NestJS AdminController helper that does the same
+// fan-out, and is intentionally left in the handler rather than a service because
+// it aggregates cross-domain data with no business logic.
+//
+// Parity reference:
+// apps/api/src/app/endpoints/data-providers/ghostfolio/ghostfolio.controller.ts
 package handler
 
 /*
@@ -34,7 +50,13 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// GetDataProviderAssetProfile returns a handler for GET /api/v1/data-providers/ghostfolio/asset-profile/{symbol}.
+// GetDataProviderAssetProfile handles GET /api/v1/data-providers/ghostfolio/asset-profile/{symbol}.
+// The symbol is always looked up against the Yahoo Finance data source because
+// this endpoint is part of the Ghostfolio data-provider protocol, which currently
+// treats Yahoo as the default external source.
+//
+// EDGE: If no profile is found the handler returns an empty object rather than
+// 404, matching the NestJS contract (the client handles missing profiles gracefully).
 func GetDataProviderAssetProfile(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.DataProviderService == nil {
@@ -61,7 +83,8 @@ func GetDataProviderAssetProfile(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// GetDataProviderDividends returns a handler for GET /api/v1/data-providers/ghostfolio/dividends/{symbol}.
+// GetDataProviderDividends handles GET /api/v1/data-providers/ghostfolio/dividends/{symbol}.
+// The from/to query parameters default to the trailing 12-month window when omitted.
 func GetDataProviderDividends(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.DataProviderService == nil {
@@ -83,7 +106,9 @@ func GetDataProviderDividends(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// GetDataProviderHistorical returns a handler for GET /api/v1/data-providers/ghostfolio/historical/{symbol}.
+// GetDataProviderHistorical handles GET /api/v1/data-providers/ghostfolio/historical/{symbol}.
+// Returns OHLCV-style historical data keyed by date string (YYYY-MM-DD) under
+// the "historicalData" key. Date range defaults to trailing 12 months.
 func GetDataProviderHistorical(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.DataProviderService == nil {
@@ -114,7 +139,10 @@ func GetDataProviderHistorical(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// DataProviderLookup returns a handler for GET /api/v1/data-providers/ghostfolio/lookup.
+// DataProviderLookup handles GET /api/v1/data-providers/ghostfolio/lookup.
+// Short queries (fewer than 2 non-space characters) return an empty item list
+// immediately rather than hitting the upstream provider. This matches the NestJS
+// minimum-length guard and avoids noise queries to Yahoo Finance.
 func DataProviderLookup(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.DataProviderService == nil {
@@ -140,7 +168,10 @@ func DataProviderLookup(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// GetDataProviderQuotes returns a handler for GET /api/v1/data-providers/ghostfolio/quotes.
+// GetDataProviderQuotes handles GET /api/v1/data-providers/ghostfolio/quotes.
+// Accepts a comma-separated "symbols" query parameter and returns a map of
+// symbol → quote data. All symbols are assumed to be Yahoo Finance symbols;
+// data-source routing is not performed at this endpoint.
 func GetDataProviderQuotes(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.DataProviderService == nil {
@@ -173,7 +204,17 @@ func GetDataProviderQuotes(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// GetDataProviderStatus returns a handler for GET /api/v1/data-providers/ghostfolio/status.
+// GetDataProviderStatus handles GET /api/v1/data-providers/ghostfolio/status and
+// returns quota usage and subscription tier for the authenticated user.
+//
+// PHASE 1: Read daily request count from analytics repository.
+// PHASE 2: Read configured daily request cap from the property store.
+// PHASE 3: Determine subscription tier by checking for an active subscription row.
+//
+// WHY: The quota cap is stored as an admin-configurable property rather than a
+// compile-time constant so operators can tune it without a redeploy. The
+// subscription tier is derived at query-time (not cached) to reflect real-time
+// plan changes.
 func GetDataProviderStatus(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.DataProviderService == nil {
@@ -221,6 +262,8 @@ func GetDataProviderStatus(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// parseQueryTime reads a YYYY-MM-DD date from a query parameter and returns
+// defaultVal if the parameter is absent or cannot be parsed.
 func parseQueryTime(r *http.Request, key string, defaultVal time.Time) time.Time {
 	val := r.URL.Query().Get(key)
 	if val == "" {
@@ -233,6 +276,8 @@ func parseQueryTime(r *http.Request, key string, defaultVal time.Time) time.Time
 	return t
 }
 
+// isNotFoundError reports whether err represents a "no rows" DB result,
+// used to distinguish missing-record from genuine DB errors.
 func isNotFoundError(err error) bool {
 	return errors.Is(err, pgx.ErrNoRows)
 }

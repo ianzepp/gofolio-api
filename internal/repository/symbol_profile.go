@@ -1,3 +1,4 @@
+// Package repository — see order.go for the package-level doc comment.
 package repository
 
 import (
@@ -9,20 +10,36 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// SymbolProfileRepository handles persistence for SymbolProfile, which is the
+// canonical metadata record for a tradeable instrument (stock, ETF, crypto,
+// etc.). Each profile is uniquely identified by (dataSource, symbol) and
+// carries rich instrument metadata — asset class, sectors, countries, FIGI
+// identifiers, and a scraper configuration used by the data-collection layer.
+//
+// Orders reference SymbolProfiles via symbolProfileId, so a profile must exist
+// before an order for that instrument can be recorded.
 type SymbolProfileRepository struct {
 	db db.DBTX
 }
 
+// NewSymbolProfileRepository constructs a SymbolProfileRepository backed by
+// the provided database handle.
 func NewSymbolProfileRepository(db db.DBTX) *SymbolProfileRepository {
 	return &SymbolProfileRepository{db: db}
 }
 
+// symbolProfileColumns is the canonical SELECT list for SymbolProfile rows.
+// The column count is large because SymbolProfile aggregates all known
+// identifiers (ISIN, CUSIP, FIGI, etc.) into a single table to avoid joins
+// during price-calculation hot paths.
 const symbolProfileColumns = `id, "assetClass", "assetSubClass", comment,
 	countries, "createdAt", currency, cusip, "dataSource", figi,
 	"figiComposite", "figiShareClass", holdings, "isActive", isin,
 	name, "scraperConfiguration", sectors, symbol, "symbolMapping",
 	"updatedAt", url, "userId"`
 
+// FindByID retrieves a symbol profile by its primary key. Returns a wrapped
+// ErrNoRows when no matching record exists.
 func (r *SymbolProfileRepository) FindByID(ctx context.Context, id string) (model.SymbolProfile, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+symbolProfileColumns+`
@@ -34,6 +51,9 @@ func (r *SymbolProfileRepository) FindByID(ctx context.Context, id string) (mode
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.SymbolProfile])
 }
 
+// FindByDataSourceAndSymbol looks up a profile by its natural composite key.
+// This is the lookup used when importing orders — the caller resolves the
+// ticker+source pair to a stable UUID before inserting the order row.
 func (r *SymbolProfileRepository) FindByDataSourceAndSymbol(ctx context.Context, dataSource string, symbol string) (model.SymbolProfile, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+symbolProfileColumns+`
@@ -45,6 +65,8 @@ func (r *SymbolProfileRepository) FindByDataSourceAndSymbol(ctx context.Context,
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.SymbolProfile])
 }
 
+// CountByDataSource returns the number of profiles registered under a given
+// data source. Used to surface per-provider coverage metrics in admin views.
 func (r *SymbolProfileRepository) CountByDataSource(ctx context.Context, dataSource string) (int, error) {
 	var count int
 	err := r.db.QueryRow(ctx,
@@ -55,6 +77,11 @@ func (r *SymbolProfileRepository) CountByDataSource(ctx context.Context, dataSou
 	return count, nil
 }
 
+// FindByIDs fetches multiple profiles in a single query using a Postgres
+// ANY($1) array parameter. Returns an empty slice immediately when ids is
+// empty to avoid a no-op database round-trip.
+// WHY: batch lookup avoids N+1 queries when hydrating a list of orders with
+// their associated instrument metadata.
 func (r *SymbolProfileRepository) FindByIDs(ctx context.Context, ids []string) ([]model.SymbolProfile, error) {
 	if len(ids) == 0 {
 		return []model.SymbolProfile{}, nil
@@ -70,6 +97,12 @@ func (r *SymbolProfileRepository) FindByIDs(ctx context.Context, ids []string) (
 	return pgx.CollectRows(rows, pgx.RowToStructByName[model.SymbolProfile])
 }
 
+// SearchByQuery performs a case-insensitive substring search on name and
+// symbol within a given data source, returning up to 50 results. The hard
+// limit prevents accidental full-table scans on broad search terms.
+// TRADE-OFF: ILIKE with a leading wildcard prevents index use on name/symbol
+// but is acceptable given the 50-row cap and the expectation that the symbol
+// profile table is small relative to market data or orders.
 func (r *SymbolProfileRepository) SearchByQuery(ctx context.Context, dataSource string, query string) ([]model.SymbolProfile, error) {
 	pattern := "%" + query + "%"
 	rows, err := r.db.Query(ctx,
@@ -85,6 +118,9 @@ func (r *SymbolProfileRepository) SearchByQuery(ctx context.Context, dataSource 
 	return pgx.CollectRows(rows, pgx.RowToStructByName[model.SymbolProfile])
 }
 
+// FindAll retrieves every symbol profile ordered by ticker symbol.
+// Used by export and admin endpoints; avoid calling from performance-sensitive
+// paths as the result set can grow large over time.
 func (r *SymbolProfileRepository) FindAll(ctx context.Context) ([]model.SymbolProfile, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+symbolProfileColumns+`

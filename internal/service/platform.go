@@ -8,14 +8,20 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// PlatformService manages the set of brokerage platforms (e.g. Interactive
+// Brokers, Robinhood) that users can associate with their accounts. Platforms
+// are admin-managed reference data: users assign an account to a platform to
+// help organise their portfolio, but cannot create or delete platforms themselves.
 type PlatformService struct {
 	pool *pgxpool.Pool
 }
 
+// NewPlatformService constructs a PlatformService backed by the given pool.
 func NewPlatformService(pool *pgxpool.Pool) *PlatformService {
 	return &PlatformService{pool: pool}
 }
 
+// GetPlatforms returns all available brokerage platforms visible to all users.
 func (s *PlatformService) GetPlatforms(ctx context.Context) ([]model.Platform, error) {
 	repo := repository.NewPlatformRepository(s.pool)
 	return repo.FindAll(ctx)

@@ -10,14 +10,20 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// AccountService manages brokerage and cash accounts owned by users. Accounts
+// are the top-level container for activities (orders) and balances, and they
+// carry a currency so that the portfolio engine can convert positions to the
+// user's base currency.
 type AccountService struct {
 	pool *pgxpool.Pool
 }
 
+// NewAccountService constructs an AccountService backed by the given pool.
 func NewAccountService(pool *pgxpool.Pool) *AccountService {
 	return &AccountService{pool: pool}
 }
 
+// GetAccounts returns all accounts belonging to the given user.
 func (s *AccountService) GetAccounts(ctx context.Context, userID string) ([]model.Account, error) {
 	repo := repository.NewAccountRepository(s.pool)
 	return repo.FindByUserID(ctx, userID)
@@ -43,6 +49,10 @@ func (s *AccountService) DeleteAccount(ctx context.Context, id string, userID st
 	return repo.Delete(ctx, id, userID)
 }
 
+// TransferRequest carries the parameters for an atomic balance transfer between
+// two accounts. Both accounts must be owned by authenticated users, enforced
+// via the FromUserID/ToUserID fields that are threaded through to the
+// repository UPDATE WHERE clause.
 type TransferRequest struct {
 	FromID     string
 	FromUserID string
@@ -51,6 +61,14 @@ type TransferRequest struct {
 	Amount     float64
 }
 
+// TransferBalance moves Amount from one account to another atomically within a
+// single database transaction. The debit and credit are executed sequentially
+// inside the transaction so that a partial failure leaves no net balance change.
+//
+// WHY: Using db.WithTx ensures that the two UPDATE statements share a
+// transaction even though the repository is constructed from a pgx.Tx rather
+// than the pool, preventing a race condition where the debit succeeds but the
+// credit fails.
 func (s *AccountService) TransferBalance(ctx context.Context, req TransferRequest) error {
 	return db.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		repo := repository.NewAccountRepository(tx)

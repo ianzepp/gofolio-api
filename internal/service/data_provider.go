@@ -13,13 +13,22 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// DataProviderService orchestrates calls to data providers.
+// DataProviderService orchestrates calls to external data providers (Yahoo Finance,
+// Manual, etc.). It is the single integration point between the service layer and
+// the provider abstraction, hiding fan-out, batching, concurrency, and DB-write
+// concerns from callers.
+//
+// TRADE-OFF: Providers are registered at startup as a flat map keyed by DataSource.
+// This makes dispatch O(1) and avoids reflection, at the cost of requiring an
+// explicit registration step in the composition root.
 type DataProviderService struct {
 	pool      *pgxpool.Pool
 	providers map[model.DataSource]provider.DataProvider
 }
 
-// NewDataProviderService creates a new data provider orchestrator.
+// NewDataProviderService builds a DataProviderService from a slice of providers,
+// indexing them by their DataSource name for O(1) dispatch. Duplicate DataSource
+// registrations are silently overwritten — last writer wins.
 func NewDataProviderService(pool *pgxpool.Pool, providers []provider.DataProvider) *DataProviderService {
 	m := make(map[model.DataSource]provider.DataProvider, len(providers))
 	for _, p := range providers {
@@ -28,8 +37,22 @@ func NewDataProviderService(pool *pgxpool.Pool, providers []provider.DataProvide
 	return &DataProviderService{pool: pool, providers: m}
 }
 
-// GetQuotes fetches live quotes for items, grouped by data source.
-// It upserts the results into the MarketData table with INTRADAY state.
+// GetQuotes fetches live quotes for a set of asset identifiers concurrently,
+// then persists each result to the MarketData table so that historical queries
+// can read from the DB without hitting the external provider again.
+//
+// PHASE 1: Group identifiers by DataSource to minimise round-trips.
+// PHASE 2: Split each source's symbols into provider-sized batches and dispatch
+//
+//	concurrent requests via errgroup.
+//
+// PHASE 3: Upsert successful quotes into MarketData with INTRADAY state so that
+//
+//	today's price is available for historical range queries.
+//
+// EDGE: Items whose provider is not registered are silently skipped rather than
+// returning an error, since a single missing integration should not block all
+// other quotes in the same request.
 func (s *DataProviderService) GetQuotes(ctx context.Context, items []provider.AssetProfileIdentifier) (map[string]provider.DataProviderResponse, error) {
 	// Group by data source
 	grouped := make(map[model.DataSource][]string)
@@ -100,7 +123,11 @@ func (s *DataProviderService) GetQuotes(ctx context.Context, items []provider.As
 	return result, nil
 }
 
-// GetHistorical fetches historical data from the database (DB-first path).
+// GetHistorical fetches historical price data for a symbol from the local
+// MarketData table. This is the DB-first path — it assumes that a prior
+// quote-fetch or data-import job has already populated the table for the
+// requested range. Callers that need live provider data should use
+// GetHistoricalRaw instead.
 func (s *DataProviderService) GetHistorical(ctx context.Context, dataSource model.DataSource, symbol string, from, to time.Time) (map[string]provider.HistoricalResponse, error) {
 	if s.pool == nil {
 		return nil, fmt.Errorf("database not available")
@@ -119,7 +146,13 @@ func (s *DataProviderService) GetHistorical(ctx context.Context, dataSource mode
 	return result, nil
 }
 
-// GetHistoricalRaw fetches historical data directly from providers (bypasses DB).
+// GetHistoricalRaw fetches historical price data concurrently from the external
+// providers, bypassing the local MarketData table entirely. It is used when
+// freshness matters (e.g. the symbol/date endpoint) or when the DB cache has
+// not yet been populated.
+//
+// TRADE-OFF: Going direct to providers is slower and consumes API quota, but
+// guarantees the most up-to-date series for any requested date range.
 func (s *DataProviderService) GetHistoricalRaw(ctx context.Context, items []provider.AssetProfileIdentifier, from, to time.Time) (map[string]map[string]provider.HistoricalResponse, error) {
 	result := make(map[string]map[string]provider.HistoricalResponse)
 	g, gCtx := errgroup.WithContext(ctx)
@@ -162,7 +195,9 @@ func (s *DataProviderService) GetHistoricalRaw(ctx context.Context, items []prov
 	return result, nil
 }
 
-// GetDividends fetches dividend data from a provider.
+// GetDividends fetches dividend events for a symbol directly from the named
+// provider. Unlike GetHistorical, dividends are not cached in the MarketData
+// table, so this always reaches out to the external source.
 func (s *DataProviderService) GetDividends(ctx context.Context, dataSource model.DataSource, symbol string, from, to time.Time) (map[string]provider.HistoricalResponse, error) {
 	p, ok := s.providers[dataSource]
 	if !ok {
@@ -171,7 +206,13 @@ func (s *DataProviderService) GetDividends(ctx context.Context, dataSource model
 	return p.GetDividends(ctx, symbol, from, to)
 }
 
-// Search fans out a query to all providers and merges results sorted by name.
+// Search fans out a symbol lookup query to every registered provider
+// concurrently and merges their results into a single list sorted by name.
+// Individual provider errors are non-fatal — a failing provider is skipped so
+// that a single integration outage does not block the search feature entirely.
+//
+// WHY: Users should be able to add positions from any provider, and a global
+// search makes provider selection transparent at the UI layer.
 func (s *DataProviderService) Search(ctx context.Context, query string, includeIndices bool) (provider.LookupResponse, error) {
 	g, gCtx := errgroup.WithContext(ctx)
 	ch := make(chan []provider.LookupItem, len(s.providers))
@@ -206,7 +247,13 @@ func (s *DataProviderService) Search(ctx context.Context, query string, includeI
 	return provider.LookupResponse{Items: allItems}, nil
 }
 
-// GetAssetProfiles fetches asset profiles from providers.
+// GetAssetProfiles fetches rich asset metadata (name, asset class, currency,
+// sector weights, etc.) from providers concurrently. Failed lookups are
+// non-fatal and simply absent from the returned map, allowing partial results
+// to be used by callers that can tolerate missing profiles.
+//
+// WHY: Asset profiles are fetched on-demand during import or enrichment rather
+// than eagerly, so a batch-concurrent fetch keeps latency manageable.
 func (s *DataProviderService) GetAssetProfiles(ctx context.Context, items []provider.AssetProfileIdentifier) (map[string]*model.SymbolProfile, error) {
 	result := make(map[string]*model.SymbolProfile)
 	g, gCtx := errgroup.WithContext(ctx)
@@ -249,13 +296,19 @@ func (s *DataProviderService) GetAssetProfiles(ctx context.Context, items []prov
 	return result, nil
 }
 
-// GetProvider returns the provider for a data source, if registered.
+// GetProvider returns the registered DataProvider for a given DataSource, or
+// false if none has been registered. Callers use this for conditional logic
+// that depends on whether a particular integration is available at runtime.
 func (s *DataProviderService) GetProvider(ds model.DataSource) (provider.DataProvider, bool) {
 	p, ok := s.providers[ds]
 	return p, ok
 }
 
-// batchSymbols splits symbols into batches of maxSize. If maxSize <= 0, returns one batch.
+// batchSymbols partitions a symbol list into sub-slices of at most maxSize
+// elements, which are then dispatched as separate API requests. This is
+// necessary because providers enforce per-request symbol limits (e.g. Yahoo
+// Finance allows up to ~1500 symbols per call). If maxSize <= 0 the entire
+// slice is returned as a single batch, acting as "no limit".
 func batchSymbols(symbols []string, maxSize int) [][]string {
 	if maxSize <= 0 || len(symbols) <= maxSize {
 		return [][]string{symbols}

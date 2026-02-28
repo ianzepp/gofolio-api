@@ -1,3 +1,16 @@
+// Package handler — portfolio.go implements stub handlers for /api/v1/portfolio/*.
+//
+// These endpoints are the most complex in the Ghostfolio system — they require
+// full portfolio calculation (time-weighted returns, position tracking, FX
+// conversion, benchmark comparisons) that depends on services not yet ported
+// from NestJS. All handlers currently return empty success responses to unblock
+// frontend development while preserving the correct route signatures and
+// middleware hooks (impersonation, filters).
+//
+// Each stub captures impersonationId and filter parameters so the call sites are
+// ready to be wired without requiring handler signature changes.
+//
+// Parity reference: apps/api/src/app/portfolio/portfolio.controller.ts
 package handler
 
 /*

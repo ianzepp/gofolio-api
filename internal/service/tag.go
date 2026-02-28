@@ -8,19 +8,29 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// TagService manages user-defined tags that can be attached to activities
+// (orders) to support custom categorisation and filtering in the portfolio view.
+// Tags are global within a user's account but can be queried system-wide by
+// admins (GetTags / GetTagsWithActivityCount) for moderation purposes.
 type TagService struct {
 	pool *pgxpool.Pool
 }
 
+// NewTagService constructs a TagService backed by the given pool.
 func NewTagService(pool *pgxpool.Pool) *TagService {
 	return &TagService{pool: pool}
 }
 
+// GetTags returns all tags in the system without activity counts, suitable for
+// simple list/autocomplete endpoints where count information is not needed.
 func (s *TagService) GetTags(ctx context.Context) ([]model.Tag, error) {
 	repo := repository.NewTagRepository(s.pool)
 	return repo.FindAll(ctx)
 }
 
+// GetTagsWithActivityCount returns all tags enriched with the number of
+// activities each tag is applied to. This is used in admin views to identify
+// unused tags that can be pruned.
 func (s *TagService) GetTagsWithActivityCount(ctx context.Context) ([]model.TagWithActivityCount, error) {
 	repo := repository.NewTagRepository(s.pool)
 	return repo.FindAllWithActivityCount(ctx)

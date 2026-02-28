@@ -1,3 +1,25 @@
+// Package handler implements HTTP handler functions for the Ghostfolio Go API.
+// Each handler follows a closure pattern: a constructor (e.g. GetUser) receives a
+// *Deps dependency bundle and returns an http.HandlerFunc. This decouples routing
+// from service wiring and makes handlers trivially unit-testable.
+//
+// This file covers the /api/v1/user family of endpoints, ported from the NestJS
+// UserController. The most significant behavioral difference from a standard REST
+// API is the access-token model: every user has a UUID access token that is stored
+// in the database as an HMAC-SHA512 hash (salted with ACCESS_TOKEN_SALT). This
+// lets the client prove identity when rotating or deleting credentials without
+// having the server store the plaintext token.
+//
+// Parity reference: apps/api/src/app/user/user.controller.ts
+//
+// Routes implemented:
+//   - GET    /api/v1/user              GetUser
+//   - POST   /api/v1/user              CreateUser (anonymous signup)
+//   - DELETE /api/v1/user              DeleteUser (self-delete with token proof)
+//   - DELETE /api/v1/user/{id}         DeleteUserById (admin delete)
+//   - POST   /api/v1/user/access-token CreateUserAccessToken (rotate own token)
+//   - POST   /api/v1/user/{id}/access-token CreateUserAccessTokenById (admin rotate)
+//   - PUT    /api/v1/user/setting      UpdateUserSetting
 package handler
 
 /*
@@ -44,6 +66,14 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// GetUser handles GET /api/v1/user and assembles the rich user object expected by
+// the Ghostfolio frontend. The response aggregates data from four different
+// services (user, settings, accounts, tags) because the NestJS original performs
+// the same fan-out in-controller rather than in a dedicated service layer.
+//
+// WHY: The client uses a single GET /user call on startup to bootstrap the entire
+// UI state (permissions, settings, account list, tags). Keeping that aggregation
+// in the handler mirrors the NestJS contract exactly and avoids a new service API.
 func GetUser(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.UserService == nil {
@@ -111,6 +141,13 @@ func GetUser(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// CreateUser handles POST /api/v1/user and creates an anonymous user account.
+// On success it issues both a plaintext access token (stored hashed in the DB)
+// and a signed JWT so the caller can immediately authenticate subsequent requests.
+//
+// WHY: Ghostfolio supports access-token-based anonymous sign-up with no email or
+// password. The plaintext token is returned once here and never again — the caller
+// must store it. The JWT is the short-lived session credential.
 func CreateUser(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.UserService == nil {
@@ -150,6 +187,12 @@ func CreateUser(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// DeleteUser handles DELETE /api/v1/user (self-delete). The caller must supply
+// their plaintext access token in the request body; the handler hashes it and
+// cross-checks against the DB record to confirm identity before deleting.
+//
+// WHY: Requiring token proof prevents CSRF-style deletions where an attacker
+// has a valid JWT but not the access token. This matches the NestJS contract.
 func DeleteUser(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.UserService == nil {
@@ -197,6 +240,12 @@ func DeleteUser(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// DeleteUserById handles DELETE /api/v1/user/{id} for admin-initiated deletions.
+// Admins cannot delete themselves via this route — self-deletion must go through
+// DeleteUser which requires access-token proof.
+//
+// WHY: Separating admin-delete from self-delete preserves the two-factor proof
+// requirement for self-deletion while giving admins an unconditional delete path.
 func DeleteUserById(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.UserService == nil {
@@ -224,6 +273,12 @@ func DeleteUserById(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// CreateUserAccessToken handles POST /api/v1/user/access-token, allowing a user
+// to rotate their own access token. The caller must present the current plaintext
+// token in the request body to prove possession before a new one is generated.
+//
+// WHY: This proof-of-possession requirement prevents an attacker with a stolen
+// JWT from silently rotating the victim's access token.
 func CreateUserAccessToken(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.UserService == nil {
@@ -280,6 +335,10 @@ func CreateUserAccessToken(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// CreateUserAccessTokenById handles POST /api/v1/user/{id}/access-token for
+// admin-initiated token rotation. Unlike the self-serve endpoint, no current
+// token proof is required — access is gate-kept by the accessAdminControl
+// permission at the routing level.
 func CreateUserAccessTokenById(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.UserService == nil {
@@ -305,6 +364,12 @@ func CreateUserAccessTokenById(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// hashAccessToken produces a deterministic HMAC-SHA512 hex digest of the
+// plaintext access token using ACCESS_TOKEN_SALT as the key. Storing only
+// the hash means a DB breach does not expose usable tokens.
+//
+// EDGE: Returns an error if ACCESS_TOKEN_SALT is empty — callers must handle
+// this as a configuration failure rather than an auth error.
 func hashAccessToken(accessToken string) (string, error) {
 	salt := os.Getenv("ACCESS_TOKEN_SALT")
 	if salt == "" {
@@ -318,6 +383,13 @@ func hashAccessToken(accessToken string) (string, error) {
 	return hex.EncodeToString(mac.Sum(nil)), nil
 }
 
+// UpdateUserSetting handles PUT /api/v1/user/setting and performs a
+// partial-update (merge) of the caller's settings JSON blob. Null values in the
+// request body delete the corresponding key; non-null values upsert it.
+//
+// WHY: Settings are stored as opaque JSON in the DB. Merging rather than
+// replacing avoids clients needing to round-trip the full settings object on
+// every partial update, and matches the NestJS behavior.
 func UpdateUserSetting(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.UserService == nil {

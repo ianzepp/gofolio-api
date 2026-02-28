@@ -12,9 +12,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// ErrSymbolNotFound is returned by Get when the provider returns no quote for
+// the requested symbol. Callers should translate this to a 404 HTTP response.
 var ErrSymbolNotFound = errors.New("symbol not found")
 
-// SymbolItem represents the response for a single symbol lookup.
+// SymbolItem is the response shape for a single symbol lookup. It combines live
+// quote data from the provider with optional historical prices from the DB,
+// giving clients everything they need to render a symbol detail page.
 type SymbolItem struct {
 	AssetClass     *model.AssetClass    `json:"assetClass,omitempty"`
 	AssetSubClass  *model.AssetSubClass `json:"assetSubClass,omitempty"`
@@ -27,13 +31,18 @@ type SymbolItem struct {
 	HistoricalData []MarketDataPoint    `json:"historicalData,omitempty"`
 }
 
-// MarketDataPoint is a single date+price for historical data.
+// MarketDataPoint is a single date+price pair in the historical series returned
+// inside a SymbolItem. The Date field uses ISO 8601 with milliseconds to match
+// the NestJS serialization format expected by the frontend charting library.
 type MarketDataPoint struct {
 	Date  string  `json:"date"`
 	Value float64 `json:"value"`
 }
 
-// SymbolService provides symbol-level operations.
+// SymbolService exposes symbol-level read operations: live quote lookup,
+// historical price retrieval, and symbol search. It is a thin coordinator
+// between the HTTP handler and DataProviderService, adding only the
+// historical-data DB enrichment step that providers cannot supply alone.
 type SymbolService struct {
 	pool                *pgxpool.Pool
 	dataProviderService *DataProviderService
@@ -44,7 +53,12 @@ func NewSymbolService(pool *pgxpool.Pool, dps *DataProviderService) *SymbolServi
 	return &SymbolService{pool: pool, dataProviderService: dps}
 }
 
-// Get returns a quote (and optionally historical data) for a symbol.
+// Get returns a live quote for a symbol, optionally enriched with historical
+// price data from the local DB going back includeHistoricalDataDays days.
+// Returns ErrSymbolNotFound if the provider returns no quote or a negative price.
+//
+// EDGE: A negative MarketPrice is treated as "not found" rather than a valid
+// quote, because some providers return -1 as a sentinel for unavailable data.
 func (s *SymbolService) Get(ctx context.Context, dataSource model.DataSource, symbol string, includeHistoricalDataDays int) (*SymbolItem, error) {
 	items := []provider.AssetProfileIdentifier{
 		{DataSource: dataSource, Symbol: symbol},
@@ -97,7 +111,11 @@ func (s *SymbolService) Get(ctx context.Context, dataSource model.DataSource, sy
 	return item, nil
 }
 
-// GetForDate returns the market price for a symbol on a specific date.
+// GetForDate returns the market price for a symbol on a specific calendar date
+// by fetching directly from the provider (not the DB cache). If no price is
+// available for the given date, an empty object is returned to match the legacy
+// NestJS parity contract — callers should treat an absent "marketPrice" key as
+// a not-found condition rather than expecting an error.
 func (s *SymbolService) GetForDate(ctx context.Context, dataSource model.DataSource, symbol string, date time.Time) (map[string]any, error) {
 	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 	items := []provider.AssetProfileIdentifier{
@@ -121,7 +139,8 @@ func (s *SymbolService) GetForDate(ctx context.Context, dataSource model.DataSou
 	return map[string]any{}, nil
 }
 
-// Lookup delegates to the data provider search.
+// Lookup delegates symbol search to the DataProviderService, which fans out
+// the query to all registered providers and merges results.
 func (s *SymbolService) Lookup(ctx context.Context, query string, includeIndices bool) (provider.LookupResponse, error) {
 	return s.dataProviderService.Search(ctx, query, includeIndices)
 }

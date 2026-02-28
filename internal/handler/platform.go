@@ -1,3 +1,21 @@
+// Package handler — platform.go implements handlers for /api/v1/platform and
+// /api/v1/platforms.
+//
+// Platforms represent brokerage/broker institutions (e.g. "Interactive Brokers").
+// Two routes share the same underlying data but differ in response shape:
+//   - GET /api/v1/platform  → array with accountCount field (admin view)
+//   - GET /api/v1/platforms → { platforms: [...] } without accountCount (public view)
+//
+// The accountCount field in the admin response is currently hard-coded to 0
+// because computing it requires an accounts JOIN that is not yet exposed by the
+// platform service. This is a known parity gap and is noted inline.
+//
+// Non-existent platform IDs return 403 (delete) or 400 (update) rather than 404,
+// mirroring the NestJS behaviour.
+//
+// Parity reference:
+//   - apps/api/src/app/platform/platform.controller.ts
+//   - apps/api/src/app/endpoints/platforms/platforms.controller.ts
 package handler
 
 /*
@@ -34,6 +52,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// GetPlatformsWithAccountCount handles GET /api/v1/platform. Emits accountCount=0
+// for all platforms until the account-count JOIN is implemented in the service layer.
 func GetPlatformsWithAccountCount(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.PlatformService == nil {
@@ -64,6 +84,7 @@ func GetPlatformsWithAccountCount(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// CreatePlatform handles POST /api/v1/platform.
 func CreatePlatform(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.PlatformService == nil {
@@ -94,6 +115,8 @@ func CreatePlatform(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// DeletePlatform handles DELETE /api/v1/platform/{id}. An existence check runs
+// before deletion; not-found returns 403 rather than 404 per NestJS parity.
 func DeletePlatform(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.PlatformService == nil {
@@ -120,6 +143,8 @@ func DeletePlatform(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// UpdatePlatform handles PUT /api/v1/platform/{id}. A missing platform returns
+// 400 Bad Request per NestJS parity (not the more-intuitive 404).
 func UpdatePlatform(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.PlatformService == nil {
@@ -156,6 +181,8 @@ func UpdatePlatform(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// GetPlatforms handles GET /api/v1/platforms and returns the list wrapped in a
+// "platforms" key, matching the public endpoint response envelope.
 func GetPlatforms(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.PlatformService == nil {

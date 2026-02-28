@@ -1,3 +1,18 @@
+// Package handler — agent.go implements handlers for /api/v1/agent/*.
+//
+// The agent chat endpoint streams responses as NDJSON (newline-delimited JSON)
+// rather than a single JSON blob. Each emitted chunk is flushed immediately via
+// http.Flusher to support real-time streaming to the client. The stream protocol
+// uses typed event objects:
+//
+//	{ "type": "chunk", "content": "..." }   — a text fragment
+//	{ "type": "done",  "response": {...} }  — stream terminator
+//
+// Currently HandleCreateAgentChat is a stub that echoes the message back in the
+// "done" event. The actual LLM call and tool-use loop will replace the body once
+// the agent service layer is wired.
+//
+// Parity reference: apps/api/src/app/agent/agent.controller.ts
 package handler
 
 /*
@@ -79,6 +94,10 @@ func HandleGetAgentSession(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{})
 }
 
+// writeStreamEvent marshals event to JSON, appends a newline, writes it to w,
+// and flushes the underlying connection if it implements http.Flusher. Errors
+// from Marshal are silently swallowed because a partial stream is preferable to
+// an abrupt close; errors from Write are also silently swallowed (client gone).
 func writeStreamEvent(w http.ResponseWriter, event map[string]any) {
 	encoded, err := json.Marshal(event)
 	if err != nil {

@@ -1,3 +1,4 @@
+// Package repository — see order.go for the package-level doc comment.
 package repository
 
 import (
@@ -10,17 +11,27 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// AccessRepository handles persistence for the Access entity, which models
+// portfolio-sharing grants from one Ghostfolio user (the owner, "userId") to
+// another ("granteeUserId"). An Access row controls what a grantee can see or
+// do within the owner's portfolio — permissions and per-grant settings are
+// stored as Postgres arrays and JSONB respectively.
 type AccessRepository struct {
 	db db.DBTX
 }
 
+// NewAccessRepository constructs an AccessRepository backed by the provided
+// database handle.
 func NewAccessRepository(db db.DBTX) *AccessRepository {
 	return &AccessRepository{db: db}
 }
 
+// accessColumns is the canonical SELECT list for Access rows.
 const accessColumns = `id, alias, "createdAt", "granteeUserId",
 	permissions, settings, "updatedAt", "userId"`
 
+// FindByUserID returns all access grants created by userID (i.e. grants where
+// the calling user is the portfolio owner), ordered newest first.
 func (r *AccessRepository) FindByUserID(ctx context.Context, userID string) ([]model.Access, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+accessColumns+`
@@ -33,6 +44,8 @@ func (r *AccessRepository) FindByUserID(ctx context.Context, userID string) ([]m
 	return pgx.CollectRows(rows, pgx.RowToStructByName[model.Access])
 }
 
+// FindByID fetches a single access grant by its primary key without an
+// ownership restriction. Use FindByIDAndUserID for user-scoped lookups.
 func (r *AccessRepository) FindByID(ctx context.Context, id string) (model.Access, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+accessColumns+`
@@ -44,6 +57,9 @@ func (r *AccessRepository) FindByID(ctx context.Context, id string) (model.Acces
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Access])
 }
 
+// FindByIDAndUserID fetches a grant scoped to the owning user, acting as a
+// combined lookup-and-ownership-check. Returns ErrNoRows when the grant does
+// not exist or belongs to a different user.
 func (r *AccessRepository) FindByIDAndUserID(ctx context.Context, id string, userID string) (model.Access, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+accessColumns+`
@@ -55,6 +71,8 @@ func (r *AccessRepository) FindByIDAndUserID(ctx context.Context, id string, use
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Access])
 }
 
+// Create inserts a new access grant and returns the full persisted record.
+// The caller must supply a pre-generated ID and populate all required fields.
 func (r *AccessRepository) Create(ctx context.Context, a model.Access) (model.Access, error) {
 	rows, err := r.db.Query(ctx,
 		`INSERT INTO "Access" (id, alias, "granteeUserId", permissions,
@@ -69,6 +87,9 @@ func (r *AccessRepository) Create(ctx context.Context, a model.Access) (model.Ac
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Access])
 }
 
+// Update replaces the mutable fields of an access grant (alias, permissions,
+// settings) without verifying ownership. Intended for admin-level paths.
+// NOTE: alias is a pointer to distinguish an explicit null from an absent value.
 func (r *AccessRepository) Update(ctx context.Context, id string, alias *string, permissions []string, settings json.RawMessage) (model.Access, error) {
 	rows, err := r.db.Query(ctx,
 		`UPDATE "Access"
@@ -82,6 +103,8 @@ func (r *AccessRepository) Update(ctx context.Context, id string, alias *string,
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Access])
 }
 
+// UpdateByUserID updates a grant's mutable fields only when it is owned by
+// userID, enforcing ownership at the query level.
 func (r *AccessRepository) UpdateByUserID(ctx context.Context, id string, userID string, alias *string, permissions []string, settings json.RawMessage) (model.Access, error) {
 	rows, err := r.db.Query(ctx,
 		`UPDATE "Access"
@@ -95,6 +118,8 @@ func (r *AccessRepository) UpdateByUserID(ctx context.Context, id string, userID
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Access])
 }
 
+// Delete removes an access grant by ID without ownership verification.
+// Use DeleteByUserID for user-scoped deletion.
 func (r *AccessRepository) Delete(ctx context.Context, id string) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM "Access" WHERE id = $1`, id)
 	if err != nil {
@@ -103,6 +128,9 @@ func (r *AccessRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// DeleteByUserID removes the grant identified by id only when it belongs to
+// userID. Returns the count of affected rows so callers can distinguish
+// not-found (0) from success (1) without a separate lookup.
 func (r *AccessRepository) DeleteByUserID(ctx context.Context, id string, userID string) (int64, error) {
 	tag, err := r.db.Exec(ctx, `DELETE FROM "Access" WHERE id = $1 AND "userId" = $2`, id, userID)
 	if err != nil {

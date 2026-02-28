@@ -5,8 +5,22 @@ import (
 	"time"
 )
 
-// SymbolProfile stores metadata about a financial instrument.
-// Unique: (dataSource, symbol)
+// SymbolProfile stores metadata about a financial instrument as sourced from an
+// external data provider. It is the central reference record that Orders and
+// MarketData rows link to via symbolProfileId.
+//
+// The (dataSource, symbol) pair is the natural key — the same ticker can exist
+// under multiple data sources (e.g. "AAPL" on both YAHOO and GHOSTFOLIO), each
+// with its own profile record. The UUID ID is used as the FK to avoid tight
+// coupling to a specific provider's symbol scheme.
+//
+// JSON columns (Countries, Holdings, Sectors, SymbolMapping, ScraperConfiguration)
+// are stored as json.RawMessage so that the Go layer can pass them through to
+// clients without unmarshalling, preserving provider-specific structure that the
+// Go server does not interpret directly.
+//
+// UserId is non-nil only for user-created custom symbols (DataSourceManual),
+// indicating that the profile is private to that user.
 type SymbolProfile struct {
 	ID                   string           `db:"id" json:"id"`
 	AssetClass           *AssetClass      `db:"assetClass" json:"assetClass,omitempty"`
@@ -33,8 +47,17 @@ type SymbolProfile struct {
 	UserId               *string          `db:"userId" json:"userId,omitempty"`
 }
 
-// SymbolProfileOverrides stores per-symbol customizations.
-// PK: symbolProfileId
+// SymbolProfileOverrides stores user-supplied corrections to a SymbolProfile.
+// Rather than mutating the provider-sourced SymbolProfile directly (which would
+// be overwritten on the next data sync), overrides are stored in a sibling row
+// keyed by symbolProfileId and merged at query time.
+//
+// WHY: this separation lets the system re-fetch authoritative data from providers
+// without losing user customisations, and makes it easy to diff what the user
+// changed vs. what the provider says.
+//
+// TRADE-OFF: callers must always merge SymbolProfile + SymbolProfileOverrides
+// before returning data to clients; forgetting to merge is a correctness bug.
 type SymbolProfileOverrides struct {
 	SymbolProfileId string          `db:"symbolProfileId" json:"symbolProfileId"`
 	AssetClass      *AssetClass     `db:"assetClass" json:"assetClass,omitempty"`

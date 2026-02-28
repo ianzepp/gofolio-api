@@ -1,3 +1,14 @@
+// Package handler — access.go implements handlers for /api/v1/access.
+//
+// Access records represent portfolio-sharing grants: a user (grantor) can share
+// their portfolio with another user (grantee) with a specific permission set.
+// This enables the Ghostfolio "public portfolio" and "shared view" features.
+//
+// Ownership is enforced by scoping all mutations to the authenticated user's ID.
+// Delete and update operations return 403 (not 404) when the target record does
+// not exist or is not owned by the caller, to avoid leaking ID existence.
+//
+// Parity reference: apps/api/src/app/access/access.controller.ts
 package handler
 
 /*
@@ -31,6 +42,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// GetAccesses handles GET /api/v1/access and returns the caller's outbound
+// access grants as an unwrapped array (no envelope key).
 func GetAccesses(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.AccessService == nil {
@@ -57,6 +70,9 @@ func GetAccesses(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// CreateAccess handles POST /api/v1/access. Permissions and settings default to
+// empty slice/object if absent in the body so the DB schema invariants are met
+// without requiring the client to explicitly send empty values.
 func CreateAccess(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.AccessService == nil {
@@ -105,6 +121,9 @@ func CreateAccess(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// DeleteAccess handles DELETE /api/v1/access/{id}. The service scopes the delete
+// to the caller's userID; a zero row-count result (not found or not owned) is
+// treated as 403.
 func DeleteAccess(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.AccessService == nil {
@@ -133,6 +152,8 @@ func DeleteAccess(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// UpdateAccess handles PUT /api/v1/access/{id}. Not-found or not-owned returns
+// 403 via pgx.ErrNoRows from the user-scoped update query.
 func UpdateAccess(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.AccessService == nil {

@@ -11,14 +11,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// ExportService assembles a portable data export for a user's portfolio. The
+// export format is the canonical Ghostfolio interchange format: a versioned JSON
+// envelope containing accounts and activities, suitable for backup, migration,
+// and re-import. Filters allow clients to export subsets (e.g. a single
+// account or a single symbol) without downloading the entire portfolio.
 type ExportService struct {
 	pool *pgxpool.Pool
 }
 
+// NewExportService constructs an ExportService backed by the given pool.
 func NewExportService(pool *pgxpool.Pool) *ExportService {
 	return &ExportService{pool: pool}
 }
 
+// ExportAccount is the portable representation of a brokerage/cash account.
+// Internal fields like userId are intentionally omitted so that exported data
+// can be re-imported into a different Ghostfolio instance without ID conflicts.
 type ExportAccount struct {
 	Balance    float64 `json:"balance"`
 	Comment    *string `json:"comment"`
@@ -29,6 +38,9 @@ type ExportAccount struct {
 	PlatformId *string `json:"platformId"`
 }
 
+// ExportActivity is the portable representation of a trading or income event.
+// It uses symbol+dataSource rather than the internal symbolProfileId, making it
+// provider-addressable and human-readable in exported JSON files.
 type ExportActivity struct {
 	AccountId  *string   `json:"accountId"`
 	Comment    *string   `json:"comment"`
@@ -42,12 +54,34 @@ type ExportActivity struct {
 	UnitPrice  float64   `json:"unitPrice"`
 }
 
+// ExportResponse is the top-level export envelope. Meta carries a timestamp and
+// schema version so that importers can detect format changes without inspecting
+// the payload structure.
 type ExportResponse struct {
 	Meta       map[string]any   `json:"meta"`
 	Accounts   []ExportAccount  `json:"accounts"`
 	Activities []ExportActivity `json:"activities"`
 }
 
+// GetExport builds the filtered export payload for a user's portfolio.
+// Filters are applied in two passes to preserve the invariant that exported
+// accounts only contain accounts that have at least one matching activity.
+//
+// PHASE 1: Load all accounts and orders for the user from the DB.
+// PHASE 2: Apply the account filter to narrow the order set.
+// PHASE 3: Batch-fetch SymbolProfiles for the remaining orders to resolve
+//
+//	symbol and dataSource without per-order queries.
+//
+// PHASE 4: Apply activity, dataSource, and symbol filters.
+// PHASE 5: Sort activities by date ascending (NestJS parity requirement).
+// PHASE 6: Emit only accounts that have at least one activity in the result,
+//
+//	respecting the account filter if set.
+//
+// EDGE: An order whose SymbolProfile cannot be found is silently excluded
+// rather than failing the entire export, preventing a stale DB state from
+// blocking data retrieval.
 func (s *ExportService) GetExport(
 	ctx context.Context,
 	userID string,

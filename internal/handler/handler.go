@@ -1,3 +1,32 @@
+// Package handler contains all HTTP handlers for the api-go server and the
+// shared utilities they depend on.
+//
+// # File layout
+//
+//   - handler.go  — shared response/request helpers (this file)
+//   - deps.go     — Deps struct: injected services passed into every handler
+//   - health.go   — GET /api/v1/health*
+//   - One file per NestJS controller domain (account.go, order.go, …)
+//
+// # Handler pattern
+//
+// Handlers are factory functions that close over *Deps and return an
+// http.HandlerFunc. This avoids global state and makes handlers trivially
+// testable by injecting mock services. Example:
+//
+//	func GetOrders(deps *Deps) http.HandlerFunc {
+//	    return func(w http.ResponseWriter, r *http.Request) { ... }
+//	}
+//
+// Stub handlers (not yet implemented) are plain functions that return an
+// empty JSON object so that the routing table compiles and differential
+// tests can detect when a route goes from stub to real.
+//
+// # NestJS parity
+//
+// Error shape, pagination defaults, and filter query-parameter names are
+// kept identical to the NestJS implementation so that the differential test
+// suite can diff responses without field-name translation.
 package handler
 
 import (
@@ -10,7 +39,11 @@ import (
 
 // --- Response helpers ---
 
-// JSON writes a JSON response with the given status code.
+// JSON encodes v as JSON and writes it to w with the given HTTP status code.
+// Content-Type is set before WriteHeader so that the header is included even
+// when status is not 200. Encoding errors are logged but not returned to the
+// caller — by that point WriteHeader has already been called and the response
+// cannot be changed.
 func JSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -19,8 +52,13 @@ func JSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
-// Error writes a JSON error response matching NestJS format:
-// { "statusCode": 403, "message": "Forbidden" }
+// Error writes a JSON error response in NestJS HttpException format:
+//
+//	{ "statusCode": 403, "message": "Forbidden" }
+//
+// WHY: The NestJS frontend and differential tests expect this exact shape.
+// Deviating from it would require client-side workarounds that complicate the
+// parity migration.
 func Error(w http.ResponseWriter, status int, message string) {
 	JSON(w, status, map[string]any{
 		"statusCode": status,
@@ -35,9 +73,14 @@ func NoContent(w http.ResponseWriter) {
 
 // --- Request helpers ---
 
-// Bind decodes a JSON request body into the target struct.
-// Returns false and writes a 400 error if decoding fails.
-// Use this instead of ReadBody — it takes both w and r.
+// Bind decodes the JSON request body into target. It returns true on success.
+// On failure it writes a 400 error response and returns false, so callers can
+// use the pattern:
+//
+//	if !Bind(w, r, &body) { return }
+//
+// EDGE: A nil Body (e.g. GET with no body) is treated as a missing body error
+// rather than a JSON parse error, giving a clearer client-facing message.
 func Bind(w http.ResponseWriter, r *http.Request, target any) bool {
 	if r.Body == nil {
 		Error(w, http.StatusBadRequest, "Request body is required")
@@ -54,7 +97,10 @@ func Bind(w http.ResponseWriter, r *http.Request, target any) bool {
 
 // --- Query parameter helpers ---
 
-// Filters represents the common filter query parameters used across many endpoints.
+// Filters captures the cross-cutting query parameters accepted by most list
+// and portfolio endpoints. Fields map 1-to-1 to the query parameter names used
+// by the NestJS API to preserve wire compatibility with existing frontends and
+// the differential test suite.
 type Filters struct {
 	Accounts     []string
 	AssetClasses []string
@@ -85,7 +131,9 @@ func ParseFilters(r *http.Request) Filters {
 	}
 }
 
-// Pagination represents skip/take/sort query parameters.
+// Pagination represents the cursor-less skip/take pagination used by Ghostfolio
+// list endpoints. SortColumn and SortDirection are passed through to the service
+// layer for SQL ORDER BY construction; they are not validated here.
 type Pagination struct {
 	Skip          int
 	Take          int
@@ -107,7 +155,9 @@ func ParsePagination(r *http.Request) Pagination {
 	}
 }
 
-// Impersonation returns the impersonation user ID from the request header, if present.
+// Impersonation returns the impersonation user ID from the Impersonation-Id
+// header, or an empty string if the header is absent. Admin handlers use this
+// to act on behalf of another user without switching the authenticated identity.
 func Impersonation(r *http.Request) string {
 	// Legacy parity note:
 	// Ghostfolio uses HEADER_KEY_IMPERSONATION = "Impersonation-Id" in libs/common.

@@ -1,3 +1,21 @@
+// Package handler — auth.go implements handlers for /api/v1/auth/*.
+//
+// Most routes in this file are stubs that return empty success responses — they
+// satisfy the API contract while the OAuth/WebAuthn service layer is ported from
+// NestJS. The two meaningful flows are:
+//
+//   - Anonymous login: POST /auth/anonymous accepts an access token in the body
+//     and GET /auth/anonymous/:token accepts it in the path. Both variants exist
+//     because early Ghostfolio clients used the GET form.
+//
+//   - OAuth redirects: Google and OIDC routes redirect to the configured OAuth
+//     provider using ROOT_URL. The callback routes redirect back to the Angular
+//     SPA with the JWT appended to the path.
+//
+// OIDC is feature-flag gated via the ENABLE_FEATURE_AUTH_OIDC env var. Attempting
+// the OIDC flow when disabled returns 403 rather than 404 to match NestJS.
+//
+// Parity reference: apps/api/src/app/auth/auth.controller.ts
 package handler
 
 /*
@@ -151,6 +169,8 @@ func HandleWebauthnVerifyAuthentication(w http.ResponseWriter, r *http.Request) 
 
 const defaultLanguageCode = "en"
 
+// rootURL returns the configured frontend root URL, falling back to the
+// default localhost Angular dev server. Used to construct OAuth redirect targets.
 func rootURL() string {
 	if value := os.Getenv("ROOT_URL"); value != "" {
 		return value

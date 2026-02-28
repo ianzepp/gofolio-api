@@ -1,3 +1,18 @@
+// Package handler — account_balance.go implements handlers for
+// POST /api/v1/account-balance and DELETE /api/v1/account-balance/{id}.
+//
+// Account balances are timestamped snapshots of a cash balance for a given
+// account. The upsert semantic (CreateOrUpdate by accountId+date) is intentional:
+// if the user submits a balance for the same account on the same day, it replaces
+// the previous record rather than creating a duplicate. This mirrors the NestJS
+// Prisma upsert and avoids duplicates when a user corrects a daily entry.
+//
+// Date handling: the client may send either YYYY-MM-DD or RFC3339 timestamps.
+// All dates are normalised to midnight UTC (via repository.ResetHours) so that
+// upsert keys are stable regardless of the time component in the submitted value.
+//
+// Ownership: both handlers verify that the account belongs to the authenticated
+// user before operating on balance records, preventing cross-user data access.
 package handler
 
 import (
@@ -12,8 +27,13 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// HandleCreateAccountBalance handles POST /account-balance
-// NestJS: validates account ownership, upserts by (accountId, date).
+// HandleCreateAccountBalance handles POST /api/v1/account-balance. It validates
+// account ownership before upserting the balance record. If a balance already
+// exists for the same (accountId, date) pair it is overwritten, not duplicated.
+//
+// PHASE 1: Validate account ownership via AccountService.
+// PHASE 2: Parse and normalise the date to midnight UTC.
+// PHASE 3: Upsert the balance record.
 func HandleCreateAccountBalance(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.AccountBalanceService == nil || deps.AccountService == nil {
@@ -80,8 +100,9 @@ func HandleCreateAccountBalance(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// HandleDeleteAccountBalance handles DELETE /account-balance/:id
-// NestJS: validates ownership, returns the deleted record.
+// HandleDeleteAccountBalance handles DELETE /api/v1/account-balance/{id}.
+// A pre-flight ownership check returns 403 if the record does not exist or does
+// not belong to the authenticated user, avoiding leakage of balance IDs.
 func HandleDeleteAccountBalance(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.AccountBalanceService == nil {

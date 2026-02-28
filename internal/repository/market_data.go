@@ -1,3 +1,4 @@
+// Package repository — see order.go for the package-level doc comment.
 package repository
 
 import (
@@ -10,17 +11,29 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// MarketDataRepository handles persistence for daily price points scraped or
+// fetched from external data providers. Each row represents one closing price
+// for one symbol on one day from one source; the unique constraint on
+// (dataSource, date, symbol) is used for idempotent upserts so that the
+// data-collection pipeline can re-run without creating duplicates.
 type MarketDataRepository struct {
 	db db.DBTX
 }
 
+// NewMarketDataRepository constructs a MarketDataRepository backed by the
+// provided database handle.
 func NewMarketDataRepository(db db.DBTX) *MarketDataRepository {
 	return &MarketDataRepository{db: db}
 }
 
+// marketDataColumns is the canonical SELECT list for MarketData rows.
 const marketDataColumns = `id, "createdAt", "dataSource", date,
 	"marketPrice", state, symbol`
 
+// FindBySymbol returns the full price history for a symbol from a given data
+// source, ordered newest-first. The result set may be large for actively-
+// tracked securities — callers that only need the latest price should prefer
+// FindLatestByDataSourceAndSymbol.
 func (r *MarketDataRepository) FindBySymbol(ctx context.Context, dataSource string, symbol string) ([]model.MarketData, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+marketDataColumns+`
@@ -33,6 +46,10 @@ func (r *MarketDataRepository) FindBySymbol(ctx context.Context, dataSource stri
 	return pgx.CollectRows(rows, pgx.RowToStructByName[model.MarketData])
 }
 
+// FindBySymbolAndDateRange returns price points for a symbol within a closed
+// date interval [from, to], ordered chronologically ascending. This ordering
+// is important for time-series calculations (TWR, MWRR) that must process
+// data in forward chronological order.
 func (r *MarketDataRepository) FindBySymbolAndDateRange(ctx context.Context, dataSource string, symbol string, from time.Time, to time.Time) ([]model.MarketData, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+marketDataColumns+`
@@ -46,6 +63,9 @@ func (r *MarketDataRepository) FindBySymbolAndDateRange(ctx context.Context, dat
 	return pgx.CollectRows(rows, pgx.RowToStructByName[model.MarketData])
 }
 
+// CountByDataSourceAndSymbol returns the number of stored price points for a
+// given symbol and data source. Used to decide whether historical backfill is
+// needed before serving portfolio calculations.
 func (r *MarketDataRepository) CountByDataSourceAndSymbol(ctx context.Context, dataSource string, symbol string) (int, error) {
 	var count int
 	err := r.db.QueryRow(ctx,
@@ -57,6 +77,9 @@ func (r *MarketDataRepository) CountByDataSourceAndSymbol(ctx context.Context, d
 	return count, nil
 }
 
+// FindLatestByDataSourceAndSymbol retrieves the most recent price record for
+// a single symbol. The LIMIT 1 with ORDER BY date DESC avoids a full scan
+// when a suitable index on (dataSource, symbol, date DESC) exists.
 func (r *MarketDataRepository) FindLatestByDataSourceAndSymbol(ctx context.Context, dataSource string, symbol string) (model.MarketData, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+marketDataColumns+`
@@ -70,8 +93,17 @@ func (r *MarketDataRepository) FindLatestByDataSourceAndSymbol(ctx context.Conte
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.MarketData])
 }
 
+// FindLatestBySymbols retrieves the latest price record for each symbol in the
+// provided list, all from the same data source. Returns an empty slice without
+// hitting the database when symbols is empty.
+//
+// PERF: DISTINCT ON (symbol) with ORDER BY symbol, date DESC is a Postgres-
+// specific optimisation that avoids a subquery or window function to select
+// the most recent row per group efficiently.
 func (r *MarketDataRepository) FindLatestBySymbols(ctx context.Context, dataSource string, symbols []string) ([]model.MarketData, error) {
 	if len(symbols) == 0 {
+		// EDGE: early-return avoids sending "ANY('{}')" to Postgres, which is
+		// valid SQL but produces an unhelpful empty result and wastes a round-trip.
 		return []model.MarketData{}, nil
 	}
 	rows, err := r.db.Query(ctx,
@@ -85,6 +117,12 @@ func (r *MarketDataRepository) FindLatestBySymbols(ctx context.Context, dataSour
 	return pgx.CollectRows(rows, pgx.RowToStructByName[model.MarketData])
 }
 
+// UpsertMarketPrice inserts a new price point or updates an existing one
+// identified by the unique constraint on (dataSource, date, symbol). This is
+// the idempotent write path used by the data-provider scraper pipeline — it
+// is safe to call repeatedly with the same inputs.
+// NOTE: the ID column uses gen_random_uuid() so the caller does not need to
+// supply one.
 func (r *MarketDataRepository) UpsertMarketPrice(ctx context.Context, dataSource string, symbol string, date time.Time, price float64, state model.MarketDataState) error {
 	_, err := r.db.Exec(ctx,
 		`INSERT INTO "MarketData" (id, "dataSource", date, "marketPrice", state, symbol)
@@ -99,6 +137,10 @@ func (r *MarketDataRepository) UpsertMarketPrice(ctx context.Context, dataSource
 	return nil
 }
 
+// Create inserts a single market data row with a caller-supplied ID and returns
+// the full persisted record. Unlike UpsertMarketPrice, this will fail with a
+// unique-constraint error if a record for the same (dataSource, date, symbol)
+// already exists — use UpsertMarketPrice for idempotent writes.
 func (r *MarketDataRepository) Create(ctx context.Context, md model.MarketData) (model.MarketData, error) {
 	rows, err := r.db.Query(ctx,
 		`INSERT INTO "MarketData" (id, "dataSource", date, "marketPrice", state, symbol)

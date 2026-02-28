@@ -1,3 +1,13 @@
+// Package handler — admin.go implements handlers for /api/v1/admin/*.
+//
+// The admin surface covers platform-wide dashboards, market-data management,
+// and user administration. Most data-gather and profile-data mutation routes
+// are stubs that return empty success responses — they exist to satisfy the
+// API contract while the background job system is ported from NestJS.
+//
+// The four non-stub handlers (GetAdmin, GetAdminMarketData, GetAdminUsers,
+// GetAdminUser) are guarded at routing time by the accessAdminControl permission
+// and delegate to AdminService for all DB access, keeping the handler layer thin.
 package handler
 
 import (
@@ -7,7 +17,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// GET /admin
+// GetAdmin handles GET /api/v1/admin and returns the admin dashboard summary.
+// If AdminService is not wired (e.g. in test environments) a safe empty response
+// is returned rather than a service-unavailable error, because the dashboard is
+// non-critical and some deployments may intentionally omit the admin service.
 func GetAdmin(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.AdminService == nil {
@@ -31,7 +44,9 @@ func GetAdmin(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// GET /admin/market-data
+// GetAdminMarketData handles GET /api/v1/admin/market-data. Pagination and
+// filter parameters are parsed via the shared ParsePagination/ParseFilters
+// helpers and forwarded to AdminService for DB-level filtering.
 func GetAdminMarketData(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.AdminService == nil {
@@ -52,7 +67,7 @@ func GetAdminMarketData(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// GET /admin/user
+// GetAdminUsers handles GET /api/v1/admin/user and returns a paginated user list.
 func GetAdminUsers(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.AdminService == nil {
@@ -72,7 +87,10 @@ func GetAdminUsers(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// GET /admin/user/:id
+// GetAdminUser handles GET /api/v1/admin/user/{id} and returns the full admin
+// view of a single user, including role, settings, and activity counts.
+// Returns 404 when the user does not exist, unlike other admin endpoints that
+// return empty objects — the NestJS original propagates the Prisma not-found error.
 func GetAdminUser(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")

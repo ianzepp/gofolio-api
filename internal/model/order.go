@@ -2,7 +2,26 @@ package model
 
 import "time"
 
-// Order represents a buy/sell/dividend activity.
+// Order represents any portfolio activity — the name "Order" is inherited from
+// the original Prisma schema but the type covers the full range of OrderType
+// values (BUY, SELL, DIVIDEND, FEE, INTEREST, ITEM, LIABILITY, LIQUIDITY).
+//
+// SymbolProfileId links every order to a symbol, even for non-traded types such
+// as LIQUIDITY, which reference a currency pseudo-symbol. This keeps the
+// portfolio calculation engine uniform: every activity has an associated price
+// series regardless of type.
+//
+// AccountId and AccountUserId are nullable because orders can exist without an
+// account (e.g. imported activities from a broker export before the user has
+// configured accounts). AccountUserId mirrors the account's userId to allow an
+// efficient composite-FK check without a join.
+//
+// IsDraft marks orders that have been imported but not confirmed by the user;
+// draft orders are excluded from portfolio performance calculations.
+//
+// EDGE: Quantity and UnitPrice are float64. For very high-precision instruments
+// (e.g. fractional crypto) this can introduce rounding drift over many rows.
+// The original NestJS app uses Decimal.js on the client side to compensate.
 type Order struct {
 	ID              string    `db:"id" json:"id"`
 	AccountId       *string   `db:"accountId" json:"accountId,omitempty"`

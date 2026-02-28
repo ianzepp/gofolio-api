@@ -1,3 +1,16 @@
+// Package handler — symbol.go implements handlers for /api/v1/symbol/*.
+//
+// Symbols are identified by a (dataSource, symbol) pair. The dataSource path
+// segment is validated against the known set of data source identifiers; unknown
+// values return 404 so clients receive a clear signal rather than a downstream
+// provider error.
+//
+// GetSymbol optionally includes historical data when the includeHistoricalData
+// query parameter is set to a positive integer (days). Values ≤ 0 are clamped
+// to 0 (no historical data) to prevent negative-day queries from reaching the
+// service layer.
+//
+// Parity reference: apps/api/src/app/symbol/symbol.controller.ts
 package handler
 
 /*
@@ -27,7 +40,9 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
 )
 
-// GetSymbol returns a closure that handles GET /api/v1/symbol/{dataSource}/{symbol}.
+// GetSymbol handles GET /api/v1/symbol/{dataSource}/{symbol}. The optional
+// includeHistoricalData query parameter specifies how many trailing days of
+// price history to include; it is clamped to ≥ 0 before passing to the service.
 func GetSymbol(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.SymbolService == nil {
@@ -65,7 +80,9 @@ func GetSymbol(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// GetSymbolByDate returns a closure that handles GET /api/v1/symbol/{dataSource}/{symbol}/{dateString}.
+// GetSymbolByDate handles GET /api/v1/symbol/{dataSource}/{symbol}/{dateString}
+// and returns the market price for the symbol on a specific date. Date must be
+// in YYYY-MM-DD format; an invalid format returns 400.
 func GetSymbolByDate(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.SymbolService == nil {
@@ -97,6 +114,9 @@ func GetSymbolByDate(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// isValidDataSource returns true if dataSource is one of the known DataSource
+// enum values. This guard prevents routing arbitrary strings to provider
+// implementations that might misinterpret them.
 func isValidDataSource(dataSource model.DataSource) bool {
 	switch dataSource {
 	case model.DataSourceAlphaVantage,
@@ -114,7 +134,8 @@ func isValidDataSource(dataSource model.DataSource) bool {
 	}
 }
 
-// SymbolLookup returns a closure that handles GET /api/v1/symbol/lookup.
+// SymbolLookup handles GET /api/v1/symbol/lookup. An empty query returns an
+// empty items list without hitting the provider, matching the NestJS guard.
 func SymbolLookup(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.SymbolService == nil {

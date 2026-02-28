@@ -1,3 +1,4 @@
+// Package repository — see order.go for the package-level doc comment.
 package repository
 
 import (
@@ -9,16 +10,32 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// SubscriptionRepository handles persistence for Subscription records, which
+// track paid access grants for Ghostfolio premium features. A subscription is
+// valid while its expiresAt timestamp is in the future; expired rows are kept
+// for billing history but are excluded from all active queries.
+//
+// NOTE: this repository is read-only from the application perspective — write
+// operations are performed directly by the payment/admin layer, not via the
+// API server.
 type SubscriptionRepository struct {
 	db db.DBTX
 }
 
+// NewSubscriptionRepository constructs a SubscriptionRepository backed by the
+// provided database handle.
 func NewSubscriptionRepository(db db.DBTX) *SubscriptionRepository {
 	return &SubscriptionRepository{db: db}
 }
 
+// subscriptionColumns is the canonical SELECT list for Subscription rows.
 const subscriptionColumns = `id, "createdAt", "expiresAt", price, "updatedAt", "userId"`
 
+// FindActiveByUserID returns the most-recently-expiring active subscription
+// for a user. Returns ErrNoRows when the user has no valid subscription.
+// WHY: LIMIT 1 with ORDER BY expiresAt DESC surfaces the longest-remaining
+// subscription when a user holds overlapping grants (e.g. a gift code on top
+// of a recurring subscription).
 func (r *SubscriptionRepository) FindActiveByUserID(ctx context.Context, userID string) (model.Subscription, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+subscriptionColumns+`
@@ -32,6 +49,9 @@ func (r *SubscriptionRepository) FindActiveByUserID(ctx context.Context, userID 
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Subscription])
 }
 
+// FindAllActive returns every non-expired subscription across all users,
+// ordered with the furthest-future expiry first. Used by admin dashboards to
+// audit active subscribers.
 func (r *SubscriptionRepository) FindAllActive(ctx context.Context) ([]model.Subscription, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+subscriptionColumns+`

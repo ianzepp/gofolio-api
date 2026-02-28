@@ -1,3 +1,15 @@
+// Package handler — order.go implements handlers for /api/v1/order.
+//
+// "Orders" in Ghostfolio terminology are portfolio activities (buys, sells,
+// dividends, interest payments, etc.). The NestJS API calls them "activities"
+// in responses but "orders" in route paths and DB table names — this file
+// mirrors that naming inconsistency for wire-format parity.
+//
+// Ownership is enforced via user-scoped service calls: every query and mutation
+// includes the authenticated userID so that users are naturally isolated without
+// additional permission checks in the handler.
+//
+// Parity reference: apps/api/src/app/order/order.controller.ts
 package handler
 
 /*
@@ -37,6 +49,9 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// GetOrders handles GET /api/v1/order. Results are returned under the key
+// "activities" to match the NestJS response envelope even though the route and
+// DB model use the word "order".
 func GetOrders(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.OrderService == nil {
@@ -70,6 +85,10 @@ func GetOrders(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// CreateOrder handles POST /api/v1/order. When an accountId is supplied in the
+// body, the accountUserId is pinned to the authenticated user so that the order's
+// account-ownership chain is verifiable even if the account record is later
+// transferred.
 func CreateOrder(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.OrderService == nil {
@@ -160,6 +179,9 @@ func GetOrder(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// UpdateOrder handles PUT /api/v1/order/{id}. A read-before-write is performed
+// to verify the authenticated user owns the order; a missing row returns 403
+// rather than 404, matching NestJS behaviour (avoid leaking whether IDs exist).
 func UpdateOrder(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.OrderService == nil {
@@ -231,6 +253,9 @@ func UpdateOrder(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// DeleteOrder handles DELETE /api/v1/order/{id}. The service returns the number
+// of rows deleted; zero means the order did not exist or did not belong to the
+// caller — both cases map to 403 to avoid leaking ID existence.
 func DeleteOrder(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.OrderService == nil {
@@ -259,6 +284,13 @@ func DeleteOrder(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// DeleteOrders handles DELETE /api/v1/order (bulk delete). Filter parameters are
+// parsed for future parity but currently ignored — the implementation deletes all
+// orders for the user. The response is the integer count of deleted rows, matching
+// the NestJS contract.
+//
+// NOTE: Filter support is tracked as a known divergence. When implemented it
+// should be wired through DeleteOrdersByUserIDWithFilters, not this handler.
 func DeleteOrders(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.OrderService == nil {

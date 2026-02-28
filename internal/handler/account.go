@@ -1,3 +1,15 @@
+// Package handler — account.go implements handlers for /api/v1/account.
+//
+// Accounts represent brokerage/bank accounts that hold cash and/or investment
+// positions. The GetAccounts response is deliberately aggregated: it rolls up
+// activity counts and portfolio value metrics that the NestJS client expects on
+// the accounts list screen, avoiding a separate analytics round-trip.
+//
+// Impersonation is supported on read endpoints: when an impersonation header is
+// present the handler substitutes the target user's ID, enabling admin viewing
+// of another user's accounts without the target's JWT.
+//
+// Parity reference: apps/api/src/app/account/account.controller.ts
 package handler
 
 /*
@@ -46,6 +58,18 @@ import (
 	"github.com/google/uuid"
 )
 
+// GetAccounts handles GET /api/v1/account and returns the user's accounts along
+// with aggregated portfolio metrics. The metrics (activitiesCount, totalBalance,
+// totalDividend, totalInterest, totalValue) are computed in-handler by iterating
+// all orders because neither the account nor the order service currently exposes
+// an aggregate query.
+//
+// WHY: The NestJS controller performs this aggregation in-process as well. Until
+// portfolio calculation services are ported, the inline approach preserves exact
+// API parity without introducing a partial service abstraction.
+//
+// EDGE: If the order service is unavailable the accounts list is still returned;
+// activity-derived metrics will be zero rather than an error.
 func GetAccounts(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.AccountService == nil {
@@ -116,6 +140,10 @@ func GetAccounts(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// CreateAccount handles POST /api/v1/account. If the request body supplies an
+// id, that value is used verbatim; otherwise a new UUID is generated. This
+// client-supplied-ID behaviour matches the NestJS implementation and is required
+// for import/restore flows where the client must control IDs.
 func CreateAccount(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.AccountService == nil {
@@ -167,6 +195,9 @@ func CreateAccount(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// DeleteAccount handles DELETE /api/v1/account/{id}. Ownership enforcement is
+// delegated to AccountService.DeleteAccount which scopes the delete by both
+// account ID and user ID, so a user cannot delete another user's account.
 func DeleteAccount(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.AccountService == nil {
@@ -292,6 +323,18 @@ func GetAccountBalances(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// TransferBalance handles POST /api/v1/account/transfer-balance. Before
+// delegating to the service it validates that:
+//   - both accounts belong to the authenticated user,
+//   - source and destination are distinct,
+//   - the source account has sufficient balance.
+//
+// WHY: These checks mirror the NestJS controller pre-conditions. Pushing them
+// into the handler (not just the service) returns more specific HTTP error codes
+// (400/404) rather than a generic 500 from a DB constraint violation.
+//
+// EDGE: The response is HTTP 200 with no body — this is legacy NestJS void
+// return behaviour.
 func TransferBalance(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.AccountService == nil {

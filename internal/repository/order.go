@@ -1,3 +1,16 @@
+// Package repository provides raw-SQL database access for all Ghostfolio domain
+// entities against a Postgres database originally managed by Prisma. Each file
+// in this package owns one domain entity and exposes a thin repository struct
+// whose methods map 1-to-1 with the service-layer operations used throughout
+// the NestJS reference implementation.
+//
+// All repositories accept a db.DBTX interface so they work transparently with
+// both a plain *pgxpool.Pool and a *pgx.Tx — callers that need atomicity simply
+// pass an active transaction.
+//
+// Column lists are defined as package-level constants (e.g. orderColumns) to
+// guarantee that SELECT and RETURNING clauses stay in sync with each other and
+// with the model struct field tags used by pgx.RowToStructByName.
 package repository
 
 import (
@@ -9,18 +22,29 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// OrderRepository provides database access for the Order entity, which
+// represents a single investment transaction (buy, sell, dividend, etc.)
+// belonging to a user. Orders are the primary unit of portfolio activity and
+// are referenced by analytics, export, and performance-calculation pipelines.
 type OrderRepository struct {
 	db db.DBTX
 }
 
+// NewOrderRepository constructs an OrderRepository backed by the provided
+// database handle. The handle may be a connection pool or an open transaction.
 func NewOrderRepository(db db.DBTX) *OrderRepository {
 	return &OrderRepository{db: db}
 }
 
+// orderColumns enumerates every column returned from the Order table.
+// Centralising the list here prevents SELECT/RETURNING drift and makes
+// schema changes a single-site edit.
 const orderColumns = `id, "accountId", "accountUserId", comment, "createdAt",
 	currency, date, fee, "isDraft", quantity, "symbolProfileId",
 	type, "unitPrice", "updatedAt", "userId"`
 
+// FindByUserID returns all orders owned by userID, sorted newest-first.
+// Returns an empty slice (not an error) when the user has no orders.
 func (r *OrderRepository) FindByUserID(ctx context.Context, userID string) ([]model.Order, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+orderColumns+`
@@ -33,6 +57,9 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID string) ([]mo
 	return pgx.CollectRows(rows, pgx.RowToStructByName[model.Order])
 }
 
+// FindByID fetches a single order by its primary key regardless of owner.
+// Returns pgx.ErrNoRows (wrapped) when no matching record exists.
+// WHY: admin-level operations need ID-only lookup without a user scope check.
 func (r *OrderRepository) FindByID(ctx context.Context, id string) (model.Order, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+orderColumns+`
@@ -44,6 +71,9 @@ func (r *OrderRepository) FindByID(ctx context.Context, id string) (model.Order,
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
 }
 
+// FindByIDAndUserID fetches a single order scoped to a specific owner.
+// The combined WHERE clause acts as an ownership check — a non-owner receives
+// ErrNoRows rather than a permissions error, which matches NestJS behaviour.
 func (r *OrderRepository) FindByIDAndUserID(ctx context.Context, id string, userID string) (model.Order, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+orderColumns+`
@@ -55,6 +85,9 @@ func (r *OrderRepository) FindByIDAndUserID(ctx context.Context, id string, user
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
 }
 
+// Create inserts a new Order row and returns the full persisted record,
+// including database-generated timestamps. The caller is responsible for
+// generating the ID before calling this method.
 func (r *OrderRepository) Create(ctx context.Context, order model.Order) (model.Order, error) {
 	rows, err := r.db.Query(ctx,
 		`INSERT INTO "Order" (id, "accountId", "accountUserId", comment,
@@ -71,6 +104,9 @@ func (r *OrderRepository) Create(ctx context.Context, order model.Order) (model.
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
 }
 
+// Update replaces mutable fields on an existing order identified solely by ID.
+// WHY: used by admin endpoints that are allowed to update any order without
+// verifying ownership at the query level (ownership is enforced upstream).
 func (r *OrderRepository) Update(ctx context.Context, order model.Order) (model.Order, error) {
 	rows, err := r.db.Query(ctx,
 		`UPDATE "Order"
@@ -89,6 +125,9 @@ func (r *OrderRepository) Update(ctx context.Context, order model.Order) (model.
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
 }
 
+// UpdateByUserID replaces mutable fields on an order only when the record
+// belongs to userID. Returns ErrNoRows (wrapped) if the order does not exist
+// or is owned by a different user, preventing cross-user mutation.
 func (r *OrderRepository) UpdateByUserID(ctx context.Context, order model.Order, userID string) (model.Order, error) {
 	rows, err := r.db.Query(ctx,
 		`UPDATE "Order"
@@ -107,6 +146,8 @@ func (r *OrderRepository) UpdateByUserID(ctx context.Context, order model.Order,
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
 }
 
+// CountAll returns the total number of orders across all users.
+// Used by the admin dashboard to surface platform-wide activity metrics.
 func (r *OrderRepository) CountAll(ctx context.Context) (int, error) {
 	var count int
 	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM "Order"`).Scan(&count)
@@ -116,6 +157,9 @@ func (r *OrderRepository) CountAll(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+// CountByDataSourceAndSymbol returns how many orders reference a given
+// dataSource+symbol pair via the SymbolProfile join. This is used before
+// deleting a SymbolProfile to check whether any orders would be orphaned.
 func (r *OrderRepository) CountByDataSourceAndSymbol(ctx context.Context, dataSource string, symbol string) (int, error) {
 	var count int
 	err := r.db.QueryRow(ctx,
@@ -128,6 +172,9 @@ func (r *OrderRepository) CountByDataSourceAndSymbol(ctx context.Context, dataSo
 	return count, nil
 }
 
+// Delete removes an order by ID without an ownership check.
+// WHY: admin paths need unconditional deletion; user-facing paths should use
+// DeleteByIDAndUserID instead.
 func (r *OrderRepository) Delete(ctx context.Context, id string) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM "Order" WHERE id = $1`, id)
 	if err != nil {
@@ -136,6 +183,10 @@ func (r *OrderRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// DeleteByIDAndUserID removes a specific order owned by userID and returns
+// the number of rows affected (0 or 1). A count of 0 means either the order
+// does not exist or belongs to a different user — callers should treat this
+// as a not-found / forbidden condition.
 func (r *OrderRepository) DeleteByIDAndUserID(ctx context.Context, id string, userID string) (int64, error) {
 	tag, err := r.db.Exec(ctx, `DELETE FROM "Order" WHERE id = $1 AND "userId" = $2`, id, userID)
 	if err != nil {
@@ -144,6 +195,9 @@ func (r *OrderRepository) DeleteByIDAndUserID(ctx context.Context, id string, us
 	return tag.RowsAffected(), nil
 }
 
+// DeleteByUserID removes all orders belonging to userID, returning the count
+// of deleted rows. Used during account deletion to cascade-remove activity
+// before the User row itself is dropped.
 func (r *OrderRepository) DeleteByUserID(ctx context.Context, userID string) (int64, error) {
 	tag, err := r.db.Exec(ctx, `DELETE FROM "Order" WHERE "userId" = $1`, userID)
 	if err != nil {

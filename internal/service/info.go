@@ -11,19 +11,30 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// InfoService assembles the public instance metadata returned by
+// GET /api/v1/info. This endpoint is unauthenticated — it is used by the
+// frontend to decide which features and auth methods to render before a user
+// has logged in, so it must never return sensitive data.
 type InfoService struct {
 	pool *pgxpool.Pool
 }
 
+// NewInfoService constructs an InfoService backed by the given pool.
 func NewInfoService(pool *pgxpool.Pool) *InfoService {
 	return &InfoService{pool: pool}
 }
 
+// BenchmarkProperty is the stored shape of a single benchmark entry in the
+// BENCHMARKS Property row. EnableSharing controls whether the benchmark
+// appears in public portfolio views.
 type BenchmarkProperty struct {
 	SymbolProfileId string `json:"symbolProfileId"`
 	EnableSharing   bool   `json:"enableSharing"`
 }
 
+// BenchmarkAssetProfile is the public-safe projection of a SymbolProfile used
+// in the info response. It omits financial data and PII so that this endpoint
+// can remain unauthenticated.
 type BenchmarkAssetProfile struct {
 	DataSource string  `json:"dataSource"`
 	ID         string  `json:"id"`
@@ -31,6 +42,11 @@ type BenchmarkAssetProfile struct {
 	Symbol     string  `json:"symbol"`
 }
 
+// InfoResponse is the payload returned by GET /api/v1/info. GlobalPermissions
+// drives feature-flag rendering on the client: the frontend inspects this list
+// to conditionally show auth buttons, subscription flows, system messages, etc.
+// Keeping permissions as a string slice (rather than a bitmask or map) preserves
+// JSON parity with the NestJS implementation and keeps the contract additive.
 type InfoResponse struct {
 	BaseCurrency      string                  `json:"baseCurrency"`
 	Benchmarks        []BenchmarkAssetProfile `json:"benchmarks"`
@@ -41,6 +57,23 @@ type InfoResponse struct {
 	Statistics        any                     `json:"statistics"`
 }
 
+// GetInfo assembles the public instance metadata. Feature flags are read from
+// environment variables so that deployments can toggle capabilities without a
+// database migration. Database-backed state (signup enabled, benchmarks,
+// currencies) is layered on top.
+//
+// PHASE 1: Resolve feature flags from env to build GlobalPermissions.
+// PHASE 2: Check IS_USER_SIGNUP_ENABLED property; append createUserAccount
+//
+//	if signup is permitted (default on when property is absent).
+//
+// PHASE 3: Load BENCHMARKS property and resolve SymbolProfile IDs to names.
+// PHASE 4: Merge hardcoded base currencies with CURRENCIES property values,
+//
+//	deduplicating and sorting for deterministic JSON output.
+//
+// NOTE: Demo auth token generation is deferred to the handler/auth layer since
+// it requires JWT signing keys that are not available in this service.
 func (s *InfoService) GetInfo(ctx context.Context) (InfoResponse, error) {
 	propRepo := repository.NewPropertyRepository(s.pool)
 	spRepo := repository.NewSymbolProfileRepository(s.pool)
@@ -134,6 +167,9 @@ func (s *InfoService) GetInfo(ctx context.Context) (InfoResponse, error) {
 	}, nil
 }
 
+// featureEnabled reads an environment variable and interprets it as a boolean.
+// An absent variable falls back to defaultValue, allowing both opt-in and
+// opt-out feature flags. Accepted truthy values: "1", "true", "yes", "on".
 func featureEnabled(key string, defaultValue bool) bool {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
@@ -148,6 +184,9 @@ func featureEnabled(key string, defaultValue bool) bool {
 	}
 }
 
+// uniqueSortedNonEmpty deduplicates, trims, and sorts a string slice, omitting
+// blanks. It is used to produce a stable, canonical currency list so that
+// JSON parity checks do not fail due to ordering differences between runs.
 func uniqueSortedNonEmpty(values []string) []string {
 	seen := make(map[string]struct{}, len(values))
 	out := make([]string, 0, len(values))

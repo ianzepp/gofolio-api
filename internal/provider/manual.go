@@ -1,3 +1,24 @@
+// Package provider — manual.go implements a DataProvider backed by the local
+// Postgres database rather than an external API.
+//
+// The ManualProvider serves symbols whose DataSource is model.DataSourceManual.
+// These are user-created assets (e.g. private equity, real estate, custom funds)
+// where market data must be entered manually or scraped from a user-configured URL.
+//
+// # Scraper integration
+//
+// When a symbol profile has a ScraperConfiguration JSON blob, GetQuotes attempts
+// to fetch a live price from the configured URL using a dot-path selector over
+// the JSON response. Only "instant" mode is supported (direct JSON GET); HTML
+// scraping is deferred. If the scraper fetch fails for any reason the last stored
+// DB price is used as the fallback — the error is silently swallowed to avoid
+// breaking the entire quote batch for a misconfigured scraper.
+//
+// # Dividend data
+//
+// ManualProvider.GetDividends always returns empty because manual symbols do not
+// have structured dividend event data in the DB schema. Users who want dividend
+// tracking for manual symbols must record them as Dividend-type orders.
 package provider
 
 import (
@@ -15,7 +36,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ManualProvider serves market data from the local database (MANUAL data source).
+// ManualProvider serves market data from the local database for MANUAL data
+// source symbols. It is safe for concurrent use — each method creates its own
+// repository instances scoped to the request context.
 type ManualProvider struct {
 	pool   *pgxpool.Pool
 	client *http.Client
@@ -45,7 +68,13 @@ func (p *ManualProvider) GetDataProviderInfo() DataProviderInfo {
 	}
 }
 
-// GetQuotes fetches the latest market data from the DB for each symbol.
+// GetQuotes fetches the latest stored market price for each symbol from the DB.
+// If a symbol has a scraper configuration, tryScraperPrice is called and its
+// result replaces the DB price. Symbols with no DB record and no valid scraper
+// return a price of 0 rather than an error, matching the NestJS behaviour where
+// manual symbols with no data show as zero-priced.
+//
+// MarketState is always "delayed" because manual data has no real-time feed.
 func (p *ManualProvider) GetQuotes(ctx context.Context, symbols []string) (map[string]DataProviderResponse, error) {
 	if len(symbols) == 0 {
 		return map[string]DataProviderResponse{}, nil
@@ -151,7 +180,13 @@ func (p *ManualProvider) Search(ctx context.Context, query string, _ bool) (Look
 	return LookupResponse{Items: items}, nil
 }
 
-// tryScraperPrice attempts to fetch a price via JSON scraping if configured.
+// tryScraperPrice attempts to fetch a live price by calling fetchJSONPrice if the
+// symbol profile has a valid scraper configuration. Returns (0, false) on any
+// failure — missing profile, missing/invalid config, network error, or selector
+// error — so the caller falls back to the DB price silently.
+//
+// SAFETY: All failure modes are non-fatal. A misconfigured scraper must not
+// break quote fetching for the rest of the portfolio.
 func (p *ManualProvider) tryScraperPrice(ctx context.Context, spRepo *repository.SymbolProfileRepository, symbol string) (float64, bool) {
 	sp, err := spRepo.FindByDataSourceAndSymbol(ctx, string(model.DataSourceManual), symbol)
 	if err != nil {
@@ -190,7 +225,14 @@ type scraperConfig struct {
 	Locale   string `json:"locale"`
 }
 
-// fetchJSONPrice fetches a JSON endpoint and walks a dot-path selector.
+// fetchJSONPrice GETs rawURL, decodes the JSON response, and extracts a numeric
+// price by walking the dot-separated selector path through nested objects.
+//
+// Example: selector "data.price.last" walks data → price → last.
+//
+// The locale parameter is forwarded as Accept-Language so locale-sensitive APIs
+// return consistently formatted numbers. Supported value types at the leaf node
+// are float64, string (parsed as float64), and json.Number.
 func (p *ManualProvider) fetchJSONPrice(ctx context.Context, rawURL, selector, locale string) (float64, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {

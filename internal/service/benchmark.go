@@ -8,14 +8,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// BenchmarkService returns performance summaries for the market indices or
+// assets that an admin has designated as benchmarks. Benchmarks give users
+// a reference point (e.g. S&P 500) against which to compare their portfolio.
 type BenchmarkService struct {
 	pool *pgxpool.Pool
 }
 
+// NewBenchmarkService constructs a BenchmarkService backed by the given pool.
 func NewBenchmarkService(pool *pgxpool.Pool) *BenchmarkService {
 	return &BenchmarkService{pool: pool}
 }
 
+// BenchmarkItem is a single benchmark entry in the GET /api/v1/benchmark response.
+// MarketCondition, MarketChange, Trend50d, and Trend200d are currently stubbed to
+// neutral/zero values — full computation requires historical market data ingestion
+// that is not yet implemented in the Go port. The stubs maintain JSON parity with
+// the NestJS response shape so that the frontend can render without modification.
 type BenchmarkItem struct {
 	DataSource      string  `json:"dataSource"`
 	MarketCondition string  `json:"marketCondition"`
@@ -28,10 +37,16 @@ type BenchmarkItem struct {
 	AllTimeHigh     any     `json:"allTimeHigh,omitempty"`
 }
 
+// BenchmarkResponse is the top-level wrapper for the benchmark list endpoint.
 type BenchmarkResponse struct {
 	Benchmarks []BenchmarkItem `json:"benchmarks"`
 }
 
+// GetBenchmarks loads the admin-configured benchmark symbols from the BENCHMARKS
+// Property row, resolves their SymbolProfiles, and returns a list of stub items.
+// Errors at any stage (missing property, bad JSON, unknown profiles) return an
+// empty list rather than an error, because a misconfigured benchmark setting
+// should not degrade the rest of the application.
 func (s *BenchmarkService) GetBenchmarks(ctx context.Context) (BenchmarkResponse, error) {
 	propRepo := repository.NewPropertyRepository(s.pool)
 	spRepo := repository.NewSymbolProfileRepository(s.pool)
