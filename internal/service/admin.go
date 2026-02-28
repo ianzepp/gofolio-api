@@ -170,7 +170,9 @@ func (s *AdminService) GetUsers(ctx context.Context, skip int, take int) (AdminU
 
 	// Total count
 	var total int
-	_ = s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM "User"`).Scan(&total)
+	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM "User"`).Scan(&total); err != nil {
+		return AdminUsersResponse{}, fmt.Errorf("count admin users: %w", err)
+	}
 
 	return AdminUsersResponse{Count: total, Users: users}, nil
 }
@@ -254,7 +256,9 @@ func (s *AdminService) GetMarketData(ctx context.Context, skip int, take int, qu
 	// Count total
 	var total int
 	countSQL := `SELECT COUNT(*) FROM "SymbolProfile" sp` + whereClause
-	_ = s.pool.QueryRow(ctx, countSQL, args...).Scan(&total)
+	if err := s.pool.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
+		return AdminMarketDataResponse{}, fmt.Errorf("count admin market data: %w", err)
+	}
 
 	// Determine sort
 	orderBy := `sp.symbol ASC`

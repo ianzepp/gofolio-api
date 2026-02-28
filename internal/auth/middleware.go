@@ -43,7 +43,12 @@ func Authenticate(cfg Config, next http.HandlerFunc) http.HandlerFunc {
 				writeError(w, http.StatusServiceUnavailable, "Service Unavailable")
 				return
 			}
-			hashedKey := HashApiKey(apiKey)
+			hashedKey, err := HashApiKey(apiKey)
+			if err != nil {
+				log.Printf("auth: API key hashing failed: %v", err)
+				writeError(w, http.StatusInternalServerError, "Internal Server Error")
+				return
+			}
 			repo := repository.NewApiKeyRepository(cfg.Pool)
 			userID, err := repo.FindUserIDByHashedKey(r.Context(), hashedKey)
 			if err != nil {

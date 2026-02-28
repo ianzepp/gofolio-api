@@ -251,5 +251,16 @@ func main() {
 	}
 
 	log.Printf("api-go listening on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	server := &http.Server{
+		Addr:              ":" + port,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
 }
