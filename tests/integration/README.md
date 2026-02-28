@@ -61,6 +61,10 @@ If either API is unreachable at `/api/v1/health`, tests are skipped.
     and exports `JWT_DEMO_TOKEN` + `DEMO_USER_ID`
   - if no demo user exists, creates a throwaway user and updates its role to
     `DEMO` for parity testing
+  - creates an isolated ROAI test user with deterministic orders (BTC-USD, MSFT)
+    seeded via direct DB inserts and exports `JWT_ROAI_TOKEN`, `ROAI_USER_ID`,
+    `ROAI_ACCOUNT_ID`, `ROAI_BTCUSD_ORDER_ID`, `ROAI_MSFT_BUY_ORDER_ID`,
+    and `ROAI_SEEDED` for ROAI calculator parity cases
 - Builds a persistent Go binary and starts it on `GO_PORT` (default `3334`) if it is not already running.
 - Waits for Go health endpoint before running tests.
 - Automatically stops the Go API process it started.

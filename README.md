@@ -44,10 +44,10 @@ Current parity snapshot:
 
 - Differential harness: `169` cases total (`132` status + `37` JSON)
 - Differential pass rate (as of February 28, 2026): `162/169` passing
-- 18 services wired into handler `Deps` struct
-- 14 repository files, 13 model files, 3 provider files, 19 service files
-- `11,416` Go LOC in `apps/api-go` (`15,481` total file LOC in the tree)
-- Remaining parity failures are concentrated in ROAI portfolio-calculator responses:
+- 20 services wired into handler `Deps` struct
+- 14 repository files, 13 model files, 3 provider files, 21 service files, 6 calculator files
+- `13,960` Go LOC in `apps/api-go` (`15,368` total including tests)
+- Remaining parity failures are concentrated in ROAI portfolio-calculator JSON responses:
   - `roai-holdings-json`
   - `roai-details-json`
   - `roai-holding-btcusd-json`
@@ -55,7 +55,7 @@ Current parity snapshot:
   - `roai-dividends-json`
   - `roai-investments-json`
   - `roai-holdings-filter-roai-account-json`
-- Remaining stub areas: `portfolio/*` (calculator), `auth/*` (OAuth/WebAuthn), `admin/queue/*`, `agent/*`, `subscription/*`, `import`
+- Remaining stub areas: `auth/*` (OAuth/WebAuthn), `admin/queue/*`, `agent/*`, `subscription/*`, `import`
 
 ## Architecture
 
@@ -92,7 +92,7 @@ db/              → Pool management, DBTX interface, WithTx helper
 - **Data providers:** Yahoo Finance (`provider/yahoo.go`), Manual (`provider/manual.go`)
 - **Cache:** In-memory with TTL (planned, see `migrate-off-redis.md`)
 - **Job queue:** Goroutine-based (planned, see `migrate-off-redis.md`)
-- **Decimal math:** `shopspring/decimal` (planned, deferred to calculator layer)
+- **Decimal math:** `shopspring/decimal` (used in calculator layer for ROAI computations)
 - **No frameworks.** Standard library + minimal dependencies.
 
 ### Dependency injection
