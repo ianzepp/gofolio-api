@@ -38,8 +38,14 @@ If either API is unreachable at `/api/v1/health`, tests are skipped.
 - Bootstraps a fresh legacy user by default:
   - calls `POST /api/v1/user`
   - uses returned `authToken` (or exchanges `accessToken` via `POST /api/v1/auth/anonymous`)
-  - exports `JWT_USER_TOKEN` and `JWT_TOKEN` for differential cases
+  - exports `JWT_USER_TOKEN`, `JWT_TOKEN`, `LEGACY_USER_ID` for differential cases
+  - creates a second throwaway user and exports `JWT_EMPTY_USER_TOKEN`,
+    `EMPTY_USER_ID`, `EMPTY_USER_ACCESS_TOKEN` for destructive/edge cases
+  - creates transfer test accounts for the bootstrapped user and exports
+    `TRANSFER_ACCOUNT_FROM_ID` and `TRANSFER_ACCOUNT_TO_ID`
   - exports `ADMIN_USER_ID` as a guaranteed foreign UUID for ownership-negative cases
+  - attempts DB-assisted admin bootstrap and exports `JWT_ADMIN_TOKEN` +
+    `ADMIN_DB_USER_ID` for admin-control parity cases when available
   - attempts to load `demoAuthToken` from `GET /api/v1/info` and exports
     `JWT_DEMO_TOKEN` + `DEMO_USER_ID` when available
   - attempts to create/export `API_KEY_USER` via `POST /api/v1/api-keys` when permitted
@@ -79,11 +85,25 @@ For DB-backed parity cases, Go also needs `DATABASE_URL`.
 1. `DATABASE_URL` from current shell env
 2. `DATABASE_URL` from repo `.env` (if present)
 
+For access-token parity cases, Go also needs `ACCESS_TOKEN_SALT`.
+`run.sh` resolves it in this order:
+
+1. `ACCESS_TOKEN_SALT` from current shell env
+2. `ACCESS_TOKEN_SALT` from repo `.env` (if present)
+
 Optional tools used by advanced bootstrap paths:
 
 - `jq` (required by runner)
 - `openssl` (for admin JWT signing fallback)
 - `psql` (for admin user lookup fallback)
+
+## Current Coverage
+
+Current fixture set (`tests/integration/testdata/cases.json`) has:
+
+- `26` total cases
+- `22` status-compare cases
+- `4` JSON-compare cases
 
 ## Auth
 
@@ -111,6 +131,16 @@ Fields:
 - `requiredEnv`: optional list of env vars required for the case; case is skipped if any are missing
 - `body`: optional JSON payload
 - `ignoreJsonPaths`: optional list of dot-paths to ignore in JSON mode
+
+In JSON mode, the harness:
+
+- decodes JSON from both responses
+- removes all configured `ignoreJsonPaths`
+- canonicalizes with Go `json.Marshal`
+- compares byte-for-byte
+
+Path syntax supports object traversal and arrays, including wildcard array
+elements with `*` (for example `positions.*.id`).
 
 Example JSON compare case:
 

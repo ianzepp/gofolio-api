@@ -220,6 +220,7 @@ Current test pattern:
   - Run the same request fixtures against legacy NestJS and the Go API
   - Compare status (and JSON where configured) to detect parity regressions
   - Details: [`tests/integration/README.md`](./tests/integration/README.md)
+  - Current fixture count: `26` total (`22` status compare, `4` JSON compare)
 
 Run all tests:
 
@@ -243,6 +244,18 @@ LEGACY_BASE_URL=http://localhost:3333 \
 GO_BASE_URL=http://localhost:3334 \
 go test ./tests/integration -v
 ```
+
+### Differential JSON comparison
+
+When a case uses `"mode": "json"`, the harness:
+
+- parses both responses as JSON
+- removes each configured `ignoreJsonPaths` entry
+- canonicalizes each JSON payload with `json.Marshal`
+- asserts exact canonical equality
+
+This lets fixtures focus on stable contract fields while ignoring volatile
+paths (timestamps, generated IDs, dynamic arrays, etc.).
 
 ### Legacy scope guard
 
