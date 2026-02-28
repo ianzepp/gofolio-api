@@ -107,6 +107,27 @@ func (r *OrderRepository) UpdateByUserID(ctx context.Context, order model.Order,
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
 }
 
+func (r *OrderRepository) CountAll(ctx context.Context) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM "Order"`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count orders: %w", err)
+	}
+	return count, nil
+}
+
+func (r *OrderRepository) CountByDataSourceAndSymbol(ctx context.Context, dataSource string, symbol string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM "Order" o
+		 JOIN "SymbolProfile" sp ON o."symbolProfileId" = sp.id
+		 WHERE sp."dataSource" = $1 AND sp.symbol = $2`, dataSource, symbol).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count orders by symbol: %w", err)
+	}
+	return count, nil
+}
+
 func (r *OrderRepository) Delete(ctx context.Context, id string) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM "Order" WHERE id = $1`, id)
 	if err != nil {

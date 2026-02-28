@@ -1,23 +1,34 @@
 package handler
 
-/*
-Stub parity reference:
-Original NestJS controller(s):
-- apps/api/src/app/export/export.controller.ts
+import (
+	"net/http"
 
-Routes + request/response shape:
-- GET /api/v1/export (HandleGetExport)
-  Request: no explicit request params
-  Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-*/
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
+)
 
-import "net/http"
+func GetExport(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
 
-func HandleGetExport(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{
-		"meta":       map[string]any{},
-		"accounts":   []any{},
-		"activities": []any{},
-	})
+		if deps.ExportService == nil {
+			JSON(w, http.StatusOK, map[string]any{
+				"meta":       map[string]any{},
+				"accounts":   []any{},
+				"activities": []any{},
+			})
+			return
+		}
+
+		resp, err := deps.ExportService.GetExport(r.Context(), userID)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, "Internal server error")
+			return
+		}
+
+		JSON(w, http.StatusOK, resp)
+	}
 }

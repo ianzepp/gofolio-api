@@ -36,12 +36,18 @@ func main() {
 			dbPool = pool
 			poolCloser = pool.Close
 			deps = &handler.Deps{
-				AccountService:  service.NewAccountService(pool),
-				AccessService:   service.NewAccessService(pool),
-				OrderService:    service.NewOrderService(pool),
-				PlatformService: service.NewPlatformService(pool),
-				TagService:      service.NewTagService(pool),
-				UserService:     service.NewUserService(pool),
+				AccountService:    service.NewAccountService(pool),
+				AccessService:     service.NewAccessService(pool),
+				AdminService:      service.NewAdminService(pool),
+				AssetService:      service.NewAssetService(pool),
+				BenchmarkService:  service.NewBenchmarkService(pool),
+				ExportService:     service.NewExportService(pool),
+				InfoService:       service.NewInfoService(pool),
+				MarketDataService: service.NewMarketDataService(pool),
+				OrderService:      service.NewOrderService(pool),
+				PlatformService:   service.NewPlatformService(pool),
+				TagService:        service.NewTagService(pool),
+				UserService:       service.NewUserService(pool),
 			}
 		}
 	}
@@ -77,7 +83,7 @@ func main() {
 	mux.HandleFunc("DELETE /api/v1/account-balance/{id}", auth.RequirePermission(authCfg, auth.DeleteAccountBalance, handler.HandleDeleteAccountBalance))
 
 	// Admin
-	mux.HandleFunc("GET /api/v1/admin", handler.HandleGetAdmin)
+	mux.HandleFunc("GET /api/v1/admin", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdmin(deps)))
 	mux.HandleFunc("GET /api/v1/admin/demo-user/sync", handler.HandleSyncDemoUser)
 	mux.HandleFunc("POST /api/v1/admin/gather", handler.HandleGatherData)
 	mux.HandleFunc("POST /api/v1/admin/gather/max", handler.HandleGatherMax)
@@ -85,14 +91,14 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/gather/profile-data/{dataSource}/{symbol}", handler.HandleGatherProfileDataForSymbol)
 	mux.HandleFunc("POST /api/v1/admin/gather/{dataSource}/{symbol}", handler.HandleGatherDataForSymbol)
 	mux.HandleFunc("POST /api/v1/admin/gather/{dataSource}/{symbol}/{dateString}", handler.HandleGatherDataForDate)
-	mux.HandleFunc("GET /api/v1/admin/market-data", handler.HandleGetAdminMarketData)
+	mux.HandleFunc("GET /api/v1/admin/market-data", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminMarketData(deps)))
 	mux.HandleFunc("POST /api/v1/admin/market-data/{dataSource}/{symbol}/test", handler.HandleTestMarketData)
 	mux.HandleFunc("DELETE /api/v1/admin/profile-data/{dataSource}/{symbol}", handler.HandleDeleteProfileData)
 	mux.HandleFunc("PATCH /api/v1/admin/profile-data/{dataSource}/{symbol}", handler.HandleUpdateProfileData)
 	mux.HandleFunc("POST /api/v1/admin/profile-data/{dataSource}/{symbol}", handler.HandleCreateProfileData)
 	mux.HandleFunc("PUT /api/v1/admin/settings/{key}", handler.HandleUpdateAdminSetting)
-	mux.HandleFunc("GET /api/v1/admin/user", handler.HandleGetAdminUsers)
-	mux.HandleFunc("GET /api/v1/admin/user/{id}", handler.HandleGetAdminUser)
+	mux.HandleFunc("GET /api/v1/admin/user", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminUsers(deps)))
+	mux.HandleFunc("GET /api/v1/admin/user/{id}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminUser(deps)))
 
 	// Admin Queue
 	mux.HandleFunc("DELETE /api/v1/admin/queue/job", handler.HandleDeleteQueueJobs)
@@ -112,7 +118,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/api-keys", handler.HandleCreateApiKey)
 
 	// Asset
-	mux.HandleFunc("GET /api/v1/asset/{dataSource}/{symbol}", handler.HandleGetAsset)
+	mux.HandleFunc("GET /api/v1/asset/{dataSource}/{symbol}", handler.GetAsset(deps))
 
 	// Assets (web manifest)
 	mux.HandleFunc("GET /assets/{languageCode}/site.webmanifest", handler.HandleGetWebManifest)
@@ -133,7 +139,7 @@ func main() {
 	mux.HandleFunc("DELETE /api/v1/auth-device/{id}", handler.HandleDeleteAuthDevice)
 
 	// Benchmarks
-	mux.HandleFunc("GET /api/v1/benchmarks", handler.HandleGetBenchmarks)
+	mux.HandleFunc("GET /api/v1/benchmarks", handler.GetBenchmarks(deps))
 	mux.HandleFunc("POST /api/v1/benchmarks", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleCreateBenchmark))
 	mux.HandleFunc("DELETE /api/v1/benchmarks/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleDeleteBenchmark))
 	mux.HandleFunc("GET /api/v1/benchmarks/{dataSource}/{symbol}/{startDateString}", auth.Authenticate(authCfg, handler.HandleGetBenchmarkDetail))
@@ -153,7 +159,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/exchange-rate/{symbol}/{dateString}", handler.HandleGetExchangeRate)
 
 	// Export
-	mux.HandleFunc("GET /api/v1/export", handler.HandleGetExport)
+	mux.HandleFunc("GET /api/v1/export", auth.Authenticate(authCfg, handler.GetExport(deps)))
 
 	// Health
 	mux.HandleFunc("GET /api/v1/health", handler.HandleGetHealth)
@@ -165,7 +171,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/import/dividends/{dataSource}/{symbol}", handler.HandleGetImportDividends)
 
 	// Info
-	mux.HandleFunc("GET /api/v1/info", handler.HandleGetInfo)
+	mux.HandleFunc("GET /api/v1/info", handler.GetInfo(deps))
 
 	// Logo
 	mux.HandleFunc("GET /api/v1/logo", handler.HandleGetLogo)
@@ -173,7 +179,7 @@ func main() {
 
 	// Market Data
 	mux.HandleFunc("GET /api/v1/market-data/markets", handler.HandleGetMarkets)
-	mux.HandleFunc("GET /api/v1/market-data/{dataSource}/{symbol}", handler.HandleGetMarketData)
+	mux.HandleFunc("GET /api/v1/market-data/{dataSource}/{symbol}", auth.Authenticate(authCfg, handler.GetMarketData(deps)))
 	mux.HandleFunc("POST /api/v1/market-data/{dataSource}/{symbol}", handler.HandleCreateMarketData)
 
 	// Order

@@ -46,6 +46,30 @@ func (r *MarketDataRepository) FindBySymbolAndDateRange(ctx context.Context, dat
 	return pgx.CollectRows(rows, pgx.RowToStructByName[model.MarketData])
 }
 
+func (r *MarketDataRepository) CountByDataSourceAndSymbol(ctx context.Context, dataSource string, symbol string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM "MarketData"
+		 WHERE "dataSource" = $1 AND symbol = $2`, dataSource, symbol).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count market data: %w", err)
+	}
+	return count, nil
+}
+
+func (r *MarketDataRepository) FindLatestByDataSourceAndSymbol(ctx context.Context, dataSource string, symbol string) (model.MarketData, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT `+marketDataColumns+`
+		 FROM "MarketData"
+		 WHERE "dataSource" = $1 AND symbol = $2
+		 ORDER BY date DESC
+		 LIMIT 1`, dataSource, symbol)
+	if err != nil {
+		return model.MarketData{}, fmt.Errorf("query latest market data: %w", err)
+	}
+	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.MarketData])
+}
+
 func (r *MarketDataRepository) Create(ctx context.Context, md model.MarketData) (model.MarketData, error) {
 	rows, err := r.db.Query(ctx,
 		`INSERT INTO "MarketData" (id, "dataSource", date, "marketPrice", state, symbol)

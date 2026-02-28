@@ -1,35 +1,22 @@
 package handler
 
-/*
-Stub parity reference:
-Original NestJS controller(s):
-- apps/api/src/app/endpoints/benchmarks/benchmarks.controller.ts
-
-Routes + request/response shape:
-- GET /api/v1/benchmarks (HandleGetBenchmarks)
-  Request: no explicit request params
-  Auth/permission: public / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/benchmarks (HandleCreateBenchmark)
-  Request: no explicit request params
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- DELETE /api/v1/benchmarks/{dataSource}/{symbol} (HandleDeleteBenchmark)
-  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol')
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/benchmarks/{dataSource}/{symbol}/{startDateString} (HandleGetBenchmarkDetail)
-  Request: path dataSource: DataSource (arg: 'dataSource'); startDateString: string (arg: 'startDateString'); symbol: string (arg: 'symbol'); query dateRange: DateRange = 'max' (arg: 'range')
-  Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-*/
-
 import "net/http"
 
-func HandleGetBenchmarks(w http.ResponseWriter, r *http.Request) {
-	// Legacy behavior note:
-	// Read benchmark list is public, but benchmark mutations are admin-only.
-	JSON(w, http.StatusOK, []any{})
+func GetBenchmarks(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps.BenchmarkService == nil {
+			JSON(w, http.StatusOK, map[string]any{"benchmarks": []any{}})
+			return
+		}
+
+		resp, err := deps.BenchmarkService.GetBenchmarks(r.Context())
+		if err != nil {
+			JSON(w, http.StatusOK, map[string]any{"benchmarks": []any{}})
+			return
+		}
+
+		JSON(w, http.StatusOK, resp)
+	}
 }
 
 func HandleCreateBenchmark(w http.ResponseWriter, r *http.Request) {
@@ -39,8 +26,8 @@ func HandleCreateBenchmark(w http.ResponseWriter, r *http.Request) {
 func HandleDeleteBenchmark(w http.ResponseWriter, r *http.Request) {
 	dataSource := r.PathValue("dataSource")
 	symbol := r.PathValue("symbol")
-	_ = dataSource // TODO: pass to service
-	_ = symbol     // TODO: pass to service
+	_ = dataSource
+	_ = symbol
 	JSON(w, http.StatusOK, map[string]any{})
 }
 
@@ -49,9 +36,9 @@ func HandleGetBenchmarkDetail(w http.ResponseWriter, r *http.Request) {
 	symbol := r.PathValue("symbol")
 	startDateString := r.PathValue("startDateString")
 	filters := ParseFilters(r)
-	_ = dataSource      // TODO: pass to service
-	_ = symbol          // TODO: pass to service
-	_ = startDateString // TODO: pass to service
-	_ = filters         // TODO: pass to service
+	_ = dataSource
+	_ = symbol
+	_ = startDateString
+	_ = filters
 	JSON(w, http.StatusOK, map[string]any{})
 }

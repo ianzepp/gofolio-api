@@ -65,6 +65,15 @@ func (r *UserRepository) FindAll(ctx context.Context) ([]model.User, error) {
 	return pgx.CollectRows(rows, pgx.RowToStructByName[model.User])
 }
 
+func (r *UserRepository) CountAll(ctx context.Context) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM "User"`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count users: %w", err)
+	}
+	return count, nil
+}
+
 func (r *UserRepository) Delete(ctx context.Context, id string) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM "User" WHERE id = $1`, id)
 	if err != nil {

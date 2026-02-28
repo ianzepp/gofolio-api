@@ -45,6 +45,31 @@ func (r *SymbolProfileRepository) FindByDataSourceAndSymbol(ctx context.Context,
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.SymbolProfile])
 }
 
+func (r *SymbolProfileRepository) CountByDataSource(ctx context.Context, dataSource string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM "SymbolProfile" WHERE "dataSource" = $1`, dataSource).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count symbol profiles by data source: %w", err)
+	}
+	return count, nil
+}
+
+func (r *SymbolProfileRepository) FindByIDs(ctx context.Context, ids []string) ([]model.SymbolProfile, error) {
+	if len(ids) == 0 {
+		return []model.SymbolProfile{}, nil
+	}
+	rows, err := r.db.Query(ctx,
+		`SELECT `+symbolProfileColumns+`
+		 FROM "SymbolProfile"
+		 WHERE id = ANY($1)
+		 ORDER BY name ASC`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("query symbol profiles by ids: %w", err)
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByName[model.SymbolProfile])
+}
+
 func (r *SymbolProfileRepository) FindAll(ctx context.Context) ([]model.SymbolProfile, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+symbolProfileColumns+`

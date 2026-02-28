@@ -11,7 +11,8 @@ func TestHandleGetInfo(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/info", nil)
 	rr := httptest.NewRecorder()
 
-	HandleGetInfo(rr, req)
+	deps := &Deps{} // nil services trigger fallback stub
+	GetInfo(deps)(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
@@ -47,8 +48,9 @@ func TestHandleGetInfo(t *testing.T) {
 }
 
 func TestInfoRoute(t *testing.T) {
+	deps := &Deps{}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/info", HandleGetInfo)
+	mux.HandleFunc("GET /api/v1/info", GetInfo(deps))
 
 	tests := []struct {
 		name       string

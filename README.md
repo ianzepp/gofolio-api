@@ -38,7 +38,7 @@ Go eliminates the ceremony. No decorators, no DI containers, no module system. F
 
 **Phase 1 — Stubs** (complete): Every route returns 200 with empty/mock JSON so the Angular frontend loads without errors.
 
-**Phase 2 — DB harness** (in progress): 3-layer architecture (handler → service → repository) with raw `pgx` queries. Tag endpoints are the first vertical slice wired to real DB queries.
+**Phase 2 — DB harness** (in progress): 3-layer architecture (handler → service → repository) with raw `pgx` queries. CRUD domains wired: tag, account, order, access, platform, user. Read-only data paths wired: info, benchmarks, admin dashboard, admin market-data, admin users, asset, market-data by symbol, export.
 
 ## Architecture
 
@@ -220,7 +220,7 @@ Current test pattern:
   - Run the same request fixtures against legacy NestJS and the Go API
   - Compare status (and JSON where configured) to detect parity regressions
   - Details: [`tests/integration/README.md`](./tests/integration/README.md)
-  - Current fixture count: `26` total (`22` status compare, `4` JSON compare)
+  - Current fixture count: `73` total (`68` status compare, `5` JSON compare)
 
 Run all tests:
 

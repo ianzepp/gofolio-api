@@ -1,89 +1,93 @@
 package handler
 
-/*
-Stub parity reference:
-Original NestJS controller(s):
-- apps/api/src/app/admin/admin.controller.ts
-
-Routes + request/response shape:
-- GET /api/v1/admin (HandleGetAdmin)
-  Request: no explicit request params
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/admin/demo-user/sync (HandleSyncDemoUser)
-  Request: no explicit request params
-  Auth/permission: jwt / permissions.syncDemoUserAccount
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/admin/gather (HandleGatherData)
-  Request: no explicit request params
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/admin/gather/{dataSource}/{symbol} (HandleGatherDataForSymbol)
-  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol'); query dateRange: DateRange (arg: 'range')
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/admin/gather/{dataSource}/{symbol}/{dateString} (HandleGatherDataForDate)
-  Request: path dataSource: DataSource (arg: 'dataSource'); dateString: string (arg: 'dateString'); symbol: string (arg: 'symbol')
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/admin/gather/max (HandleGatherMax)
-  Request: no explicit request params
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/admin/gather/profile-data (HandleGatherProfileData)
-  Request: no explicit request params
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/admin/gather/profile-data/{dataSource}/{symbol} (HandleGatherProfileDataForSymbol)
-  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol')
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/admin/market-data (HandleGetAdminMarketData)
-  Request: no explicit request params
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/admin/market-data/{dataSource}/{symbol}/test (HandleTestMarketData)
-  Request: body data: { scraperConfiguration: ScraperConfiguration }
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- DELETE /api/v1/admin/profile-data/{dataSource}/{symbol} (HandleDeleteProfileData)
-  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol')
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- PATCH /api/v1/admin/profile-data/{dataSource}/{symbol} (HandleUpdateProfileData)
-  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol'); body assetProfile: UpdateAssetProfileDto
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/admin/profile-data/{dataSource}/{symbol} (HandleCreateProfileData)
-  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol')
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- PUT /api/v1/admin/settings/{key} (HandleUpdateAdminSetting)
-  Request: path key: string (arg: 'key'); body data: UpdatePropertyDto
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/admin/user (HandleGetAdminUsers)
-  Request: no explicit request params
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/admin/user/{id} (HandleGetAdminUser)
-  Request: path id: string (arg: 'id')
-  Auth/permission: jwt / permissions.accessAdminControl
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-*/
-
 import "net/http"
 
 // GET /admin
-func HandleGetAdmin(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{
-		"exchangeRates":    []any{},
-		"settings":         map[string]any{},
-		"transactionCount": 0,
-		"userCount":        0,
-		"version":          "",
-	})
+func GetAdmin(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps.AdminService == nil {
+			JSON(w, http.StatusOK, map[string]any{
+				"exchangeRates":    []any{},
+				"settings":         map[string]any{},
+				"transactionCount": 0,
+				"userCount":        0,
+				"version":          "",
+			})
+			return
+		}
+
+		dashboard, err := deps.AdminService.GetDashboard(r.Context())
+		if err != nil {
+			Error(w, http.StatusInternalServerError, "Internal server error")
+			return
+		}
+
+		JSON(w, http.StatusOK, dashboard)
+	}
 }
+
+// GET /admin/market-data
+func GetAdminMarketData(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps.AdminService == nil {
+			JSON(w, http.StatusOK, map[string]any{"marketData": []any{}})
+			return
+		}
+
+		pg := ParsePagination(r)
+		filters := ParseFilters(r)
+
+		resp, err := deps.AdminService.GetMarketData(r.Context(), pg.Skip, pg.Take, filters.Query, pg.SortColumn, pg.SortDirection)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, "Internal server error")
+			return
+		}
+
+		JSON(w, http.StatusOK, resp)
+	}
+}
+
+// GET /admin/user
+func GetAdminUsers(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps.AdminService == nil {
+			JSON(w, http.StatusOK, []any{})
+			return
+		}
+
+		pg := ParsePagination(r)
+
+		resp, err := deps.AdminService.GetUsers(r.Context(), pg.Skip, pg.Take)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, "Internal server error")
+			return
+		}
+
+		JSON(w, http.StatusOK, resp)
+	}
+}
+
+// GET /admin/user/:id
+func GetAdminUser(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+
+		if deps.AdminService == nil {
+			JSON(w, http.StatusOK, map[string]any{})
+			return
+		}
+
+		user, err := deps.AdminService.GetUser(r.Context(), id)
+		if err != nil {
+			Error(w, http.StatusNotFound, "User not found")
+			return
+		}
+
+		JSON(w, http.StatusOK, user)
+	}
+}
+
+// --- Stubs that remain unchanged ---
 
 // GET /admin/demo-user/sync
 func HandleSyncDemoUser(w http.ResponseWriter, r *http.Request) {
@@ -134,13 +138,6 @@ func HandleGatherProfileDataForSymbol(w http.ResponseWriter, r *http.Request) {
 	_ = dataSource
 	_ = symbol
 	JSON(w, http.StatusOK, map[string]any{})
-}
-
-// GET /admin/market-data
-func HandleGetAdminMarketData(w http.ResponseWriter, r *http.Request) {
-	filters := ParseFilters(r)
-	_ = filters
-	JSON(w, http.StatusOK, map[string]any{"marketData": []any{}})
 }
 
 // POST /admin/market-data/:dataSource/:symbol/test
@@ -198,17 +195,5 @@ func HandleUpdateAdminSetting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = body
-	JSON(w, http.StatusOK, map[string]any{})
-}
-
-// GET /admin/user
-func HandleGetAdminUsers(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, []any{})
-}
-
-// GET /admin/user/:id
-func HandleGetAdminUser(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	_ = id
 	JSON(w, http.StatusOK, map[string]any{})
 }

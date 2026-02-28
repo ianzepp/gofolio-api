@@ -26,6 +26,14 @@ func (r *PropertyRepository) FindByKey(ctx context.Context, key string) (model.P
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Property])
 }
 
+func (r *PropertyRepository) FindAll(ctx context.Context) ([]model.Property, error) {
+	rows, err := r.db.Query(ctx, `SELECT key, value FROM "Property" ORDER BY key ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("query properties: %w", err)
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByName[model.Property])
+}
+
 func (r *PropertyRepository) Upsert(ctx context.Context, p model.Property) (model.Property, error) {
 	rows, err := r.db.Query(ctx,
 		`INSERT INTO "Property" (key, value)
