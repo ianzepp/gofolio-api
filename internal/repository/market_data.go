@@ -137,6 +137,22 @@ func (r *MarketDataRepository) UpsertMarketPrice(ctx context.Context, dataSource
 	return nil
 }
 
+// FindLatestOnOrBeforeDate retrieves the most recent price record for a symbol
+// on or before the given date. Used by exchange rate lookups to find the
+// closest available rate when an exact date match may not exist.
+func (r *MarketDataRepository) FindLatestOnOrBeforeDate(ctx context.Context, dataSource string, symbol string, date time.Time) (model.MarketData, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT `+marketDataColumns+`
+		 FROM "MarketData"
+		 WHERE "dataSource" = $1 AND symbol = $2 AND date <= $3
+		 ORDER BY date DESC
+		 LIMIT 1`, dataSource, symbol, date)
+	if err != nil {
+		return model.MarketData{}, fmt.Errorf("query latest market data on or before date: %w", err)
+	}
+	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.MarketData])
+}
+
 // Create inserts a single market data row with a caller-supplied ID and returns
 // the full persisted record. Unlike UpsertMarketPrice, this will fail with a
 // unique-constraint error if a record for the same (dataSource, date, symbol)

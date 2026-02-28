@@ -1,44 +1,76 @@
 package handler
 
-/*
-Stub parity reference:
-Original NestJS controller(s):
-- apps/api/src/app/endpoints/watchlist/watchlist.controller.ts
+import (
+	"net/http"
 
-Routes + request/response shape:
-- GET /api/v1/watchlist (HandleGetWatchlist)
-  Request: no explicit request params
-  Auth/permission: jwt / permissions.readWatchlist
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- POST /api/v1/watchlist (HandleCreateWatchlistItem)
-  Request: body data: CreateWatchlistItemDto
-  Auth/permission: jwt / permissions.createWatchlistItem
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- DELETE /api/v1/watchlist/{dataSource}/{symbol} (HandleDeleteWatchlistItem)
-  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol')
-  Auth/permission: jwt / permissions.deleteWatchlistItem
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-*/
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
+)
 
-import "net/http"
+// GetWatchlist returns the user's watched symbols. Supports impersonation.
+func GetWatchlist(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		if impID := Impersonation(r); impID != "" {
+			userID = impID
+		}
 
-func HandleGetWatchlist(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, []any{})
-}
+		items, err := deps.WatchlistService.GetWatchlist(r.Context(), userID)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 
-func HandleCreateWatchlistItem(w http.ResponseWriter, r *http.Request) {
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+		JSON(w, http.StatusOK, items)
 	}
-	_ = body // TODO: pass to service
-	JSON(w, http.StatusCreated, map[string]any{})
 }
 
-func HandleDeleteWatchlistItem(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
-	symbol := r.PathValue("symbol")
-	_ = dataSource // TODO: pass to service
-	_ = symbol     // TODO: pass to service
-	JSON(w, http.StatusOK, map[string]any{})
+// CreateWatchlistItem adds a symbol to the user's watchlist.
+func CreateWatchlistItem(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+
+		var body struct {
+			DataSource string `json:"dataSource"`
+			Symbol     string `json:"symbol"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		if err := deps.WatchlistService.AddWatchlistItem(r.Context(), userID, body.DataSource, body.Symbol); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		JSON(w, http.StatusCreated, map[string]any{})
+	}
+}
+
+// DeleteWatchlistItem removes a symbol from the user's watchlist.
+func DeleteWatchlistItem(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+
+		dataSource := r.PathValue("dataSource")
+		symbol := r.PathValue("symbol")
+
+		if err := deps.WatchlistService.RemoveWatchlistItem(r.Context(), userID, dataSource, symbol); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		JSON(w, http.StatusOK, map[string]any{})
+	}
 }

@@ -28,12 +28,15 @@ type Deps struct {
 	AssetService          *service.AssetService
 	BenchmarkService      *service.BenchmarkService
 	DataProviderService   *service.DataProviderService
+	ExchangeRateService   *service.ExchangeRateService
 	ExportService         *service.ExportService
 	InfoService           *service.InfoService
+	LogoService           *service.LogoService
 	MarketDataService     *service.MarketDataService
 	OrderService          *service.OrderService
 	PlatformService       *service.PlatformService
 	SymbolService         *service.SymbolService
 	TagService            *service.TagService
 	UserService           *service.UserService
+	WatchlistService      *service.WatchlistService
 }

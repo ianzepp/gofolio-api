@@ -1,26 +1,25 @@
 package handler
 
-/*
-Stub parity reference:
-Original NestJS controller(s):
-- apps/api/src/app/exchange-rate/exchange-rate.controller.ts
-
-Routes + request/response shape:
-- GET /api/v1/exchange-rate/{symbol}/{dateString} (HandleGetExchangeRate)
-  Request: path dateString: string (arg: 'dateString'); symbol: string (arg: 'symbol')
-  Auth/permission: jwt / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-*/
-
 import "net/http"
 
-func HandleGetExchangeRate(w http.ResponseWriter, r *http.Request) {
-	// Legacy behavior note:
-	// dateString is passed through verbatim and parsed in service/repository
-	// layers; handler should avoid opinionated date normalization.
-	symbol := r.PathValue("symbol")
-	dateString := r.PathValue("dateString")
-	_ = symbol
-	_ = dateString
-	JSON(w, http.StatusOK, map[string]any{})
+// GetExchangeRate returns the exchange rate for a currency-pair symbol on a
+// given date. The symbol format is "USDEUR" and dateString is "2024-01-15".
+// Returns 404 when no rate is found.
+func GetExchangeRate(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		symbol := r.PathValue("symbol")
+		dateString := r.PathValue("dateString")
+
+		resp, err := deps.ExchangeRateService.GetExchangeRate(r.Context(), symbol, dateString)
+		if err != nil {
+			Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if resp == nil {
+			Error(w, http.StatusNotFound, http.StatusText(http.StatusNotFound))
+			return
+		}
+
+		JSON(w, http.StatusOK, resp)
+	}
 }

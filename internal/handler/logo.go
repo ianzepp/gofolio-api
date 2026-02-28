@@ -1,35 +1,45 @@
 package handler
 
-/*
-Stub parity reference:
-Original NestJS controller(s):
-- apps/api/src/app/logo/logo.controller.ts
-
-Routes + request/response shape:
-- GET /api/v1/logo (HandleGetLogo)
-  Request: query url: string (arg: 'url')
-  Auth/permission: public / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- GET /api/v1/logo/{dataSource}/{symbol} (HandleGetLogoBySymbol)
-  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol')
-  Auth/permission: public / -
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-*/
-
 import "net/http"
 
-func HandleGetLogo(w http.ResponseWriter, r *http.Request) {
-	// Legacy behavior note:
-	// Logo endpoints return binary image data (image/png), not JSON.
-	w.Header().Set("Content-Type", "image/png")
-	w.WriteHeader(http.StatusOK)
+// GetLogo fetches a favicon for the URL provided in the ?url= query parameter.
+func GetLogo(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		siteURL := r.URL.Query().Get("url")
+		if siteURL == "" {
+			Error(w, http.StatusBadRequest, "url query parameter is required")
+			return
+		}
+
+		result, err := deps.LogoService.GetLogoByURL(r.Context(), siteURL)
+		if err != nil || result == nil {
+			w.Header().Set("Content-Type", "image/png")
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", result.ContentType)
+		w.WriteHeader(http.StatusOK)
+		w.Write(result.Data)
+	}
 }
 
-func HandleGetLogoBySymbol(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
-	symbol := r.PathValue("symbol")
-	_ = dataSource
-	_ = symbol
-	w.Header().Set("Content-Type", "image/png")
-	w.WriteHeader(http.StatusOK)
+// GetLogoBySymbol fetches a favicon for a symbol by looking up its website URL
+// from the SymbolProfile table.
+func GetLogoBySymbol(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dataSource := r.PathValue("dataSource")
+		symbol := r.PathValue("symbol")
+
+		result, err := deps.LogoService.GetLogoBySymbol(r.Context(), dataSource, symbol)
+		if err != nil || result == nil {
+			w.Header().Set("Content-Type", "image/png")
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", result.ContentType)
+		w.WriteHeader(http.StatusOK)
+		w.Write(result.Data)
+	}
 }

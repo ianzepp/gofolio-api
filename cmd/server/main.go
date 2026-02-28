@@ -88,14 +88,17 @@ func main() {
 				AssetService:          service.NewAssetService(pool),
 				BenchmarkService:      service.NewBenchmarkService(pool),
 				DataProviderService:   dataProviderSvc,
+				ExchangeRateService:   service.NewExchangeRateService(pool),
 				ExportService:         service.NewExportService(pool),
 				InfoService:           service.NewInfoService(pool),
+				LogoService:           service.NewLogoService(pool),
 				MarketDataService:     service.NewMarketDataService(pool),
 				OrderService:          service.NewOrderService(pool),
 				PlatformService:       service.NewPlatformService(pool),
 				SymbolService:         symbolSvc,
 				TagService:            service.NewTagService(pool),
 				UserService:           service.NewUserService(pool),
+				WatchlistService:      service.NewWatchlistService(pool),
 			}
 		}
 	}
@@ -211,7 +214,7 @@ func main() {
 	)
 
 	// Exchange Rate
-	mux.HandleFunc("GET /api/v1/exchange-rate/{symbol}/{dateString}", handler.HandleGetExchangeRate)
+	mux.HandleFunc("GET /api/v1/exchange-rate/{symbol}/{dateString}", auth.Authenticate(authCfg, handler.GetExchangeRate(deps)))
 
 	// Export
 	mux.HandleFunc("GET /api/v1/export", auth.Authenticate(authCfg, handler.GetExport(deps)))
@@ -229,8 +232,8 @@ func main() {
 	mux.HandleFunc("GET /api/v1/info", handler.GetInfo(deps))
 
 	// Logo
-	mux.HandleFunc("GET /api/v1/logo", handler.HandleGetLogo)
-	mux.HandleFunc("GET /api/v1/logo/{dataSource}/{symbol}", handler.HandleGetLogoBySymbol)
+	mux.HandleFunc("GET /api/v1/logo", handler.GetLogo(deps))
+	mux.HandleFunc("GET /api/v1/logo/{dataSource}/{symbol}", handler.GetLogoBySymbol(deps))
 
 	// Market Data
 	mux.HandleFunc("GET /api/v1/market-data/markets", handler.HandleGetMarkets)
@@ -296,9 +299,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/user/{id}/access-token", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.CreateUserAccessTokenById(deps)))
 
 	// Watchlist
-	mux.HandleFunc("GET /api/v1/watchlist", auth.RequirePermission(authCfg, auth.ReadWatchlist, handler.HandleGetWatchlist))
-	mux.HandleFunc("POST /api/v1/watchlist", auth.RequirePermission(authCfg, auth.CreateWatchlistItem, handler.HandleCreateWatchlistItem))
-	mux.HandleFunc("DELETE /api/v1/watchlist/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.DeleteWatchlistItem, handler.HandleDeleteWatchlistItem))
+	mux.HandleFunc("GET /api/v1/watchlist", auth.RequirePermission(authCfg, auth.ReadWatchlist, handler.GetWatchlist(deps)))
+	mux.HandleFunc("POST /api/v1/watchlist", auth.RequirePermission(authCfg, auth.CreateWatchlistItem, handler.CreateWatchlistItem(deps)))
+	mux.HandleFunc("DELETE /api/v1/watchlist/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.DeleteWatchlistItem, handler.DeleteWatchlistItem(deps)))
 
 	// PHASE 5: HTTP SERVER START
 	// WHY: Explicit timeouts are set on all phases of a request lifecycle to

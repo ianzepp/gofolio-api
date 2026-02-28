@@ -1116,5 +1116,72 @@
     "mode": "status",
     "auth": "api-key:API_KEY_USER",
     "requiredEnv": ["API_KEY_USER"]
+  },
+  {
+    "name": "exchange-rate-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/exchange-rate/USDEUR/2024-01-15",
+    "mode": "status"
+  },
+  {
+    "name": "exchange-rate-auth-status-parity",
+    "method": "GET",
+    "path": "/api/v1/exchange-rate/USDEUR/2024-01-15",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "exchange-rate-unknown-pair-status-parity",
+    "method": "GET",
+    "path": "/api/v1/exchange-rate/XXXYYY/2024-01-15",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "logo-by-url-status-parity",
+    "method": "GET",
+    "path": "/api/v1/logo?url=https://apple.com",
+    "mode": "status"
+  },
+  {
+    "name": "logo-by-symbol-status-parity",
+    "method": "GET",
+    "path": "/api/v1/logo/YAHOO/AAPL",
+    "mode": "status"
+  },
+  {
+    "name": "logo-by-symbol-unknown-status-parity",
+    "method": "GET",
+    "path": "/api/v1/logo/YAHOO/INTEGRATION_UNKNOWN_LOGO",
+    "mode": "status"
+  },
+  {
+    "name": "watchlist-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/watchlist",
+    "mode": "status"
+  },
+  {
+    "name": "watchlist-get-auth-status-parity",
+    "method": "GET",
+    "path": "/api/v1/watchlist",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "watchlist-create-no-auth-unauthorized",
+    "method": "POST",
+    "path": "/api/v1/watchlist",
+    "mode": "status",
+    "body": { "dataSource": "YAHOO", "symbol": "AAPL" }
+  },
+  {
+    "name": "watchlist-delete-no-auth-unauthorized",
+    "method": "DELETE",
+    "path": "/api/v1/watchlist/YAHOO/AAPL",
+    "mode": "status"
   }
 ]
