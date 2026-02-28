@@ -21,6 +21,16 @@ func (s *TagService) GetTags(ctx context.Context) ([]model.Tag, error) {
 	return repo.FindAll(ctx)
 }
 
+func (s *TagService) GetTagsWithActivityCount(ctx context.Context) ([]model.TagWithActivityCount, error) {
+	repo := repository.NewTagRepository(s.pool)
+	return repo.FindAllWithActivityCount(ctx)
+}
+
+func (s *TagService) GetTag(ctx context.Context, id string) (model.Tag, error) {
+	repo := repository.NewTagRepository(s.pool)
+	return repo.FindByID(ctx, id)
+}
+
 func (s *TagService) GetTagsByUserID(ctx context.Context, userID string) ([]model.Tag, error) {
 	repo := repository.NewTagRepository(s.pool)
 	return repo.FindByUserID(ctx, userID)
@@ -36,7 +46,7 @@ func (s *TagService) UpdateTag(ctx context.Context, id string, name string) (mod
 	return repo.Update(ctx, id, name)
 }
 
-func (s *TagService) DeleteTag(ctx context.Context, id string) error {
+func (s *TagService) DeleteTag(ctx context.Context, id string) (model.Tag, error) {
 	repo := repository.NewTagRepository(s.pool)
 	return repo.Delete(ctx, id)
 }

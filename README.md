@@ -106,9 +106,9 @@ Stub handlers that aren't yet wired to services remain as plain `func(w, r)` fun
 The Go server initializes a PostgreSQL connection pool at startup using
 `pgxpool` and the existing `DATABASE_URL` value.
 
-- Reads `DATABASE_URL` from the environment (required)
+- Reads `DATABASE_URL` from the environment when available
 - Creates a shared `*pgxpool.Pool` at startup
-- Performs a startup ping to fail early on invalid DB connectivity
+- Performs a startup ping to validate DB connectivity
 - Closes the pool on process shutdown
 
 Optional pool tuning env vars:
@@ -191,7 +191,7 @@ Scanning uses `pgx.CollectRows(rows, pgx.RowToStructByName[T])` — no manual fi
 
 - Legacy uses Prisma (`PrismaClient`) with its own connection/pooling behavior
 - Legacy attempts to connect during module init and logs errors, but does not hard-fail process startup
-- Go server fail-fasts on missing `DATABASE_URL`, connection errors, or ping failures
+- Go currently logs DB init issues and continues boot in a degraded mode
 - Go uses raw SQL with `pgx` instead of Prisma's query builder — more explicit, no codegen
 
 ## Running
@@ -203,7 +203,7 @@ go run ./cmd/server
 # Listens on :3333 — same port as the NestJS backend
 ```
 
-Startup now opens a PostgreSQL connection pool via `pgxpool` and fails fast if DB connect/ping fails.
+Startup opens a PostgreSQL connection pool via `pgxpool`. If DB init fails, the API still starts in degraded mode and logs the issue.
 
 ## Testing
 

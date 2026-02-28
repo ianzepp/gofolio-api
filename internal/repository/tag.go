@@ -28,6 +28,22 @@ func (r *TagRepository) FindAll(ctx context.Context) ([]model.Tag, error) {
 	return pgx.CollectRows(rows, pgx.RowToStructByName[model.Tag])
 }
 
+func (r *TagRepository) FindAllWithActivityCount(ctx context.Context) ([]model.TagWithActivityCount, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT t.id,
+		        t.name,
+		        t."userId",
+		        COUNT(ot."A")::int AS "activityCount"
+		 FROM "Tag" t
+		 LEFT JOIN "_OrderToTag" ot ON ot."B" = t.id
+		 GROUP BY t.id, t.name, t."userId"
+		 ORDER BY t.name ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("query tags with activity count: %w", err)
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByName[model.TagWithActivityCount])
+}
+
 func (r *TagRepository) FindByID(ctx context.Context, id string) (model.Tag, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT id, name, "userId"
@@ -75,11 +91,13 @@ func (r *TagRepository) Update(ctx context.Context, id string, name string) (mod
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Tag])
 }
 
-func (r *TagRepository) Delete(ctx context.Context, id string) error {
-	_, err := r.db.Exec(ctx,
-		`DELETE FROM "Tag" WHERE id = $1`, id)
+func (r *TagRepository) Delete(ctx context.Context, id string) (model.Tag, error) {
+	rows, err := r.db.Query(ctx,
+		`DELETE FROM "Tag"
+		 WHERE id = $1
+		 RETURNING id, name, "userId"`, id)
 	if err != nil {
-		return fmt.Errorf("delete tag: %w", err)
+		return model.Tag{}, fmt.Errorf("delete tag: %w", err)
 	}
-	return nil
+	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Tag])
 }

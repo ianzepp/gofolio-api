@@ -13,31 +13,34 @@ import (
 )
 
 func main() {
+	var poolCloser func()
+	deps := &handler.Deps{}
+
 	cfg, err := db.LoadConfigFromEnv()
 	if err != nil {
-		log.Fatalf("database config error: %v", err)
+		log.Printf("database config warning: %v", err)
+	} else {
+		pool, dbErr := db.Open(context.Background(), cfg)
+		if dbErr != nil {
+			log.Printf("database connection warning: %v", dbErr)
+		} else if pingErr := db.Ping(context.Background(), pool, 5*time.Second); pingErr != nil {
+			log.Printf("database ping warning: %v", pingErr)
+			pool.Close()
+		} else {
+			log.Printf("database connected")
+			poolCloser = pool.Close
+			deps = &handler.Deps{
+				AccountService:  service.NewAccountService(pool),
+				AccessService:   service.NewAccessService(pool),
+				OrderService:    service.NewOrderService(pool),
+				PlatformService: service.NewPlatformService(pool),
+				TagService:      service.NewTagService(pool),
+				UserService:     service.NewUserService(pool),
+			}
+		}
 	}
-
-	pool, err := db.Open(context.Background(), cfg)
-	if err != nil {
-		log.Fatalf("database connection error: %v", err)
-	}
-	defer pool.Close()
-
-	if err := db.Ping(context.Background(), pool, 5*time.Second); err != nil {
-		log.Fatalf("database ping error: %v", err)
-	}
-
-	log.Printf("database connected")
-
-	// Wire services
-	deps := &handler.Deps{
-		AccountService:  service.NewAccountService(pool),
-		AccessService:   service.NewAccessService(pool),
-		OrderService:    service.NewOrderService(pool),
-		PlatformService: service.NewPlatformService(pool),
-		TagService:      service.NewTagService(pool),
-		UserService:     service.NewUserService(pool),
+	if poolCloser != nil {
+		defer poolCloser()
 	}
 
 	mux := http.NewServeMux()
