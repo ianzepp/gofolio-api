@@ -228,6 +228,69 @@
     "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_USER_ID"]
   },
   {
+    "name": "user-signup-public-created-parity",
+    "method": "POST",
+    "path": "/api/v1/user",
+    "mode": "status"
+  },
+  {
+    "name": "user-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/user",
+    "mode": "status"
+  },
+  {
+    "name": "account-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/account",
+    "mode": "status"
+  },
+  {
+    "name": "order-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/order",
+    "mode": "status"
+  },
+  {
+    "name": "order-delete-no-auth-unauthorized",
+    "method": "DELETE",
+    "path": "/api/v1/order",
+    "mode": "status"
+  },
+  {
+    "name": "access-get-no-auth-unauthorized",
+    "method": "GET",
+    "path": "/api/v1/access",
+    "mode": "status"
+  },
+  {
+    "name": "platforms-get-user-ok-parity",
+    "method": "GET",
+    "path": "/api/v1/platforms",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "platform-get-user-forbidden-parity",
+    "method": "GET",
+    "path": "/api/v1/platform",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "account-transfer-no-auth-unauthorized",
+    "method": "POST",
+    "path": "/api/v1/account/transfer-balance",
+    "mode": "status",
+    "body": {
+      "accountIdFrom": "00000000-0000-4000-8000-000000000000",
+      "accountIdTo": "11111111-1111-4111-8111-111111111111",
+      "balance": 1
+    }
+  },
+  {
     "name": "user-get-json-parity",
     "method": "GET",
     "path": "/api/v1/user",

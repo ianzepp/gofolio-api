@@ -33,8 +33,8 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (model.User, e
 
 func (r *UserRepository) Create(ctx context.Context, user model.User) (model.User, error) {
 	rows, err := r.db.Query(ctx,
-		`INSERT INTO "User" (id, "accessToken", provider, role)
-		 VALUES ($1, $2, $3, $4)
+		`INSERT INTO "User" (id, "accessToken", "createdAt", provider, role, "updatedAt")
+		 VALUES ($1, $2, NOW(), $3, $4, NOW())
 		 RETURNING `+userColumns,
 		user.ID, user.AccessToken, user.Provider, user.Role)
 	if err != nil {
