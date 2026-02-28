@@ -68,6 +68,10 @@ type Filters struct {
 
 // ParseFilters extracts the common filter query parameters from a request.
 func ParseFilters(r *http.Request) Filters {
+	// Legacy parity note:
+	// NestJS controllers pass query fields through as comma-separated strings
+	// for list filters (accounts, assetClasses, tags). Keep this CSV parsing
+	// behavior stable for differential tests and existing frontend requests.
 	q := r.URL.Query()
 	return Filters{
 		Accounts:     splitCSV(q.Get("accounts")),
@@ -91,6 +95,9 @@ type Pagination struct {
 
 // ParsePagination extracts pagination query parameters from a request.
 func ParsePagination(r *http.Request) Pagination {
+	// Legacy parity note:
+	// Default take=50 mirrors the current NestJS endpoint conventions used by
+	// list endpoints that accept skip/take.
 	q := r.URL.Query()
 	return Pagination{
 		Skip:          queryInt(q.Get("skip"), 0),
@@ -102,6 +109,9 @@ func ParsePagination(r *http.Request) Pagination {
 
 // Impersonation returns the impersonation user ID from the request header, if present.
 func Impersonation(r *http.Request) string {
+	// Legacy parity note:
+	// Ghostfolio uses HEADER_KEY_IMPERSONATION = "Impersonation-Id" in libs/common.
+	// net/http header lookup is case-insensitive, so this matches legacy clients.
 	return r.Header.Get("Impersonation-Id")
 }
 

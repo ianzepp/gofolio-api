@@ -32,6 +32,9 @@ Routes + request/response shape:
 import "net/http"
 
 // --- Group: platform (CRUD with account count) ---
+// Legacy behavior note:
+// NestJS exposes both /platform and /platforms from different controllers.
+// Keep both routes wired; they are not aliases.
 
 func HandleGetPlatform(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, []any{})

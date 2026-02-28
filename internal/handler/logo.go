@@ -19,6 +19,8 @@ Routes + request/response shape:
 import "net/http"
 
 func HandleGetLogo(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Logo endpoints return binary image data (image/png), not JSON.
 	w.Header().Set("Content-Type", "image/png")
 	w.WriteHeader(http.StatusOK)
 }

@@ -36,6 +36,9 @@ import "net/http"
 
 // DELETE /order (bulk delete)
 func HandleDeleteOrders(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Bulk delete honors impersonation header and is intentionally kept as
+	// DELETE /order (not /orders) to match the existing REST contract.
 	impersonationId := Impersonation(r)
 	_ = impersonationId
 	JSON(w, http.StatusOK, map[string]any{})
@@ -43,6 +46,9 @@ func HandleDeleteOrders(w http.ResponseWriter, r *http.Request) {
 
 // GET /order
 func HandleGetOrders(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Query semantics combine shared filter parsing, pagination, and optional
+	// impersonation in one endpoint.
 	filters := ParseFilters(r)
 	page := ParsePagination(r)
 	impersonationId := Impersonation(r)

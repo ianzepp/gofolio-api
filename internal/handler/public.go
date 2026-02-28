@@ -15,6 +15,8 @@ Routes + request/response shape:
 import "net/http"
 
 func HandleGetPublicPortfolio(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Public portfolio is access-link based and intentionally unauthenticated.
 	accessId := r.PathValue("accessId")
 	_ = accessId
 	JSON(w, http.StatusOK, map[string]any{})

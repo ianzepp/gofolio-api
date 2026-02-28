@@ -15,6 +15,9 @@ Routes + request/response shape:
 import "net/http"
 
 func HandleGetExchangeRate(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// dateString is passed through verbatim and parsed in service/repository
+	// layers; handler should avoid opinionated date normalization.
 	symbol := r.PathValue("symbol")
 	dateString := r.PathValue("dateString")
 	_ = symbol

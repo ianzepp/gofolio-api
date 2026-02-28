@@ -44,6 +44,8 @@ import "net/http"
 
 // GET /portfolio/details
 func HandleGetPortfolioDetails(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Portfolio routes consistently thread impersonation + shared query filters.
 	filters := ParseFilters(r)
 	impersonationId := Impersonation(r)
 	_ = filters

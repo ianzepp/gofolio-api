@@ -36,6 +36,9 @@ import (
 
 func GetTags(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Legacy behavior note:
+		// - NestJS protects this route with AuthGuard('jwt') + readTags permission.
+		// - Current Go routing applies auth/permission middleware at registration time.
 		if deps == nil || deps.TagService == nil {
 			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
 			return
@@ -55,6 +58,13 @@ func GetTags(deps *Deps) http.HandlerFunc {
 
 func CreateTag(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Legacy behavior note:
+		// - NestJS intentionally does NOT use HasPermissionGuard here. It performs
+		//   custom permission logic in-controller:
+		//   createOwnTag OR createTag must be present.
+		// - If caller only has createOwnTag, userId must match request.user.id.
+		// - That mismatch returns 400 (not 403).
+		// Keep this context in mind when adjusting middleware for parity.
 		if deps == nil || deps.TagService == nil {
 			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
 			return
@@ -95,6 +105,9 @@ func CreateTag(deps *Deps) http.HandlerFunc {
 
 func DeleteTag(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Legacy behavior note:
+		// - If tag does not exist, NestJS returns 403 Forbidden (not 404).
+		// This preserves an intentionally non-REST status-code contract.
 		if deps == nil || deps.TagService == nil {
 			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
 			return
@@ -121,6 +134,9 @@ func DeleteTag(deps *Deps) http.HandlerFunc {
 
 func UpdateTag(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Legacy behavior note:
+		// - Request body requires both id and name string validation here.
+		// - If target tag does not exist, NestJS returns 403 Forbidden (not 404).
 		if deps == nil || deps.TagService == nil {
 			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
 			return

@@ -40,6 +40,9 @@ import "net/http"
 
 // HandleGetAccounts handles GET /account
 func HandleGetAccounts(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Account endpoints support impersonation via the "Impersonation-Id" header.
+	// Keep plumbing explicit even while this handler is stubbed.
 	impersonationId := Impersonation(r)
 	_ = impersonationId
 	JSON(w, http.StatusOK, map[string]any{"accounts": []any{}})

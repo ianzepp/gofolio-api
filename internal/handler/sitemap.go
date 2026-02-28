@@ -15,6 +15,8 @@ Routes + request/response shape:
 import "net/http"
 
 func HandleGetSitemap(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// This route lives outside /api/v1 and serves XML for crawlers.
 	w.Header().Set("Content-Type", "application/xml")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>

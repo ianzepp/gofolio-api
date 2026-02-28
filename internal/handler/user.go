@@ -50,6 +50,9 @@ func HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 
 // GET /user
 func HandleGetUser(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Accept-Language is consumed by NestJS user/info flows to populate localized
+	// defaults in returned settings. Preserve header plumbing in Go handlers.
 	lang := r.Header.Get("Accept-Language")
 	_ = lang // TODO: pass to service
 	JSON(w, http.StatusOK, map[string]any{})

@@ -27,6 +27,8 @@ Routes + request/response shape:
 import "net/http"
 
 func HandleGetBenchmarks(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Read benchmark list is public, but benchmark mutations are admin-only.
 	JSON(w, http.StatusOK, []any{})
 }
 

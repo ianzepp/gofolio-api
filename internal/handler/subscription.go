@@ -27,6 +27,8 @@ func HandleRedeemCoupon(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleGetStripeCallback(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Stripe callback finalizes by redirecting into the SPA membership page.
 	http.Redirect(w, r, rootURL()+"/"+defaultLanguageCode+"/account/membership", http.StatusFound)
 }
 

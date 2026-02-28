@@ -35,6 +35,8 @@ Routes + request/response shape:
 import "net/http"
 
 func HandleGetDataProviderAssetProfile(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Ghostfolio data-provider endpoints use API-key auth (not jwt) in NestJS.
 	symbol := r.PathValue("symbol")
 	_ = symbol
 	JSON(w, http.StatusOK, map[string]any{})

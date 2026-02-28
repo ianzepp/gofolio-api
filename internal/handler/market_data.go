@@ -23,6 +23,9 @@ Routes + request/response shape:
 import "net/http"
 
 func HandleGetMarketData(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// NestJS keeps fine-grained authorization checks in-controller here (based on
+	// user permissions and symbol ownership), not solely route-level guards.
 	dataSource := r.PathValue("dataSource")
 	symbol := r.PathValue("symbol")
 	_ = dataSource

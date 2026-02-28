@@ -218,6 +218,11 @@ func main() {
 	mux.HandleFunc("GET /api/v1/symbol/{dataSource}/{symbol}/{dateString}", handler.HandleGetSymbolByDate)
 
 	// Tags
+	// Legacy API nuance:
+	// - GET/DELETE/PUT use explicit permission guards in NestJS.
+	// - POST uses jwt auth but performs custom permission logic inside handler
+	//   (createOwnTag vs createTag + owner/userId checks).
+	// Keep this split visible so parity work remains intentional.
 	mux.HandleFunc("GET /api/v1/tags", auth.RequirePermission(authCfg, auth.ReadTags, handler.GetTags(deps)))
 	mux.HandleFunc("POST /api/v1/tags", auth.Authenticate(authCfg, handler.CreateTag(deps)))
 	mux.HandleFunc("DELETE /api/v1/tags/{id}", auth.RequirePermission(authCfg, auth.DeleteTag, handler.DeleteTag(deps)))

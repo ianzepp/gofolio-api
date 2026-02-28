@@ -44,6 +44,8 @@ func HandleCreateAgentChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Legacy behavior note:
+	// Agent chat is streamed as NDJSON/chunked response, not a single JSON blob.
 	w.Header().Set("Content-Type", "application/x-ndjson")
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.Header().Set("Cache-Control", "no-cache")

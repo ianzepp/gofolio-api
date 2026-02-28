@@ -23,6 +23,8 @@ Routes + request/response shape:
 import "net/http"
 
 func HandleGetHealth(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Baseline health response is a tiny JSON payload: {"status":"ok"}.
 	JSON(w, http.StatusOK, map[string]string{
 		"status": "ok",
 	})

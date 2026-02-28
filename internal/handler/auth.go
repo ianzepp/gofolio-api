@@ -65,6 +65,9 @@ func HandleAuthAnonymous(w http.ResponseWriter, r *http.Request) {
 
 // GET /auth/anonymous/:accessToken
 func HandleGetAuthAnonymous(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// The NestJS API supports access-token login via BOTH POST body and GET path.
+	// Keep this path variant for contract compatibility.
 	accessToken := r.PathValue("accessToken")
 	_ = accessToken // TODO: pass to service
 	JSON(w, http.StatusOK, map[string]any{})
@@ -72,6 +75,8 @@ func HandleGetAuthAnonymous(w http.ResponseWriter, r *http.Request) {
 
 // GET /auth/google
 func HandleGetAuthGoogle(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Auth flows are redirect-based, not JSON APIs.
 	http.Redirect(w, r, rootURL()+"/oauth/google", http.StatusFound)
 }
 
@@ -88,6 +93,8 @@ func HandleGetAuthGoogleCallback(w http.ResponseWriter, r *http.Request) {
 
 // GET /auth/oidc
 func HandleGetAuthOidc(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// OIDC endpoint is feature-flag gated and returns 403 when disabled.
 	if os.Getenv("ENABLE_FEATURE_AUTH_OIDC") != "true" {
 		Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 		return

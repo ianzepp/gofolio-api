@@ -42,16 +42,22 @@ func TestDifferentialAPI(t *testing.T) {
 	legacyBaseURL := strings.TrimRight(os.Getenv("LEGACY_BASE_URL"), "/")
 	goBaseURL := strings.TrimRight(os.Getenv("GO_BASE_URL"), "/")
 
-	if legacyBaseURL == "" || goBaseURL == "" {
-		t.Skip("set LEGACY_BASE_URL and GO_BASE_URL to run differential integration tests")
+	if legacyBaseURL == "" {
+		legacyBaseURL = "http://localhost:3333"
+	}
+	if goBaseURL == "" {
+		goBaseURL = "http://localhost:3334"
+	}
+
+	client := &http.Client{Timeout: 20 * time.Second}
+	if !isReachable(client, legacyBaseURL+"/api/v1/health") || !isReachable(client, goBaseURL+"/api/v1/health") {
+		t.Skipf("differential APIs not reachable (legacy=%s go=%s)", legacyBaseURL, goBaseURL)
 	}
 
 	cases, err := loadCases()
 	if err != nil {
 		t.Fatalf("load cases: %v", err)
 	}
-
-	client := &http.Client{Timeout: 20 * time.Second}
 
 	for _, tc := range cases {
 		tc := tc
@@ -110,10 +116,10 @@ func loadCases() ([]testCase, error) {
 func doRequest(client *http.Client, baseURL string, tc testCase) (response, error) {
 	var bodyReader io.Reader
 	if len(tc.Body) > 0 {
-		bodyReader = bytes.NewReader(tc.Body)
+		bodyReader = bytes.NewReader(expandEnv(tc.Body))
 	}
 
-	req, err := http.NewRequest(tc.Method, baseURL+tc.Path, bodyReader)
+	req, err := http.NewRequest(tc.Method, baseURL+expandEnvString(tc.Path), bodyReader)
 	if err != nil {
 		return response{}, err
 	}
@@ -123,22 +129,11 @@ func doRequest(client *http.Client, baseURL string, tc testCase) (response, erro
 	}
 
 	for k, v := range tc.Headers {
-		req.Header.Set(k, v)
+		req.Header.Set(k, expandEnvString(v))
 	}
 
-	switch tc.Auth {
-	case "jwt":
-		token := os.Getenv("JWT_TOKEN")
-		if token == "" {
-			return response{}, fmt.Errorf("case %q requires JWT_TOKEN", tc.Name)
-		}
-		req.Header.Set("Authorization", "Bearer "+token)
-	case "api-key":
-		key := os.Getenv("API_KEY")
-		if key == "" {
-			return response{}, fmt.Errorf("case %q requires API_KEY", tc.Name)
-		}
-		req.Header.Set("Authorization", "Bearer "+key)
+	if err := applyAuth(req, tc.Auth, tc.Name); err != nil {
+		return response{}, err
 	}
 
 	resp, err := client.Do(req)
@@ -157,6 +152,82 @@ func doRequest(client *http.Client, baseURL string, tc testCase) (response, erro
 		Body:       body,
 		Header:     resp.Header.Clone(),
 	}, nil
+}
+
+func applyAuth(req *http.Request, authMode string, caseName string) error {
+	if authMode == "" {
+		return nil
+	}
+
+	switch {
+	case authMode == "jwt":
+		token := os.Getenv("JWT_TOKEN")
+		if token == "" {
+			return fmt.Errorf("case %q requires JWT_TOKEN", caseName)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		return nil
+	case strings.HasPrefix(authMode, "jwt:"):
+		envName := strings.TrimSpace(strings.TrimPrefix(authMode, "jwt:"))
+		if envName == "" {
+			return fmt.Errorf("case %q has invalid auth mode %q", caseName, authMode)
+		}
+		token := os.Getenv(envName)
+		if token == "" {
+			return fmt.Errorf("case %q requires %s", caseName, envName)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		return nil
+	case authMode == "api-key":
+		key := os.Getenv("API_KEY")
+		if key == "" {
+			return fmt.Errorf("case %q requires API_KEY", caseName)
+		}
+		req.Header.Set("Authorization", "Api-Key "+key)
+		return nil
+	case strings.HasPrefix(authMode, "api-key:"):
+		envName := strings.TrimSpace(strings.TrimPrefix(authMode, "api-key:"))
+		if envName == "" {
+			return fmt.Errorf("case %q has invalid auth mode %q", caseName, authMode)
+		}
+		key := os.Getenv(envName)
+		if key == "" {
+			return fmt.Errorf("case %q requires %s", caseName, envName)
+		}
+		req.Header.Set("Authorization", "Api-Key "+key)
+		return nil
+	default:
+		return fmt.Errorf("case %q has unsupported auth mode %q", caseName, authMode)
+	}
+}
+
+func isReachable(client *http.Client, url string) bool {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return false
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	return true
+}
+
+func expandEnvString(s string) string {
+	if s == "" {
+		return s
+	}
+	return os.ExpandEnv(s)
+}
+
+func expandEnv(b []byte) []byte {
+	if len(b) == 0 {
+		return b
+	}
+	return []byte(expandEnvString(string(b)))
 }
 
 func assertJSONEqual(t *testing.T, tc testCase, legacyBody, goBody []byte) {

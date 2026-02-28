@@ -15,6 +15,8 @@ Routes + request/response shape:
 import "net/http"
 
 func HandleGetWebManifest(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Web manifest path is /assets/{languageCode}/site.webmanifest (outside /api).
 	languageCode := r.PathValue("languageCode")
 	_ = languageCode
 	JSON(w, http.StatusOK, map[string]any{})

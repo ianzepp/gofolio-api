@@ -15,6 +15,9 @@ Routes + request/response shape:
 import "net/http"
 
 func HandleGetInfo(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Frontend boot expects this payload shape (baseCurrency/currencies/
+	// globalPermissions/statistics keys), even when values are empty.
 	JSON(w, http.StatusOK, map[string]any{
 		"baseCurrency":      "USD",
 		"benchmarks":        []any{},

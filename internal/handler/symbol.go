@@ -23,6 +23,9 @@ Routes + request/response shape:
 import "net/http"
 
 func HandleGetSymbol(w http.ResponseWriter, r *http.Request) {
+	// Legacy behavior note:
+	// Current NestJS contract keeps this endpoint public, while lookup/date
+	// variants are authenticated.
 	dataSource := r.PathValue("dataSource")
 	symbol := r.PathValue("symbol")
 	_ = dataSource
