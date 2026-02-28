@@ -57,7 +57,8 @@ Current parity snapshot:
   - `roai-holdings-filter-roai-account-json`
 - Recently wired handlers: `auth/anonymous` (login), `api-keys`, `ai/prompt`, `cache/flush`, `auth-device`
 - Auth guards added: `admin/queue/*`, `cache/flush`
-- Remaining stub areas: `auth/oauth` (Google/OIDC server-side), `auth/webauthn`, `agent/*`, `subscription/*`, `import`, `public`
+- Remaining stub areas: `auth/oauth` (Google/OIDC server-side), `auth/webauthn`, `subscription/*`, `import`, `public`
+- Excluded from scope: `agent/*` (local-only code, not part of upstream Ghostfolio)
 
 ## Architecture
 
