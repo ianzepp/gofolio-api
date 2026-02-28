@@ -200,7 +200,7 @@ Scanning uses `pgx.CollectRows(rows, pgx.RowToStructByName[T])` — no manual fi
 cd apps/api-go
 export DATABASE_URL="postgresql://user:password@localhost:5432/ghostfolio?sslmode=prefer"
 go run ./cmd/server
-# Listens on :3333 — same port as the NestJS backend
+# Listens on :3334 by default (override with PORT)
 ```
 
 Startup opens a PostgreSQL connection pool via `pgxpool`. If DB init fails, the API still starts in degraded mode and logs the issue.

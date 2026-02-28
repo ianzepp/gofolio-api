@@ -14,6 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+const defaultPort = "3334"
+
 func main() {
 	var poolCloser func()
 	deps := &handler.Deps{}
@@ -244,7 +246,7 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "3333"
+		port = defaultPort
 	}
 
 	log.Printf("api-go listening on :%s", port)
