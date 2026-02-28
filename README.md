@@ -241,6 +241,24 @@ GO_BASE_URL=http://localhost:3334 \
 go test ./tests/integration -v
 ```
 
+### Legacy scope guard
+
+To ensure work on `api-go` does not unintentionally change unrelated legacy behavior in
+`apps/api` and `apps/client`, run:
+
+```bash
+npm run check:legacy-agent-scope
+```
+
+This guard compares `HEAD` to the merge-base with `upstream/main` and fails if
+legacy changes are outside the allowed Agent-extension integration surface.
+
+You can also run the script directly with a custom base ref or commit:
+
+```bash
+./tools/check-legacy-agent-scope.sh <base-ref-or-commit>
+```
+
 Optional auth env vars for integration fixtures:
 
 - `JWT_TOKEN`
