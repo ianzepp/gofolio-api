@@ -203,7 +203,9 @@ func (r *OrderRepository) FindActiveByUserIDWithProfile(ctx context.Context, use
 	var items []OrderWithProfile
 	err := sqlx.SelectContext(ctx, r.db,
 		&items,
-		`SELECT `+orderColumns+`,
+		`SELECT o.id, o."accountId", o."accountUserId", o.comment, o."createdAt",
+		        o.currency, o.date, o.fee, o."isDraft", o.quantity, o."symbolProfileId",
+		        o.type, o."unitPrice", o."updatedAt", o."userId",
 		        sp.currency AS sp_currency,
 		        sp."dataSource" AS "sp_dataSource",
 		        sp.symbol AS sp_symbol,

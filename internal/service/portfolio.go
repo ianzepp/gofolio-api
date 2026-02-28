@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/calculator"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
@@ -127,9 +128,7 @@ func (s *PortfolioService) computeSnapshot(ctx context.Context, calc *calculator
 
 	// Fetch exchange rates
 	startDate := calc.GetStartDate()
-	endDate := calculator.EndOfDay(calculator.ParseDate(calculator.FormatDate(calc.GetStartDate())).AddDate(100, 0, 0)) // large enough end
-	// Use a sensible end date
-	endDate = calculator.EndOfDay(calculator.ParseDate(calculator.FormatDate(endDate)))
+	endDate := calc.GetEndDate()
 
 	exchangeRates, err := s.exchangeRate.GetExchangeRatesByCurrency(ctx, currencies, baseCurrency, startDate, endDate)
 	if err != nil {
@@ -340,41 +339,56 @@ func (s *PortfolioService) GetPerformance(ctx context.Context, userID string, da
 
 // GetDividends returns portfolio dividends grouped by date.
 func (s *PortfolioService) GetDividends(ctx context.Context, userID string, dateRange string, groupBy string) (*PortfolioDividendsResponse, error) {
-	calc, baseCurrency, err := s.buildCalculator(ctx, userID)
+	calc, _, err := s.buildCalculator(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	snapshot, err := s.computeSnapshot(ctx, calc, baseCurrency)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get historical data within range
+	// Date-range semantics are anchored to calculator start date for parity with
+	// other portfolio endpoints.
 	start, end := calculator.GetIntervalFromDateRange(dateRange, calc.GetStartDate())
 
-	// Build dividend items from the snapshot chart
-	var dividends []InvestmentItemResponse
-
-	// For dividends, we need to look at activities directly
-	for _, a := range calc.GetTransactionPoints() {
-		d := calculator.ParseDate(a.Date)
-		if d.Before(start) || d.After(end) {
-			continue
-		}
-		// Interest from the transaction point represents dividends
-		if !a.Interest.IsZero() {
-			dividends = append(dividends, InvestmentItemResponse{
-				Date:       a.Date,
-				Investment: a.Interest.InexactFloat64(),
-			})
-		}
+	orderRepo := repository.NewOrderRepository(s.db)
+	ordersWithProfile, err := orderRepo.FindActiveByUserIDWithProfile(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch orders: %w", err)
 	}
 
-	_ = snapshot
+	type aggregate struct {
+		date  string
+		value float64
+	}
+	dividendsByDate := map[string]float64{}
+	for _, order := range ordersWithProfile {
+		if string(order.Type) != "DIVIDEND" {
+			continue
+		}
+		if order.Date.Before(start) || order.Date.After(end) {
+			continue
+		}
+		// Legacy parity: NestJS formats JS Date in local timezone. Mirror that by
+		// formatting with time.Local instead of UTC-normalized calculator dates.
+		date := order.Date.In(time.Local).Format("2006-01-02")
+		if groupBy == "month" && len(date) >= 7 {
+			date = date[:7] + "-01"
+		} else if groupBy == "year" && len(date) >= 4 {
+			date = date[:4] + "-01-01"
+		}
+		dividendsByDate[date] += order.Quantity * order.UnitPrice
+	}
 
-	if dividends == nil {
-		dividends = []InvestmentItemResponse{}
+	items := make([]aggregate, 0, len(dividendsByDate))
+	for date, value := range dividendsByDate {
+		items = append(items, aggregate{date: date, value: value})
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].date < items[j].date })
+
+	dividends := make([]InvestmentItemResponse, 0, len(items))
+	for _, item := range items {
+		dividends = append(dividends, InvestmentItemResponse{
+			Date:       item.date,
+			Investment: item.value,
+		})
 	}
 
 	return &PortfolioDividendsResponse{Dividends: dividends}, nil

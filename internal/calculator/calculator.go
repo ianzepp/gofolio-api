@@ -82,6 +82,16 @@ func (c *Calculator) GetStartDate() time.Time {
 	return c.startDate
 }
 
+// GetEndDate returns the calculated end date.
+func (c *Calculator) GetEndDate() time.Time {
+	return c.endDate
+}
+
+// GetActivities returns calculator input activities in chronological order.
+func (c *Calculator) GetActivities() []Activity {
+	return c.activities
+}
+
 // GetInvestments returns per-transaction-point investment sums.
 func (c *Calculator) GetInvestments() []InvestmentItem {
 	if len(c.transactionPoints) == 0 {
