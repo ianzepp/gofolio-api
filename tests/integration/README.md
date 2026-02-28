@@ -39,6 +39,20 @@ If either API is unreachable at `/api/v1/health`, tests are skipped.
   - calls `POST /api/v1/user`
   - uses returned `authToken` (or exchanges `accessToken` via `POST /api/v1/auth/anonymous`)
   - exports `JWT_USER_TOKEN` and `JWT_TOKEN` for differential cases
+  - exports `ADMIN_USER_ID` as a guaranteed foreign UUID for ownership-negative cases
+  - attempts to load `demoAuthToken` from `GET /api/v1/info` and exports
+    `JWT_DEMO_TOKEN` + `DEMO_USER_ID` when available
+  - attempts to create/export `API_KEY_USER` via `POST /api/v1/api-keys` when permitted
+  - if that fails, attempts DB-assisted fallback:
+    - query admin user id from PostgreSQL
+    - sign an admin JWT with `JWT_SECRET_KEY`
+    - call `POST /api/v1/api-keys` and export `API_KEY_USER`
+  - if API key creation is unavailable, falls back to a dummy `API_KEY_USER`
+    value so unauthorized API-key parity checks still run
+  - if `/info` has no `demoAuthToken`, attempts DB-assisted demo bootstrap
+    and exports `JWT_DEMO_TOKEN` + `DEMO_USER_ID`
+  - if no demo user exists, creates a throwaway user and updates its role to
+    `DEMO` for parity testing
 - Builds a persistent Go binary and starts it on `GO_PORT` (default `3334`) if it is not already running.
 - Waits for Go health endpoint before running tests.
 - Automatically stops the Go API process it started.
@@ -64,6 +78,12 @@ For DB-backed parity cases, Go also needs `DATABASE_URL`.
 
 1. `DATABASE_URL` from current shell env
 2. `DATABASE_URL` from repo `.env` (if present)
+
+Optional tools used by advanced bootstrap paths:
+
+- `jq` (required by runner)
+- `openssl` (for admin JWT signing fallback)
+- `psql` (for admin user lookup fallback)
 
 ## Auth
 

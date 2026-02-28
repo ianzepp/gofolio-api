@@ -176,15 +176,7 @@ bootstrap_legacy_user() {
     exit 1
   fi
 
-  user_id="$(printf '%s' "${auth_token}" | jq -Rr '
-    def b64url_to_json:
-      gsub("-"; "+")
-      | gsub("_"; "/")
-      | . + (["", "===", "==", "="][(length % 4)])
-      | @base64d
-      | fromjson;
-    (split(".")[1] // "") | b64url_to_json | .id // empty
-  ' 2>/dev/null || true)"
+  user_id="$(decode_jwt_user_id "${auth_token}")"
 
   export JWT_TOKEN="${auth_token}"
   export JWT_USER_TOKEN="${auth_token}"
@@ -196,7 +188,181 @@ bootstrap_legacy_user() {
     export LEGACY_USER_ID="${user_id}"
   fi
 
+  # For foreign-user validation cases, we only need an ID that differs from
+  # the bootstrapped user ID.
+  if [[ -z "${ADMIN_USER_ID:-}" ]]; then
+    local foreign_id
+    foreign_id="$(uuidgen 2>/dev/null || true)"
+    if [[ -z "${foreign_id}" ]]; then
+      foreign_id="00000000-0000-4000-8000-000000000000"
+    fi
+    if [[ "${foreign_id}" == "${user_id}" ]]; then
+      foreign_id="11111111-1111-4111-8111-111111111111"
+    fi
+    export ADMIN_USER_ID="${foreign_id}"
+  fi
+
+  # Try to bootstrap demo credentials from /info demoAuthToken.
+  local info_response
+  info_response="$(curl -fsS "${LEGACY_BASE_URL}/api/v1/info" || true)"
+  if [[ -n "${info_response}" ]]; then
+    local demo_auth_token
+    demo_auth_token="$(printf '%s' "${info_response}" | jq -r '.demoAuthToken // empty' 2>/dev/null || true)"
+    if [[ -n "${demo_auth_token}" ]]; then
+      export JWT_DEMO_TOKEN="${demo_auth_token}"
+      local demo_user_id
+      demo_user_id="$(decode_jwt_user_id "${demo_auth_token}")"
+      if [[ -n "${demo_user_id}" ]]; then
+        export DEMO_USER_ID="${demo_user_id}"
+      fi
+    fi
+  fi
+
+  # Opportunistically bootstrap API key for the bootstrapped user.
+  if [[ -z "${API_KEY_USER:-}" ]]; then
+    local api_key_response
+    api_key_response="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/api-keys" \
+      -H "Authorization: Bearer ${auth_token}" \
+      -H "Content-Type: application/json" 2>/dev/null || true)"
+    local api_key
+    api_key="$(printf '%s' "${api_key_response}" | jq -r '.apiKey // empty' 2>/dev/null || true)"
+    if [[ -n "${api_key}" ]]; then
+      export API_KEY_USER="${api_key}"
+    fi
+  fi
+
+  # Fallback: bootstrap API key via an admin user discovered from DB.
+  if [[ -z "${API_KEY_USER:-}" ]]; then
+    bootstrap_api_key_from_admin || true
+  fi
+
+  # Final fallback: keep API-key parity case active even when key creation is
+  # forbidden in this environment. Both sides should reject this dummy key.
+  if [[ -z "${API_KEY_USER:-}" ]]; then
+    export API_KEY_USER="integration-dummy-api-key"
+  fi
+
+  # Fallback for demo-tag parity checks when /info lacks demoAuthToken.
+  if [[ -z "${JWT_DEMO_TOKEN:-}" || -z "${DEMO_USER_ID:-}" ]]; then
+    bootstrap_demo_from_db || true
+  fi
+
   echo "bootstrapped legacy user for test run (jwt exported as JWT_USER_TOKEN/JWT_TOKEN${user_id:+, userId=${user_id}})"
+}
+
+decode_jwt_user_id() {
+  local jwt_token="$1"
+  if [[ -z "${jwt_token}" ]]; then
+    return 0
+  fi
+
+  printf '%s' "${jwt_token}" | jq -Rr '
+    def b64url_to_json:
+      gsub("-"; "+")
+      | gsub("_"; "/")
+      | . + (["", "===", "==", "="][(length % 4)])
+      | @base64d
+      | fromjson;
+    (split(".")[1] // "") | b64url_to_json | .id // empty
+  ' 2>/dev/null || true
+}
+
+make_hs256_jwt() {
+  local user_id="$1"
+  local jwt_secret="$2"
+  if [[ -z "${user_id}" || -z "${jwt_secret}" ]]; then
+    return 1
+  fi
+  if ! command -v openssl >/dev/null 2>&1; then
+    return 1
+  fi
+
+  local header payload encoded_header encoded_payload signing_input encoded_signature
+  header='{"alg":"HS256","typ":"JWT"}'
+  payload="$(jq -nc --arg id "${user_id}" '{id: $id}')"
+
+  encoded_header="$(printf '%s' "${header}" | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
+  encoded_payload="$(printf '%s' "${payload}" | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
+  signing_input="${encoded_header}.${encoded_payload}"
+  encoded_signature="$(printf '%s' "${signing_input}" \
+    | openssl dgst -sha256 -hmac "${jwt_secret}" -binary \
+    | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
+  printf '%s' "${signing_input}.${encoded_signature}"
+}
+
+bootstrap_api_key_from_admin() {
+  if ! command -v psql >/dev/null 2>&1; then
+    return 0
+  fi
+  if [[ -z "${resolved_database_url}" || -z "${resolved_jwt_secret}" ]]; then
+    return 0
+  fi
+
+  local admin_user_id
+  admin_user_id="$(psql "${resolved_database_url}" -Atqc \
+    "SELECT id FROM \"User\" WHERE role = 'ADMIN' ORDER BY \"createdAt\" ASC LIMIT 1;" 2>/dev/null || true)"
+  admin_user_id="$(printf '%s' "${admin_user_id}" | tr -d '[:space:]')"
+  if [[ -z "${admin_user_id}" ]]; then
+    return 0
+  fi
+
+  local admin_jwt
+  admin_jwt="$(make_hs256_jwt "${admin_user_id}" "${resolved_jwt_secret}" || true)"
+  if [[ -z "${admin_jwt}" ]]; then
+    return 0
+  fi
+
+  local api_key_response api_key
+  api_key_response="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/api-keys" \
+    -H "Authorization: Bearer ${admin_jwt}" \
+    -H "Content-Type: application/json" 2>/dev/null || true)"
+  api_key="$(printf '%s' "${api_key_response}" | jq -r '.apiKey // empty' 2>/dev/null || true)"
+  if [[ -n "${api_key}" ]]; then
+    export API_KEY_USER="${api_key}"
+    echo "bootstrapped API_KEY_USER via admin user from database"
+  fi
+}
+
+bootstrap_demo_from_db() {
+  if ! command -v psql >/dev/null 2>&1; then
+    return 0
+  fi
+  if [[ -z "${resolved_database_url}" || -z "${resolved_jwt_secret}" ]]; then
+    return 0
+  fi
+
+  local demo_user_id
+  demo_user_id="$(psql "${resolved_database_url}" -Atqc \
+    "SELECT id FROM \"User\" WHERE role = 'DEMO' ORDER BY \"createdAt\" ASC LIMIT 1;" 2>/dev/null || true)"
+  demo_user_id="$(printf '%s' "${demo_user_id}" | tr -d '[:space:]')"
+  if [[ -z "${demo_user_id}" ]]; then
+    demo_user_id="$(psql "${resolved_database_url}" -Atqc \
+      "SELECT value FROM \"Property\" WHERE key = 'DEMO_USER_ID' LIMIT 1;" 2>/dev/null || true)"
+    demo_user_id="$(printf '%s' "${demo_user_id}" | tr -d '[:space:]')"
+  fi
+  if [[ -z "${demo_user_id}" ]]; then
+    local demo_signup_response demo_signup_token
+    demo_signup_response="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/user" 2>/dev/null || true)"
+    demo_signup_token="$(printf '%s' "${demo_signup_response}" | jq -r '.authToken // empty' 2>/dev/null || true)"
+    demo_user_id="$(decode_jwt_user_id "${demo_signup_token}")"
+    if [[ -n "${demo_user_id}" ]]; then
+      psql "${resolved_database_url}" -Atqc \
+        "UPDATE \"User\" SET role = 'DEMO' WHERE id = '${demo_user_id}';" >/dev/null 2>&1 || true
+    fi
+  fi
+  if [[ -z "${demo_user_id}" ]]; then
+    return 0
+  fi
+
+  local demo_jwt
+  demo_jwt="$(make_hs256_jwt "${demo_user_id}" "${resolved_jwt_secret}" || true)"
+  if [[ -z "${demo_jwt}" ]]; then
+    return 0
+  fi
+
+  export DEMO_USER_ID="${demo_user_id}"
+  export JWT_DEMO_TOKEN="${demo_jwt}"
+  echo "bootstrapped DEMO_USER_ID/JWT_DEMO_TOKEN via database"
 }
 
 cleanup() {
