@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // HandleCreateAccountBalance handles POST /account-balance
@@ -42,7 +44,11 @@ func HandleCreateAccountBalance(deps *Deps) http.HandlerFunc {
 		// Validate account ownership (matches NestJS controller check).
 		_, err := deps.AccountService.GetAccount(r.Context(), body.AccountId, userID)
 		if err != nil {
-			Error(w, http.StatusNotFound, http.StatusText(http.StatusNotFound))
+			if errors.Is(err, pgx.ErrNoRows) {
+				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+				return
+			}
+			Error(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 			return
 		}
 
@@ -90,9 +96,22 @@ func HandleDeleteAccountBalance(deps *Deps) http.HandlerFunc {
 		}
 
 		id := r.PathValue("id")
+		if _, err := deps.AccountBalanceService.GetAccountBalance(r.Context(), id, userID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+				return
+			}
+			Error(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
+			return
+		}
+
 		deleted, err := deps.AccountBalanceService.DeleteAccountBalance(r.Context(), id, userID)
 		if err != nil {
-			Error(w, http.StatusInternalServerError, err.Error())
+			if errors.Is(err, pgx.ErrNoRows) {
+				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+				return
+			}
+			Error(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 			return
 		}
 		JSON(w, http.StatusOK, deleted)

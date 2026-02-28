@@ -45,8 +45,8 @@ func (r *AccountBalanceRepository) FindByAccountID(ctx context.Context, accountI
 // Matches NestJS Prisma upsert semantics on the unique constraint.
 func (r *AccountBalanceRepository) Upsert(ctx context.Context, ab model.AccountBalance) (model.AccountBalance, error) {
 	rows, err := r.db.Query(ctx,
-		`INSERT INTO "AccountBalance" (id, "accountId", "userId", date, value)
-		 VALUES ($1, $2, $3, $4, $5)
+		`INSERT INTO "AccountBalance" (id, "accountId", "createdAt", date, "updatedAt", "userId", value)
+		 VALUES ($1, $2, NOW(), $4, NOW(), $3, $5)
 		 ON CONFLICT ("accountId", date) DO UPDATE
 		   SET value = EXCLUDED.value, "updatedAt" = now()
 		 RETURNING id, "accountId", "createdAt", date, "updatedAt", "userId", value`,
