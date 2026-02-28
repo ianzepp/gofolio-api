@@ -271,7 +271,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/portfolio/report", auth.Authenticate(authCfg, handler.GetPortfolioReport(deps)))
 
 	// Public
-	mux.HandleFunc("GET /api/v1/public/{accessId}/portfolio", handler.HandleGetPublicPortfolio)
+	mux.HandleFunc("GET /api/v1/public/{accessId}/portfolio", handler.GetPublicPortfolio(deps))
 
 	// Sitemap
 	mux.HandleFunc("GET /sitemap.xml", handler.HandleGetSitemap)
