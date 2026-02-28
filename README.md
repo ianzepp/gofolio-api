@@ -8,6 +8,9 @@ A 48-hour public coding challenge: rewrite a production backend from scratch in 
 
 ### The original codebase
 
+<!-- Original TypeScript test suite (excluding api-go/ and cli/):
+     30 test files, 55 describe blocks, 41 individual test cases (it() calls) -->
+
 [Ghostfolio](https://github.com/ghostfolio/ghostfolio) is an open-source portfolio tracker. The existing backend is ~39K LOC of TypeScript on NestJS with Prisma, serving 116+ REST endpoints to an Angular frontend. Under the hood, the hardest code is an 800-line ROAI (Return on Added Investment) portfolio calculator that tracks time-weighted performance across multiple currencies, with dual-tracking for currency effects.
 
 ### The thesis
