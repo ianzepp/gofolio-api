@@ -1,5 +1,25 @@
 package handler
 
+/*
+Stub parity reference:
+Original NestJS controller(s):
+- apps/api/src/app/endpoints/watchlist/watchlist.controller.ts
+
+Routes + request/response shape:
+- GET /api/v1/watchlist (HandleGetWatchlist)
+  Request: no explicit request params
+  Auth/permission: jwt / permissions.readWatchlist
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/watchlist (HandleCreateWatchlistItem)
+  Request: body data: CreateWatchlistItemDto
+  Auth/permission: jwt / permissions.createWatchlistItem
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- DELETE /api/v1/watchlist/{dataSource}/{symbol} (HandleDeleteWatchlistItem)
+  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol')
+  Auth/permission: jwt / permissions.deleteWatchlistItem
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+*/
+
 import "net/http"
 
 func HandleGetWatchlist(w http.ResponseWriter, r *http.Request) {

@@ -1,5 +1,34 @@
 package handler
 
+/*
+Stub parity reference:
+Original NestJS controller(s):
+- apps/api/src/app/platform/platform.controller.ts
+- apps/api/src/app/endpoints/platforms/platforms.controller.ts
+
+Routes + request/response shape:
+- GET /api/v1/platform (HandleGetPlatform)
+  Request: no explicit request params
+  Auth/permission: jwt / permissions.readPlatformsWithAccountCount
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/platform (HandleCreatePlatform)
+  Request: body data: CreatePlatformDto
+  Auth/permission: jwt / permissions.createPlatform
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- DELETE /api/v1/platform/{id} (HandleDeletePlatform)
+  Request: path id: string (arg: 'id')
+  Auth/permission: jwt / permissions.deletePlatform
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- PUT /api/v1/platform/{id} (HandleUpdatePlatform)
+  Request: path id: string (arg: 'id'); body data: UpdatePlatformDto
+  Auth/permission: jwt / permissions.updatePlatform
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/platforms (HandleGetPlatforms)
+  Request: no explicit request params
+  Auth/permission: jwt / permissions.readPlatforms
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+*/
+
 import "net/http"
 
 // --- Group: platform (CRUD with account count) ---

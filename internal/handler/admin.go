@@ -1,5 +1,77 @@
 package handler
 
+/*
+Stub parity reference:
+Original NestJS controller(s):
+- apps/api/src/app/admin/admin.controller.ts
+
+Routes + request/response shape:
+- GET /api/v1/admin (HandleGetAdmin)
+  Request: no explicit request params
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/admin/demo-user/sync (HandleSyncDemoUser)
+  Request: no explicit request params
+  Auth/permission: jwt / permissions.syncDemoUserAccount
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/admin/gather (HandleGatherData)
+  Request: no explicit request params
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/admin/gather/{dataSource}/{symbol} (HandleGatherDataForSymbol)
+  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol'); query dateRange: DateRange (arg: 'range')
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/admin/gather/{dataSource}/{symbol}/{dateString} (HandleGatherDataForDate)
+  Request: path dataSource: DataSource (arg: 'dataSource'); dateString: string (arg: 'dateString'); symbol: string (arg: 'symbol')
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/admin/gather/max (HandleGatherMax)
+  Request: no explicit request params
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/admin/gather/profile-data (HandleGatherProfileData)
+  Request: no explicit request params
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/admin/gather/profile-data/{dataSource}/{symbol} (HandleGatherProfileDataForSymbol)
+  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol')
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/admin/market-data (HandleGetAdminMarketData)
+  Request: no explicit request params
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/admin/market-data/{dataSource}/{symbol}/test (HandleTestMarketData)
+  Request: body data: { scraperConfiguration: ScraperConfiguration }
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- DELETE /api/v1/admin/profile-data/{dataSource}/{symbol} (HandleDeleteProfileData)
+  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol')
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- PATCH /api/v1/admin/profile-data/{dataSource}/{symbol} (HandleUpdateProfileData)
+  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol'); body assetProfile: UpdateAssetProfileDto
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/admin/profile-data/{dataSource}/{symbol} (HandleCreateProfileData)
+  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol')
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- PUT /api/v1/admin/settings/{key} (HandleUpdateAdminSetting)
+  Request: path key: string (arg: 'key'); body data: UpdatePropertyDto
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/admin/user (HandleGetAdminUsers)
+  Request: no explicit request params
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/admin/user/{id} (HandleGetAdminUser)
+  Request: path id: string (arg: 'id')
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+*/
+
 import "net/http"
 
 // GET /admin

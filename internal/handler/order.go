@@ -1,5 +1,37 @@
 package handler
 
+/*
+Stub parity reference:
+Original NestJS controller(s):
+- apps/api/src/app/order/order.controller.ts
+
+Routes + request/response shape:
+- DELETE /api/v1/order (HandleDeleteOrders)
+  Request: no explicit request params
+  Auth/permission: jwt / permissions.deleteOrder
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/order (HandleGetOrders)
+  Request: no explicit request params
+  Auth/permission: jwt / -
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/order (HandleCreateOrder)
+  Request: body data: CreateOrderDto
+  Auth/permission: jwt / permissions.createOrder
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- DELETE /api/v1/order/{id} (HandleDeleteOrder)
+  Request: path id: string (arg: 'id')
+  Auth/permission: jwt / permissions.deleteOrder
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/order/{id} (HandleGetOrder)
+  Request: path id: string (arg: 'id')
+  Auth/permission: jwt / -
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- PUT /api/v1/order/{id} (HandleUpdateOrder)
+  Request: path id: string (arg: 'id'); body data: UpdateOrderDto
+  Auth/permission: jwt / permissions.updateOrder
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+*/
+
 import "net/http"
 
 // DELETE /order (bulk delete)

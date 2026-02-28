@@ -1,5 +1,21 @@
 package handler
 
+/*
+Stub parity reference:
+Original NestJS controller(s):
+- apps/api/src/app/import/import.controller.ts
+
+Routes + request/response shape:
+- POST /api/v1/import (HandleCreateImport)
+  Request: body importData: ImportDataDto
+  Auth/permission: jwt / permissions.createOrder
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/import/dividends/{dataSource}/{symbol} (HandleGetImportDividends)
+  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol')
+  Auth/permission: jwt / -
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+*/
+
 import "net/http"
 
 func HandleCreateImport(w http.ResponseWriter, r *http.Request) {

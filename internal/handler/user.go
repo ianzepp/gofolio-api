@@ -1,5 +1,41 @@
 package handler
 
+/*
+Stub parity reference:
+Original NestJS controller(s):
+- apps/api/src/app/user/user.controller.ts
+
+Routes + request/response shape:
+- DELETE /api/v1/user (HandleDeleteUser)
+  Request: body data: DeleteOwnUserDto
+  Auth/permission: jwt / permissions.deleteOwnUser
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/user (HandleGetUser)
+  Request: headers acceptLanguage: string (arg: 'accept-language')
+  Auth/permission: jwt / -
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/user (HandleCreateUser)
+  Request: no explicit request params
+  Auth/permission: public / -
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- DELETE /api/v1/user/{id} (HandleDeleteUserById)
+  Request: path id: string (arg: 'id')
+  Auth/permission: jwt / permissions.deleteUser
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/user/{id}/access-token (HandleCreateUserAccessTokenById)
+  Request: path id: string (arg: 'id')
+  Auth/permission: jwt / permissions.accessAdminControl
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- POST /api/v1/user/access-token (HandleCreateUserAccessToken)
+  Request: body data: UpdateOwnAccessTokenDto
+  Auth/permission: jwt / permissions.updateOwnAccessToken
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- PUT /api/v1/user/setting (HandleUpdateUserSetting)
+  Request: body data: UpdateUserSettingDto
+  Auth/permission: jwt / -
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+*/
+
 import "net/http"
 
 // DELETE /user

@@ -1,5 +1,45 @@
 package handler
 
+/*
+Stub parity reference:
+Original NestJS controller(s):
+- apps/api/src/app/portfolio/portfolio.controller.ts
+
+Routes + request/response shape:
+- GET /api/v1/portfolio/details (HandleGetPortfolioDetails)
+  Request: query dateRange: DateRange = 'max' (arg: 'range')
+  Auth/permission: jwt / -
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/portfolio/dividends (HandleGetPortfolioDividends)
+  Request: query dateRange: DateRange = 'max' (arg: 'range')
+  Auth/permission: jwt / -
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/portfolio/holding/{dataSource}/{symbol} (HandleGetPortfolioHolding)
+  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol')
+  Auth/permission: jwt / -
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- PUT /api/v1/portfolio/holding/{dataSource}/{symbol}/tags (HandleUpdatePortfolioHoldingTags)
+  Request: path dataSource: DataSource (arg: 'dataSource'); symbol: string (arg: 'symbol'); body data: UpdateHoldingTagsDto
+  Auth/permission: jwt / permissions.updateOrder
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/portfolio/holdings (HandleGetPortfolioHoldings)
+  Request: query dateRange: DateRange = 'max' (arg: 'range')
+  Auth/permission: jwt / -
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/portfolio/investments (HandleGetPortfolioInvestments)
+  Request: query dateRange: DateRange = 'max' (arg: 'range')
+  Auth/permission: jwt / -
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/portfolio/performance (HandleGetPortfolioPerformance)
+  Request: query dateRange: DateRange = 'max' (arg: 'range')
+  Auth/permission: jwt / -
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+- GET /api/v1/portfolio/report (HandleGetPortfolioReport)
+  Request: no explicit request params
+  Auth/permission: jwt / -
+  Response: currently stubbed (placeholder; implement to match Nest behavior).
+*/
+
 import "net/http"
 
 // GET /portfolio/details
