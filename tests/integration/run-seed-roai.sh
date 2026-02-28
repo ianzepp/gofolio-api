@@ -142,52 +142,55 @@ seed_market_data "USDCHF" "YAHOO" "2023-01-03" 0.9238
 seed_market_data "USDCHF" "YAHOO" "2023-07-10" 0.8854
 
 # --------------------------------------------------------------------------
-# 4. Create orders via the legacy API (both APIs read same DB state)
+# 4. Create ROAI orders directly in DB for deterministic, provider-independent
+#    seed state. API-level symbol validation is intentionally bypassed here.
 # --------------------------------------------------------------------------
-create_order() {
-  local acct_id="$1" currency="$2" data_source="$3" date="$4" fee="$5"
-  local quantity="$6" symbol="$7" type="$8" unit_price="$9"
+symbol_profile_id() {
+  local data_source="$1" symbol="$2"
+  sql "SELECT id FROM \"SymbolProfile\" WHERE \"dataSource\" = '${data_source}' AND symbol = '${symbol}' LIMIT 1;"
+}
 
-  local body
-  body="$(jq -nc \
-    --arg accountId "${acct_id}" \
-    --arg currency "${currency}" \
-    --arg dataSource "${data_source}" \
-    --arg date "${date}" \
-    --argjson fee "${fee}" \
-    --argjson quantity "${quantity}" \
-    --arg symbol "${symbol}" \
-    --arg type "${type}" \
-    --argjson unitPrice "${unit_price}" \
-    '{
-      accountId: $accountId,
-      currency: $currency,
-      dataSource: $dataSource,
-      date: $date,
-      fee: $fee,
-      quantity: $quantity,
-      symbol: $symbol,
-      type: $type,
-      unitPrice: $unitPrice
-    }')"
-
-  local resp
+insert_order() {
+  local account_id="$1" account_user_id="$2" user_id="$3" currency="$4"
+  local date_iso="$5" fee="$6" quantity="$7" symbol_profile_id="$8" type="$9" unit_price="${10}"
   local order_id
-  resp="$(api POST "/api/v1/order" -d "${body}")"
-  order_id="$(printf '%s' "${resp}" | jq -r '.id // empty' 2>/dev/null || true)"
+  order_id="$(sql "WITH inserted AS (
+    INSERT INTO \"Order\" (
+      id, \"accountId\", \"accountUserId\", \"userId\", currency, date, fee, quantity, \"symbolProfileId\", type, \"unitPrice\", \"isDraft\", \"createdAt\", \"updatedAt\"
+    ) VALUES (
+      gen_random_uuid(), '${account_id}', '${account_user_id}', '${user_id}', '${currency}',
+      '${date_iso}'::timestamptz, ${fee}, ${quantity}, '${symbol_profile_id}', '${type}'::\"Type\", ${unit_price}, false, NOW(), NOW()
+    ) RETURNING id
+  ) SELECT id FROM inserted;")"
   if [[ -z "${order_id}" ]]; then
-    fail "failed to create order ${type} ${symbol} on ${date}"
+    fail "failed to insert order ${type} (${symbol_profile_id}) on ${date_iso}"
   fi
   printf '%s' "${order_id}"
 }
 
-export ROAI_BTCUSD_ORDER_ID="$(create_order "${roai_acct_id}" "USD" "YAHOO" "2021-12-12T00:00:00.000Z" 4.46 1 "BTCUSD" "BUY" 44558.42)"
-export ROAI_MSFT_BUY_ORDER_ID="$(create_order "${roai_acct_id}" "USD" "YAHOO" "2021-09-16T00:00:00.000Z" 19 1 "MSFT" "BUY" 298.58)"
-export ROAI_MSFT_DIV_ORDER_ID="$(create_order "${roai_acct_id}" "USD" "YAHOO" "2021-11-16T00:00:00.000Z" 0 1 "MSFT" "DIVIDEND" 0.62)"
-export ROAI_NOVN_BUY_ORDER_ID="$(create_order "${roai_chf_acct_id}" "CHF" "YAHOO" "2022-03-07T00:00:00.000Z" 0 2 "NOVN.SW" "BUY" 75.8)"
-export ROAI_NOVN_SELL_ORDER_ID="$(create_order "${roai_chf_acct_id}" "CHF" "YAHOO" "2022-04-08T00:00:00.000Z" 0 2 "NOVN.SW" "SELL" 85.73)"
-export ROAI_BALN_BUY_ORDER_ID="$(create_order "${roai_chf_acct_id}" "CHF" "YAHOO" "2021-11-22T00:00:00.000Z" 1.55 2 "BALN.SW" "BUY" 142.9)"
-export ROAI_BALN_SELL_ORDER_ID="$(create_order "${roai_chf_acct_id}" "CHF" "YAHOO" "2021-11-30T00:00:00.000Z" 1.65 2 "BALN.SW" "SELL" 136.6)"
+sp_btcusd_id="$(symbol_profile_id "YAHOO" "BTCUSD")"
+sp_msft_id="$(symbol_profile_id "YAHOO" "MSFT")"
+sp_novn_id="$(symbol_profile_id "YAHOO" "NOVN.SW")"
+sp_baln_id="$(symbol_profile_id "YAHOO" "BALN.SW")"
+
+for sp_var in sp_btcusd_id sp_msft_id sp_novn_id sp_baln_id; do
+  if [[ -z "${!sp_var:-}" ]]; then
+    fail "missing symbol profile id for ${sp_var}"
+  fi
+done
+
+roai_user_id="${ROAI_USER_ID:-}"
+if [[ -z "${roai_user_id}" ]]; then
+  fail "ROAI_USER_ID is required for deterministic order inserts"
+fi
+
+export ROAI_BTCUSD_ORDER_ID="$(insert_order "${roai_acct_id}" "${roai_user_id}" "${roai_user_id}" "USD" "2021-12-12T00:00:00.000Z" 4.46 1 "${sp_btcusd_id}" "BUY" 44558.42)"
+export ROAI_MSFT_BUY_ORDER_ID="$(insert_order "${roai_acct_id}" "${roai_user_id}" "${roai_user_id}" "USD" "2021-09-16T00:00:00.000Z" 19 1 "${sp_msft_id}" "BUY" 298.58)"
+export ROAI_MSFT_DIV_ORDER_ID="$(insert_order "${roai_acct_id}" "${roai_user_id}" "${roai_user_id}" "USD" "2021-11-16T00:00:00.000Z" 0 1 "${sp_msft_id}" "DIVIDEND" 0.62)"
+export ROAI_NOVN_BUY_ORDER_ID="$(insert_order "${roai_chf_acct_id}" "${roai_user_id}" "${roai_user_id}" "CHF" "2022-03-07T00:00:00.000Z" 0 2 "${sp_novn_id}" "BUY" 75.8)"
+export ROAI_NOVN_SELL_ORDER_ID="$(insert_order "${roai_chf_acct_id}" "${roai_user_id}" "${roai_user_id}" "CHF" "2022-04-08T00:00:00.000Z" 0 2 "${sp_novn_id}" "SELL" 85.73)"
+export ROAI_BALN_BUY_ORDER_ID="$(insert_order "${roai_chf_acct_id}" "${roai_user_id}" "${roai_user_id}" "CHF" "2021-11-22T00:00:00.000Z" 1.55 2 "${sp_baln_id}" "BUY" 142.9)"
+export ROAI_BALN_SELL_ORDER_ID="$(insert_order "${roai_chf_acct_id}" "${roai_user_id}" "${roai_user_id}" "CHF" "2021-11-30T00:00:00.000Z" 1.65 2 "${sp_baln_id}" "SELL" 136.6)"
 
 # --------------------------------------------------------------------------
 # 5. Enforce full seed completeness before enabling ROAI cases
