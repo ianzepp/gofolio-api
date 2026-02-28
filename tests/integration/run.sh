@@ -214,6 +214,27 @@ bootstrap_legacy_user() {
     export EMPTY_USER_ACCESS_TOKEN="${empty_access_token}"
   fi
 
+  # Bootstrap two accounts for transfer-balance parity checks.
+  if [[ -n "${auth_token}" ]]; then
+    local transfer_from_response transfer_to_response transfer_from_id transfer_to_id
+    transfer_from_response="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/account" \
+      -H "Authorization: Bearer ${auth_token}" \
+      -H "Content-Type: application/json" \
+      -d '{"balance":100,"currency":"USD","name":"integration-transfer-from","platformId":null,"isExcluded":false}' 2>/dev/null || true)"
+    transfer_from_id="$(printf '%s' "${transfer_from_response}" | jq -r '.id // empty' 2>/dev/null || true)"
+
+    transfer_to_response="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/account" \
+      -H "Authorization: Bearer ${auth_token}" \
+      -H "Content-Type: application/json" \
+      -d '{"balance":0,"currency":"USD","name":"integration-transfer-to","platformId":null,"isExcluded":false}' 2>/dev/null || true)"
+    transfer_to_id="$(printf '%s' "${transfer_to_response}" | jq -r '.id // empty' 2>/dev/null || true)"
+
+    if [[ -n "${transfer_from_id}" && -n "${transfer_to_id}" ]]; then
+      export TRANSFER_ACCOUNT_FROM_ID="${transfer_from_id}"
+      export TRANSFER_ACCOUNT_TO_ID="${transfer_to_id}"
+    fi
+  fi
+
   # For foreign-user validation cases, we only need an ID that differs from
   # the bootstrapped user ID.
   if [[ -z "${ADMIN_USER_ID:-}" ]]; then

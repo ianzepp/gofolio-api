@@ -167,5 +167,48 @@
       "type": "BUY",
       "unitPrice": 100
     }
+  },
+  {
+    "name": "account-transfer-missing-accounts-not-found-parity",
+    "method": "POST",
+    "path": "/api/v1/account/transfer-balance",
+    "mode": "status",
+    "auth": "jwt:JWT_EMPTY_USER_TOKEN",
+    "requiredEnv": ["JWT_EMPTY_USER_TOKEN", "ADMIN_USER_ID"],
+    "body": {
+      "accountIdFrom": "${ADMIN_USER_ID}",
+      "accountIdTo": "${ADMIN_USER_ID}",
+      "balance": 1
+    }
+  },
+  {
+    "name": "account-transfer-same-account-bad-request-parity",
+    "method": "POST",
+    "path": "/api/v1/account/transfer-balance",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN", "TRANSFER_ACCOUNT_FROM_ID"],
+    "body": {
+      "accountIdFrom": "${TRANSFER_ACCOUNT_FROM_ID}",
+      "accountIdTo": "${TRANSFER_ACCOUNT_FROM_ID}",
+      "balance": 1
+    }
+  },
+  {
+    "name": "account-transfer-insufficient-funds-bad-request-parity",
+    "method": "POST",
+    "path": "/api/v1/account/transfer-balance",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": [
+      "JWT_USER_TOKEN",
+      "TRANSFER_ACCOUNT_FROM_ID",
+      "TRANSFER_ACCOUNT_TO_ID"
+    ],
+    "body": {
+      "accountIdFrom": "${TRANSFER_ACCOUNT_FROM_ID}",
+      "accountIdTo": "${TRANSFER_ACCOUNT_TO_ID}",
+      "balance": 1000000
+    }
   }
 ]

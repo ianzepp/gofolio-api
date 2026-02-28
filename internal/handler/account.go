@@ -271,7 +271,38 @@ func TransferBalance(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		err := deps.AccountService.TransferBalance(r.Context(), service.TransferRequest{
+		accounts, err := deps.AccountService.GetAccounts(r.Context(), userID)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		var accountFrom *model.Account
+		var accountTo *model.Account
+		for i := range accounts {
+			if accounts[i].ID == body.AccountIdFrom {
+				accountFrom = &accounts[i]
+			}
+			if accounts[i].ID == body.AccountIdTo {
+				accountTo = &accounts[i]
+			}
+		}
+
+		// Legacy parity: account IDs must both belong to the caller.
+		if accountFrom == nil || accountTo == nil {
+			Error(w, http.StatusNotFound, http.StatusText(http.StatusNotFound))
+			return
+		}
+		if accountFrom.ID == accountTo.ID {
+			Error(w, http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+			return
+		}
+		if accountFrom.Balance < body.Balance {
+			Error(w, http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+			return
+		}
+
+		err = deps.AccountService.TransferBalance(r.Context(), service.TransferRequest{
 			FromID:     body.AccountIdFrom,
 			FromUserID: userID,
 			ToID:       body.AccountIdTo,
