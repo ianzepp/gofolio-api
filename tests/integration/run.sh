@@ -426,6 +426,43 @@ bootstrap_legacy_user() {
   echo "bootstrapped legacy user for test run (jwt exported as JWT_USER_TOKEN/JWT_TOKEN${user_id:+, userId=${user_id}})"
 }
 
+bootstrap_roai_user() {
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "error: jq is required to bootstrap ROAI user credentials" >&2
+    exit 1
+  fi
+
+  local signup_response
+  local access_token
+  local auth_token
+  local user_id
+
+  signup_response="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/user")"
+  access_token="$(printf '%s' "${signup_response}" | jq -r '.accessToken // empty')"
+  auth_token="$(printf '%s' "${signup_response}" | jq -r '.authToken // empty')"
+
+  if [[ -z "${auth_token}" && -n "${access_token}" ]]; then
+    auth_token="$(curl -fsS -X POST "${LEGACY_BASE_URL}/api/v1/auth/anonymous" \
+      -H "Content-Type: application/json" \
+      -d "$(jq -nc --arg accessToken "${access_token}" '{accessToken: $accessToken}')" \
+      | jq -r '.authToken // empty')"
+  fi
+
+  if [[ -z "${auth_token}" ]]; then
+    echo "error: failed to bootstrap isolated ROAI auth token from legacy API" >&2
+    echo "response: ${signup_response}" >&2
+    exit 1
+  fi
+
+  user_id="$(decode_jwt_user_id "${auth_token}")"
+  export JWT_ROAI_TOKEN="${auth_token}"
+  if [[ -n "${user_id}" ]]; then
+    export ROAI_USER_ID="${user_id}"
+  fi
+
+  echo "bootstrapped isolated ROAI user${user_id:+ (userId=${user_id})}"
+}
+
 decode_jwt_user_id() {
   local jwt_token="$1"
   if [[ -z "${jwt_token}" ]]; then
@@ -593,11 +630,12 @@ fi
 bootstrap_legacy_user
 
 # Seed ROAI calculator fixtures (requires psql + DATABASE_URL).
-if [[ -n "${resolved_database_url}" && -n "${JWT_USER_TOKEN:-}" ]]; then
+if [[ -n "${resolved_database_url}" ]]; then
+  bootstrap_roai_user
   LEGACY_BASE_URL="${LEGACY_BASE_URL}" \
-  JWT_USER_TOKEN="${JWT_USER_TOKEN}" \
+  JWT_ROAI_TOKEN="${JWT_ROAI_TOKEN}" \
   DATABASE_URL="${resolved_database_url}" \
-  source "$(dirname "${BASH_SOURCE[0]}")/run-seed-roai.sh" || true
+  source "$(dirname "${BASH_SOURCE[0]}")/run-seed-roai.sh"
 fi
 
 if health_check "${GO_BASE_URL}" "${GO_HEALTH_PATH}"; then

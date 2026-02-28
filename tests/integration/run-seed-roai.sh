@@ -8,24 +8,26 @@
 #
 # Required env vars (passed by run.sh):
 #   LEGACY_BASE_URL   — base URL for the NestJS API
-#   JWT_USER_TOKEN    — JWT for the bootstrapped test user
+#   JWT_ROAI_TOKEN    — JWT for an isolated ROAI-only test user
 #   DATABASE_URL      — Postgres connection string (for psql inserts)
 #
 # Exports on success:
-#   ROAI_ACCOUNT_ID        — account used for ROAI orders
-#   ROAI_BTCUSD_ORDER_ID   — BTC buy order
-#   ROAI_MSFT_BUY_ORDER_ID — MSFT buy order
-#   ROAI_MSFT_DIV_ORDER_ID — MSFT dividend order
-#   ROAI_NOVN_BUY_ORDER_ID — NOVN buy order
-#   ROAI_NOVN_SELL_ORDER_ID— NOVN sell order
-#   ROAI_BALN_BUY_ORDER_ID — BALN buy order
-#   ROAI_BALN_SELL_ORDER_ID— BALN sell order
-#   ROAI_SEEDED=1          — flag indicating seed completed
+#   ROAI_ACCOUNT_ID         — USD account used for ROAI orders
+#   ROAI_CHF_ACCOUNT_ID     — CHF account used for ROAI orders
+#   ROAI_BTCUSD_ORDER_ID    — BTC buy order
+#   ROAI_MSFT_BUY_ORDER_ID  — MSFT buy order
+#   ROAI_MSFT_DIV_ORDER_ID  — MSFT dividend order
+#   ROAI_NOVN_BUY_ORDER_ID  — NOVN buy order
+#   ROAI_NOVN_SELL_ORDER_ID — NOVN sell order
+#   ROAI_BALN_BUY_ORDER_ID  — BALN buy order
+#   ROAI_BALN_SELL_ORDER_ID — BALN sell order
+#   ROAI_SEEDED=1           — flag indicating full deterministic seed completed
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
 LEGACY_BASE_URL="${LEGACY_BASE_URL:?LEGACY_BASE_URL is required}"
-JWT_USER_TOKEN="${JWT_USER_TOKEN:?JWT_USER_TOKEN is required}"
+JWT_ROAI_TOKEN="${JWT_ROAI_TOKEN:-${JWT_USER_TOKEN:-}}"
+JWT_ROAI_TOKEN="${JWT_ROAI_TOKEN:?JWT_ROAI_TOKEN is required}"
 DATABASE_URL="${DATABASE_URL:?DATABASE_URL is required}"
 
 if ! command -v psql >/dev/null 2>&1; then
@@ -38,45 +40,52 @@ if ! command -v jq >/dev/null 2>&1; then
   return 0 2>/dev/null || exit 0
 fi
 
+fail() {
+  echo "roai-seed: $*" >&2
+  return 1
+}
+
 api() {
   local method="$1" path="$2"
   shift 2
   curl -fsS -X "${method}" "${LEGACY_BASE_URL}${path}" \
-    -H "Authorization: Bearer ${JWT_USER_TOKEN}" \
+    -H "Authorization: Bearer ${JWT_ROAI_TOKEN}" \
     -H "Content-Type: application/json" \
-    "$@" 2>/dev/null
+    "$@"
 }
 
 sql() {
-  psql "${DATABASE_URL}" -Atqc "$1" 2>/dev/null
+  psql "${DATABASE_URL}" -Atqc "$1"
 }
 
 echo "roai-seed: seeding ROAI calculator fixtures..."
 
 # --------------------------------------------------------------------------
-# 1. Create a dedicated account for ROAI test orders (USD)
+# 1. Create dedicated accounts for ROAI test orders (isolated user)
 # --------------------------------------------------------------------------
-roai_acct_response="$(api POST "/api/v1/account" \
-  -d '{"balance":0,"currency":"USD","name":"roai-test","platformId":null,"isExcluded":false}' || true)"
-roai_acct_id="$(printf '%s' "${roai_acct_response}" | jq -r '.id // empty' || true)"
+suffix="$(date +%s)-$RANDOM"
 
+roai_acct_response="$(api POST "/api/v1/account" \
+  -d "{\"balance\":0,\"currency\":\"USD\",\"name\":\"roai-test-${suffix}\",\"platformId\":null,\"isExcluded\":false}")"
+roai_acct_id="$(printf '%s' "${roai_acct_response}" | jq -r '.id // empty')"
 if [[ -z "${roai_acct_id}" ]]; then
-  echo "roai-seed: failed to create ROAI test account, skipping" >&2
-  return 0 2>/dev/null || exit 0
+  fail "failed to create ROAI USD account"
 fi
 export ROAI_ACCOUNT_ID="${roai_acct_id}"
 
-# Also create a CHF account for CHF-denominated orders
 roai_chf_acct_response="$(api POST "/api/v1/account" \
-  -d '{"balance":0,"currency":"CHF","name":"roai-test-chf","platformId":null,"isExcluded":false}' || true)"
-roai_chf_acct_id="$(printf '%s' "${roai_chf_acct_response}" | jq -r '.id // empty' || true)"
+  -d "{\"balance\":0,\"currency\":\"CHF\",\"name\":\"roai-test-chf-${suffix}\",\"platformId\":null,\"isExcluded\":false}")"
+roai_chf_acct_id="$(printf '%s' "${roai_chf_acct_response}" | jq -r '.id // empty')"
+if [[ -z "${roai_chf_acct_id}" ]]; then
+  fail "failed to create ROAI CHF account"
+fi
+export ROAI_CHF_ACCOUNT_ID="${roai_chf_acct_id}"
 
 # --------------------------------------------------------------------------
 # 2. Seed SymbolProfiles via psql (no public API for this)
-#    ON CONFLICT DO NOTHING so re-runs are safe.
 # --------------------------------------------------------------------------
 seed_symbol_profile() {
-  local symbol="$1" currency="$2" data_source="$3" name="$4"
+  local symbol="$1" currency="$2" data_source="$3"
   sql "INSERT INTO \"SymbolProfile\" (
          id, symbol, currency, \"dataSource\", \"isActive\", \"createdAt\", \"updatedAt\"
        ) VALUES (
@@ -84,14 +93,13 @@ seed_symbol_profile() {
        ) ON CONFLICT (\"dataSource\", symbol) DO NOTHING;"
 }
 
-seed_symbol_profile "BTCUSD"  "USD" "YAHOO" "Bitcoin USD"
-seed_symbol_profile "MSFT"    "USD" "YAHOO" "Microsoft Corporation"
-seed_symbol_profile "NOVN.SW" "CHF" "YAHOO" "Novartis AG"
-seed_symbol_profile "BALN.SW" "CHF" "YAHOO" "Baloise Holding AG"
+seed_symbol_profile "BTCUSD" "USD" "YAHOO"
+seed_symbol_profile "MSFT" "USD" "YAHOO"
+seed_symbol_profile "NOVN.SW" "CHF" "YAHOO"
+seed_symbol_profile "BALN.SW" "CHF" "YAHOO"
 
 # --------------------------------------------------------------------------
 # 3. Seed MarketData via psql
-#    These are the exact mock prices from the ROAI spec files.
 # --------------------------------------------------------------------------
 seed_market_data() {
   local symbol="$1" data_source="$2" date_str="$3" price="$4"
@@ -104,24 +112,16 @@ seed_market_data() {
          SET \"marketPrice\" = EXCLUDED.\"marketPrice\";"
 }
 
-# BTCUSD prices (from portfolio-calculator-btcusd.spec.ts)
-# System time: 2022-01-14
 seed_market_data "BTCUSD" "YAHOO" "2021-12-12" 50098.3
 seed_market_data "BTCUSD" "YAHOO" "2022-01-14" 43099.7
 
-# MSFT prices (from portfolio-calculator-msft-buy-with-dividend.spec.ts)
-# System time: 2023-07-10
 seed_market_data "MSFT" "YAHOO" "2021-09-16" 89.12
 seed_market_data "MSFT" "YAHOO" "2021-11-16" 339.51
 seed_market_data "MSFT" "YAHOO" "2023-07-09" 337.22
 seed_market_data "MSFT" "YAHOO" "2023-07-10" 331.83
 
-# NOVN.SW prices (from portfolio-calculator-novn-buy-and-sell.spec.ts)
-# System time: 2022-04-11
 seed_market_data "NOVN.SW" "YAHOO" "2022-04-11" 87.8
 
-# BALN.SW prices (from portfolio-calculator-baln-buy-and-sell.spec.ts)
-# System time: 2021-12-18
 seed_market_data "BALN.SW" "YAHOO" "2021-11-12" 146
 seed_market_data "BALN.SW" "YAHOO" "2021-11-22" 142.9
 seed_market_data "BALN.SW" "YAHOO" "2021-11-26" 139.9
@@ -130,13 +130,6 @@ seed_market_data "BALN.SW" "YAHOO" "2021-12-12" 142.0
 seed_market_data "BALN.SW" "YAHOO" "2021-12-17" 143.9
 seed_market_data "BALN.SW" "YAHOO" "2021-12-18" 148.9
 
-# --------------------------------------------------------------------------
-# 4. Seed exchange rates via psql (stored in MarketData as currency pairs)
-#    The NestJS ExchangeRateDataService reads from MarketData with
-#    synthetic pair symbols like "USDCHF".
-# --------------------------------------------------------------------------
-
-# USD→CHF rates used by CHF-base-currency tests
 seed_market_data "USDCHF" "YAHOO" "2015-01-01" 0.9941099999999999
 seed_market_data "USDCHF" "YAHOO" "2017-12-31" 0.9787
 seed_market_data "USDCHF" "YAHOO" "2018-01-01" 0.97373
@@ -149,7 +142,7 @@ seed_market_data "USDCHF" "YAHOO" "2023-01-03" 0.9238
 seed_market_data "USDCHF" "YAHOO" "2023-07-10" 0.8854
 
 # --------------------------------------------------------------------------
-# 5. Create orders via the legacy API (ensures both APIs see them)
+# 4. Create orders via the legacy API (both APIs read same DB state)
 # --------------------------------------------------------------------------
 create_order() {
   local acct_id="$1" currency="$2" data_source="$3" date="$4" fee="$5"
@@ -179,72 +172,42 @@ create_order() {
     }')"
 
   local resp
-  resp="$(api POST "/api/v1/order" -d "${body}" || true)"
-  printf '%s' "${resp}" | jq -r '.id // empty' 2>/dev/null || true
+  local order_id
+  resp="$(api POST "/api/v1/order" -d "${body}")"
+  order_id="$(printf '%s' "${resp}" | jq -r '.id // empty' 2>/dev/null || true)"
+  if [[ -z "${order_id}" ]]; then
+    fail "failed to create order ${type} ${symbol} on ${date}"
+  fi
+  printf '%s' "${order_id}"
 }
 
-# -- BTCUSD: BUY 1 @ 44558.42, fee 4.46, 2021-12-12 --
-btcusd_order_id="$(create_order "${roai_acct_id}" "USD" "YAHOO" \
-  "2021-12-12T00:00:00.000Z" 4.46 1 "BTCUSD" "BUY" 44558.42)"
-if [[ -n "${btcusd_order_id}" ]]; then
-  export ROAI_BTCUSD_ORDER_ID="${btcusd_order_id}"
-fi
-
-# -- MSFT: BUY 1 @ 298.58, fee 19, 2021-09-16 --
-msft_buy_id="$(create_order "${roai_acct_id}" "USD" "YAHOO" \
-  "2021-09-16T00:00:00.000Z" 19 1 "MSFT" "BUY" 298.58)"
-if [[ -n "${msft_buy_id}" ]]; then
-  export ROAI_MSFT_BUY_ORDER_ID="${msft_buy_id}"
-fi
-
-# -- MSFT: DIVIDEND 1 @ 0.62, fee 0, 2021-11-16 --
-msft_div_id="$(create_order "${roai_acct_id}" "USD" "YAHOO" \
-  "2021-11-16T00:00:00.000Z" 0 1 "MSFT" "DIVIDEND" 0.62)"
-if [[ -n "${msft_div_id}" ]]; then
-  export ROAI_MSFT_DIV_ORDER_ID="${msft_div_id}"
-fi
-
-# -- NOVN.SW: BUY 2 @ 75.8, fee 0, 2022-03-07 --
-chf_acct="${roai_chf_acct_id:-${roai_acct_id}}"
-novn_buy_id="$(create_order "${chf_acct}" "CHF" "YAHOO" \
-  "2022-03-07T00:00:00.000Z" 0 2 "NOVN.SW" "BUY" 75.8)"
-if [[ -n "${novn_buy_id}" ]]; then
-  export ROAI_NOVN_BUY_ORDER_ID="${novn_buy_id}"
-fi
-
-# -- NOVN.SW: SELL 2 @ 85.73, fee 0, 2022-04-08 --
-novn_sell_id="$(create_order "${chf_acct}" "CHF" "YAHOO" \
-  "2022-04-08T00:00:00.000Z" 0 2 "NOVN.SW" "SELL" 85.73)"
-if [[ -n "${novn_sell_id}" ]]; then
-  export ROAI_NOVN_SELL_ORDER_ID="${novn_sell_id}"
-fi
-
-# -- BALN.SW: BUY 2 @ 142.9, fee 1.55, 2021-11-22 --
-baln_buy_id="$(create_order "${chf_acct}" "CHF" "YAHOO" \
-  "2021-11-22T00:00:00.000Z" 1.55 2 "BALN.SW" "BUY" 142.9)"
-if [[ -n "${baln_buy_id}" ]]; then
-  export ROAI_BALN_BUY_ORDER_ID="${baln_buy_id}"
-fi
-
-# -- BALN.SW: SELL 2 @ 136.6, fee 1.65, 2021-11-30 --
-baln_sell_id="$(create_order "${chf_acct}" "CHF" "YAHOO" \
-  "2021-11-30T00:00:00.000Z" 1.65 2 "BALN.SW" "SELL" 136.6)"
-if [[ -n "${baln_sell_id}" ]]; then
-  export ROAI_BALN_SELL_ORDER_ID="${baln_sell_id}"
-fi
+export ROAI_BTCUSD_ORDER_ID="$(create_order "${roai_acct_id}" "USD" "YAHOO" "2021-12-12T00:00:00.000Z" 4.46 1 "BTCUSD" "BUY" 44558.42)"
+export ROAI_MSFT_BUY_ORDER_ID="$(create_order "${roai_acct_id}" "USD" "YAHOO" "2021-09-16T00:00:00.000Z" 19 1 "MSFT" "BUY" 298.58)"
+export ROAI_MSFT_DIV_ORDER_ID="$(create_order "${roai_acct_id}" "USD" "YAHOO" "2021-11-16T00:00:00.000Z" 0 1 "MSFT" "DIVIDEND" 0.62)"
+export ROAI_NOVN_BUY_ORDER_ID="$(create_order "${roai_chf_acct_id}" "CHF" "YAHOO" "2022-03-07T00:00:00.000Z" 0 2 "NOVN.SW" "BUY" 75.8)"
+export ROAI_NOVN_SELL_ORDER_ID="$(create_order "${roai_chf_acct_id}" "CHF" "YAHOO" "2022-04-08T00:00:00.000Z" 0 2 "NOVN.SW" "SELL" 85.73)"
+export ROAI_BALN_BUY_ORDER_ID="$(create_order "${roai_chf_acct_id}" "CHF" "YAHOO" "2021-11-22T00:00:00.000Z" 1.55 2 "BALN.SW" "BUY" 142.9)"
+export ROAI_BALN_SELL_ORDER_ID="$(create_order "${roai_chf_acct_id}" "CHF" "YAHOO" "2021-11-30T00:00:00.000Z" 1.65 2 "BALN.SW" "SELL" 136.6)"
 
 # --------------------------------------------------------------------------
-# Summary
+# 5. Enforce full seed completeness before enabling ROAI cases
 # --------------------------------------------------------------------------
-seeded=0
-for var in ROAI_BTCUSD_ORDER_ID ROAI_MSFT_BUY_ORDER_ID ROAI_NOVN_BUY_ORDER_ID ROAI_BALN_BUY_ORDER_ID; do
-  if [[ -n "${!var:-}" ]]; then
-    seeded=$((seeded + 1))
+required_vars=(
+  ROAI_ACCOUNT_ID
+  ROAI_CHF_ACCOUNT_ID
+  ROAI_BTCUSD_ORDER_ID
+  ROAI_MSFT_BUY_ORDER_ID
+  ROAI_MSFT_DIV_ORDER_ID
+  ROAI_NOVN_BUY_ORDER_ID
+  ROAI_NOVN_SELL_ORDER_ID
+  ROAI_BALN_BUY_ORDER_ID
+  ROAI_BALN_SELL_ORDER_ID
+)
+for var in "${required_vars[@]}"; do
+  if [[ -z "${!var:-}" ]]; then
+    fail "missing required seeded value: ${var}"
   fi
 done
 
-echo "roai-seed: seeded ${seeded}/4 ROAI scenarios (BTCUSD=${ROAI_BTCUSD_ORDER_ID:-skip}, MSFT=${ROAI_MSFT_BUY_ORDER_ID:-skip}, NOVN=${ROAI_NOVN_BUY_ORDER_ID:-skip}, BALN=${ROAI_BALN_BUY_ORDER_ID:-skip})"
-
-if [[ "${seeded}" -gt 0 ]]; then
-  export ROAI_SEEDED=1
-fi
+export ROAI_SEEDED=1
+echo "roai-seed: complete (ROAI_SEEDED=1, ROAI account=${ROAI_ACCOUNT_ID}, ROAI CHF account=${ROAI_CHF_ACCOUNT_ID})"
