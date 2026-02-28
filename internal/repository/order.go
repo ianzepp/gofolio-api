@@ -199,6 +199,7 @@ type OrderWithProfile struct {
 	SPUrl           *string         `db:"sp_url"`
 	SPCountries     json.RawMessage `db:"sp_countries"`
 	SPSectors       json.RawMessage `db:"sp_sectors"`
+	TagIDs          json.RawMessage `db:"tag_ids"`
 }
 
 // FindActiveByUserIDWithProfile returns all non-draft orders for a user, joined
@@ -219,10 +220,17 @@ func (r *OrderRepository) FindActiveByUserIDWithProfile(ctx context.Context, use
 		        sp."userId" AS "sp_userId",
 		        sp.name AS sp_name,
 		        sp.url AS sp_url,
-		        sp.countries AS sp_countries,
-		        sp.sectors AS sp_sectors
+		        COALESCE(sp.countries, '[]'::jsonb) AS sp_countries,
+		        COALESCE(sp.sectors, '[]'::jsonb) AS sp_sectors,
+		        COALESCE(tags.tag_ids, '[]'::json) AS tag_ids
 		 FROM "Order" o
 		 JOIN "SymbolProfile" sp ON o."symbolProfileId" = sp.id
+		 LEFT JOIN LATERAL (
+		   SELECT json_agg(t.id ORDER BY t.id) AS tag_ids
+		   FROM "_OrderToTag" ot
+		   JOIN "Tag" t ON t.id = ot."B"
+		   WHERE ot."A" = o.id
+		 ) tags ON TRUE
 		 WHERE o."userId" = $1 AND o."isDraft" = false
 		 ORDER BY o.date ASC`, userID)
 	if err != nil {

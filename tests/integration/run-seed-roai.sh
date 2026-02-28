@@ -98,6 +98,28 @@ seed_symbol_profile "MSFT" "USD" "YAHOO"
 seed_symbol_profile "NOVN.SW" "CHF" "YAHOO"
 seed_symbol_profile "BALN.SW" "CHF" "YAHOO"
 
+# Ensure core ROAI symbols carry deterministic metadata used by holdings/detail
+# parity checks.
+sql "UPDATE \"SymbolProfile\"
+     SET name = 'Bitcoin USD',
+         url = 'https://bitcoin.org/',
+         countries = '[]'::jsonb,
+         sectors = '[]'::jsonb,
+         \"assetClass\" = 'LIQUIDITY'::\"AssetClass\",
+         \"assetSubClass\" = 'CRYPTOCURRENCY'::\"AssetSubClass\",
+         \"updatedAt\" = NOW()
+     WHERE \"dataSource\" = 'YAHOO' AND symbol = 'BTCUSD';"
+
+sql "UPDATE \"SymbolProfile\"
+     SET name = 'Microsoft Corporation',
+         url = 'https://www.microsoft.com',
+         countries = '[{\"code\":\"US\",\"continent\":\"North America\",\"name\":\"United States\",\"weight\":1}]'::jsonb,
+         sectors = '[{\"name\":\"Technology\",\"weight\":1}]'::jsonb,
+         \"assetClass\" = 'EQUITY'::\"AssetClass\",
+         \"assetSubClass\" = 'STOCK'::\"AssetSubClass\",
+         \"updatedAt\" = NOW()
+     WHERE \"dataSource\" = 'YAHOO' AND symbol = 'MSFT';"
+
 # --------------------------------------------------------------------------
 # 3. Seed MarketData via psql
 # --------------------------------------------------------------------------

@@ -20,6 +20,10 @@ type PortfolioService struct {
 	userService  *UserService
 }
 
+func assetKey(dataSource string, symbol string) string {
+	return dataSource + "|" + symbol
+}
+
 // NewPortfolioService constructs a PortfolioService.
 func NewPortfolioService(db *sqlx.DB, exchangeRate *ExchangeRateService, userService *UserService) *PortfolioService {
 	return &PortfolioService{
@@ -87,6 +91,16 @@ func (s *PortfolioService) buildCalculator(ctx context.Context, userID string, f
 		if len(o.SPSectors) > 0 {
 			_ = json.Unmarshal(o.SPSectors, &sectors)
 		}
+		var tags []calculator.Tag
+		if len(o.TagIDs) > 0 {
+			var tagIDs []string
+			if json.Unmarshal(o.TagIDs, &tagIDs) == nil {
+				tags = make([]calculator.Tag, 0, len(tagIDs))
+				for _, tagID := range tagIDs {
+					tags = append(tags, calculator.Tag{ID: tagID})
+				}
+			}
+		}
 		a := calculator.Activity{
 			Date:              calculator.FormatDate(o.Date),
 			Fee:               decimal.NewFromFloat(o.Fee),
@@ -100,7 +114,7 @@ func (s *PortfolioService) buildCalculator(ctx context.Context, userID string, f
 			AssetClass:        assetClass,
 			AssetSubClass:     assetSubClass,
 			UserID:            spUserID,
-			Tags:              []calculator.Tag{},
+			Tags:              tags,
 			AccountID:         accountID,
 			Name:              name,
 			URL:               url,
@@ -171,8 +185,25 @@ func matchesFilter(a calculator.Activity, f *PortfolioFilter) bool {
 	if f.Symbol != "" && a.Symbol != f.Symbol {
 		return false
 	}
-	// Tag filtering requires tags on activities; skip for now since tags aren't
-	// populated on activities yet (would need order↔tag join in repository).
+	if len(f.Tags) > 0 {
+		if len(a.Tags) == 0 {
+			return false
+		}
+		tagSet := map[string]bool{}
+		for _, t := range a.Tags {
+			tagSet[t.ID] = true
+		}
+		matched := false
+		for _, tagID := range f.Tags {
+			if tagSet[tagID] {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
 	return true
 }
 
@@ -263,8 +294,9 @@ func (s *PortfolioService) GetHoldings(ctx context.Context, userID string, dateR
 	// Build profile lookup from calculator activities
 	profileMap := map[string]symbolProfileInfo{}
 	for _, a := range calc.GetActivities() {
-		if _, ok := profileMap[a.Symbol]; !ok {
-			profileMap[a.Symbol] = symbolProfileInfo{
+		key := assetKey(a.DataSource, a.Symbol)
+		if _, ok := profileMap[key]; !ok {
+			profileMap[key] = symbolProfileInfo{
 				Name:          a.Name,
 				AssetClass:    a.AssetClass,
 				AssetSubClass: a.AssetSubClass,
@@ -298,7 +330,7 @@ func (s *PortfolioService) GetHoldings(ctx context.Context, userID string, dateR
 		var assetClass, assetSubClass, url *string
 		countries := []any{}
 		sectors := []any{}
-		if info, ok := profileMap[pos.Symbol]; ok {
+		if info, ok := profileMap[assetKey(pos.DataSource, pos.Symbol)]; ok {
 			if info.Name != "" {
 				displayName = info.Name
 			}
@@ -611,8 +643,9 @@ func (s *PortfolioService) GetHolding(ctx context.Context, userID string, dataSo
 	// Build profile lookup from calculator activities
 	profileMap := map[string]symbolProfileInfo{}
 	for _, a := range calc.GetActivities() {
-		if _, ok := profileMap[a.Symbol]; !ok {
-			profileMap[a.Symbol] = symbolProfileInfo{
+		key := assetKey(a.DataSource, a.Symbol)
+		if _, ok := profileMap[key]; !ok {
+			profileMap[key] = symbolProfileInfo{
 				Name:          a.Name,
 				AssetClass:    a.AssetClass,
 				AssetSubClass: a.AssetSubClass,
@@ -646,7 +679,7 @@ func (s *PortfolioService) GetHolding(ctx context.Context, userID string, dataSo
 	var assetClass, assetSubClass, url *string
 	countries := []any{}
 	sectors := []any{}
-	if info, ok := profileMap[found.Symbol]; ok {
+	if info, ok := profileMap[assetKey(found.DataSource, found.Symbol)]; ok {
 		if info.Name != "" {
 			displayName = info.Name
 		}
