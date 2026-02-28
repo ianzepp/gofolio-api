@@ -320,6 +320,12 @@ func (s *PortfolioService) GetHoldings(ctx context.Context, userID string, dateR
 
 	holdings := make([]PortfolioHolding, 0, len(snapshot.Positions))
 	for _, pos := range snapshot.Positions {
+		// Legacy parity: default holdings/details exclude closed positions
+		// (quantity == 0) unless an explicit closed-holding filter is applied.
+		if pos.Quantity.Equal(decimal.Zero) {
+			continue
+		}
+
 		allocation := 0.0
 		if totalValue > 0 {
 			allocation = pos.ValueInBaseCurrency.InexactFloat64() / totalValue
@@ -422,6 +428,15 @@ func (s *PortfolioService) GetHoldings(ctx context.Context, userID string, dateR
 
 // GetDetails returns portfolio details.
 func (s *PortfolioService) GetDetails(ctx context.Context, userID string, dateRange string, filters *PortfolioFilter) (*PortfolioDetailsResponse, error) {
+	calc, baseCurrency, err := s.buildCalculator(ctx, userID, filters)
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := s.computeSnapshot(ctx, calc, baseCurrency)
+	if err != nil {
+		return nil, err
+	}
+
 	holdingsResp, err := s.GetHoldings(ctx, userID, dateRange, filters)
 	if err != nil {
 		return nil, err
@@ -434,7 +449,7 @@ func (s *PortfolioService) GetDetails(ctx context.Context, userID string, dateRa
 
 	return &PortfolioDetailsResponse{
 		Accounts: map[string]AccountDetail{},
-		HasError: false,
+		HasError: snapshot.HasErrors,
 		Holdings: holdingsMap,
 	}, nil
 }

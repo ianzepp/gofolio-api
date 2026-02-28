@@ -267,7 +267,7 @@ func main() {
 	mux.HandleFunc("PUT /api/v1/portfolio/holding/{dataSource}/{symbol}/tags", auth.RequirePermission(authCfg, auth.UpdateOrder, handler.HandleUpdatePortfolioHoldingTags))
 	mux.HandleFunc("GET /api/v1/portfolio/holdings", auth.Authenticate(authCfg, handler.GetPortfolioHoldings(deps)))
 	mux.HandleFunc("GET /api/v1/portfolio/investments", auth.Authenticate(authCfg, handler.GetPortfolioInvestments(deps)))
-	mux.HandleFunc("GET /api/v1/portfolio/performance", auth.Authenticate(authCfg, handler.GetPortfolioPerformance(deps)))
+	mux.HandleFunc("GET /api/v1/portfolio/performance", handler.GetPortfolioPerformance(deps))
 	mux.HandleFunc("GET /api/v1/portfolio/report", auth.Authenticate(authCfg, handler.GetPortfolioReport(deps)))
 
 	// Public

@@ -19,8 +19,6 @@
 #   ROAI_MSFT_DIV_ORDER_ID  — MSFT dividend order
 #   ROAI_NOVN_BUY_ORDER_ID  — NOVN buy order
 #   ROAI_NOVN_SELL_ORDER_ID — NOVN sell order
-#   ROAI_BALN_BUY_ORDER_ID  — BALN buy order
-#   ROAI_BALN_SELL_ORDER_ID — BALN sell order
 #   ROAI_SEEDED=1           — flag indicating full deterministic seed completed
 # ---------------------------------------------------------------------------
 set -euo pipefail
@@ -96,7 +94,6 @@ seed_symbol_profile() {
 seed_symbol_profile "BTCUSD" "USD" "YAHOO"
 seed_symbol_profile "MSFT" "USD" "YAHOO"
 seed_symbol_profile "NOVN.SW" "CHF" "YAHOO"
-seed_symbol_profile "BALN.SW" "CHF" "YAHOO"
 
 # Ensure core ROAI symbols carry deterministic metadata used by holdings/detail
 # parity checks.
@@ -144,14 +141,6 @@ seed_market_data "MSFT" "YAHOO" "2023-07-10" 331.83
 
 seed_market_data "NOVN.SW" "YAHOO" "2022-04-11" 87.8
 
-seed_market_data "BALN.SW" "YAHOO" "2021-11-12" 146
-seed_market_data "BALN.SW" "YAHOO" "2021-11-22" 142.9
-seed_market_data "BALN.SW" "YAHOO" "2021-11-26" 139.9
-seed_market_data "BALN.SW" "YAHOO" "2021-11-30" 136.6
-seed_market_data "BALN.SW" "YAHOO" "2021-12-12" 142.0
-seed_market_data "BALN.SW" "YAHOO" "2021-12-17" 143.9
-seed_market_data "BALN.SW" "YAHOO" "2021-12-18" 148.9
-
 seed_market_data "USDCHF" "YAHOO" "2015-01-01" 0.9941099999999999
 seed_market_data "USDCHF" "YAHOO" "2017-12-31" 0.9787
 seed_market_data "USDCHF" "YAHOO" "2018-01-01" 0.97373
@@ -193,9 +182,8 @@ insert_order() {
 sp_btcusd_id="$(symbol_profile_id "YAHOO" "BTCUSD")"
 sp_msft_id="$(symbol_profile_id "YAHOO" "MSFT")"
 sp_novn_id="$(symbol_profile_id "YAHOO" "NOVN.SW")"
-sp_baln_id="$(symbol_profile_id "YAHOO" "BALN.SW")"
 
-for sp_var in sp_btcusd_id sp_msft_id sp_novn_id sp_baln_id; do
+for sp_var in sp_btcusd_id sp_msft_id sp_novn_id; do
   if [[ -z "${!sp_var:-}" ]]; then
     fail "missing symbol profile id for ${sp_var}"
   fi
@@ -211,8 +199,6 @@ export ROAI_MSFT_BUY_ORDER_ID="$(insert_order "${roai_acct_id}" "${roai_user_id}
 export ROAI_MSFT_DIV_ORDER_ID="$(insert_order "${roai_acct_id}" "${roai_user_id}" "${roai_user_id}" "USD" "2021-11-16T00:00:00.000Z" 0 1 "${sp_msft_id}" "DIVIDEND" 0.62)"
 export ROAI_NOVN_BUY_ORDER_ID="$(insert_order "${roai_chf_acct_id}" "${roai_user_id}" "${roai_user_id}" "CHF" "2022-03-07T00:00:00.000Z" 0 2 "${sp_novn_id}" "BUY" 75.8)"
 export ROAI_NOVN_SELL_ORDER_ID="$(insert_order "${roai_chf_acct_id}" "${roai_user_id}" "${roai_user_id}" "CHF" "2022-04-08T00:00:00.000Z" 0 2 "${sp_novn_id}" "SELL" 85.73)"
-export ROAI_BALN_BUY_ORDER_ID="$(insert_order "${roai_chf_acct_id}" "${roai_user_id}" "${roai_user_id}" "CHF" "2021-11-22T00:00:00.000Z" 1.55 2 "${sp_baln_id}" "BUY" 142.9)"
-export ROAI_BALN_SELL_ORDER_ID="$(insert_order "${roai_chf_acct_id}" "${roai_user_id}" "${roai_user_id}" "CHF" "2021-11-30T00:00:00.000Z" 1.65 2 "${sp_baln_id}" "SELL" 136.6)"
 
 # --------------------------------------------------------------------------
 # 5. Enforce full seed completeness before enabling ROAI cases
@@ -225,8 +211,6 @@ required_vars=(
   ROAI_MSFT_DIV_ORDER_ID
   ROAI_NOVN_BUY_ORDER_ID
   ROAI_NOVN_SELL_ORDER_ID
-  ROAI_BALN_BUY_ORDER_ID
-  ROAI_BALN_SELL_ORDER_ID
 )
 for var in "${required_vars[@]}"; do
   if [[ -z "${!var:-}" ]]; then

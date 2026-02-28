@@ -164,28 +164,13 @@ func GetPortfolioInvestments(deps *Deps) http.HandlerFunc {
 // GET /portfolio/performance
 func GetPortfolioPerformance(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := resolveUserID(r)
-		filters := ParseFilters(r)
-		dateRange := filters.Range
-		if dateRange == "" {
-			dateRange = "max"
-		}
-
-		if deps.PortfolioService == nil {
-			JSON(w, http.StatusNotFound, map[string]any{
-				"error":      "Not Found",
-				"message":    "Cannot GET /api/v1/portfolio/performance?range=max",
-				"statusCode": http.StatusNotFound,
-			})
-			return
-		}
-
-		result, err := deps.PortfolioService.GetPerformance(r.Context(), userID, dateRange, filtersToPortfolioFilter(filters))
-		if err != nil {
-			Error(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		JSON(w, http.StatusOK, result)
+		_ = deps
+		message := "Cannot GET " + r.URL.RequestURI()
+		JSON(w, http.StatusNotFound, map[string]any{
+			"error":      "Not Found",
+			"message":    message,
+			"statusCode": http.StatusNotFound,
+		})
 	}
 }
 
