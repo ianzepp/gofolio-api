@@ -22,11 +22,13 @@ Routes + request/response shape:
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 func GetAccesses(deps *Deps) http.HandlerFunc {
@@ -110,9 +112,21 @@ func DeleteAccess(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
 		id := r.PathValue("id")
-		if err := deps.AccessService.DeleteAccess(r.Context(), id); err != nil {
+		count, err := deps.AccessService.DeleteAccessByUserID(r.Context(), id, userID)
+		if err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if count == 0 {
+			// Legacy parity: non-owned/non-existent access delete returns forbidden.
+			Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 			return
 		}
 		JSON(w, http.StatusOK, map[string]any{})
@@ -126,6 +140,12 @@ func UpdateAccess(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
 		id := r.PathValue("id")
 		var body struct {
 			Alias       *string          `json:"alias"`
@@ -136,8 +156,13 @@ func UpdateAccess(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		updated, err := deps.AccessService.UpdateAccess(r.Context(), id, body.Alias, body.Permissions, body.Settings)
+		updated, err := deps.AccessService.UpdateAccessByUserID(r.Context(), id, userID, body.Alias, body.Permissions, body.Settings)
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				// Legacy parity: non-owned/non-existent access update returns forbidden.
+				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+				return
+			}
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
 		}

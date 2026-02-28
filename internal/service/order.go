@@ -26,6 +26,11 @@ func (s *OrderService) GetOrder(ctx context.Context, id string) (model.Order, er
 	return repo.FindByID(ctx, id)
 }
 
+func (s *OrderService) GetOrderByUserID(ctx context.Context, id string, userID string) (model.Order, error) {
+	repo := repository.NewOrderRepository(s.pool)
+	return repo.FindByIDAndUserID(ctx, id, userID)
+}
+
 func (s *OrderService) CreateOrder(ctx context.Context, order model.Order) (model.Order, error) {
 	repo := repository.NewOrderRepository(s.pool)
 	return repo.Create(ctx, order)
@@ -36,9 +41,19 @@ func (s *OrderService) UpdateOrder(ctx context.Context, order model.Order) (mode
 	return repo.Update(ctx, order)
 }
 
+func (s *OrderService) UpdateOrderByUserID(ctx context.Context, order model.Order, userID string) (model.Order, error) {
+	repo := repository.NewOrderRepository(s.pool)
+	return repo.UpdateByUserID(ctx, order, userID)
+}
+
 func (s *OrderService) DeleteOrder(ctx context.Context, id string) error {
 	repo := repository.NewOrderRepository(s.pool)
 	return repo.Delete(ctx, id)
+}
+
+func (s *OrderService) DeleteOrderByUserID(ctx context.Context, id string, userID string) (int64, error) {
+	repo := repository.NewOrderRepository(s.pool)
+	return repo.DeleteByIDAndUserID(ctx, id, userID)
 }
 
 func (s *OrderService) DeleteOrdersByUserID(ctx context.Context, userID string) (int64, error) {

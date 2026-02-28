@@ -44,6 +44,17 @@ func (r *OrderRepository) FindByID(ctx context.Context, id string) (model.Order,
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
 }
 
+func (r *OrderRepository) FindByIDAndUserID(ctx context.Context, id string, userID string) (model.Order, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT `+orderColumns+`
+		 FROM "Order"
+		 WHERE id = $1 AND "userId" = $2`, id, userID)
+	if err != nil {
+		return model.Order{}, fmt.Errorf("query order by user: %w", err)
+	}
+	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
+}
+
 func (r *OrderRepository) Create(ctx context.Context, order model.Order) (model.Order, error) {
 	rows, err := r.db.Query(ctx,
 		`INSERT INTO "Order" (id, "accountId", "accountUserId", comment,
@@ -78,12 +89,38 @@ func (r *OrderRepository) Update(ctx context.Context, order model.Order) (model.
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
 }
 
+func (r *OrderRepository) UpdateByUserID(ctx context.Context, order model.Order, userID string) (model.Order, error) {
+	rows, err := r.db.Query(ctx,
+		`UPDATE "Order"
+		 SET "accountId" = $2, "accountUserId" = $3, comment = $4,
+		     currency = $5, date = $6, fee = $7, "isDraft" = $8,
+		     quantity = $9, "symbolProfileId" = $10, type = $11,
+		     "unitPrice" = $12
+		 WHERE id = $1 AND "userId" = $13
+		 RETURNING `+orderColumns,
+		order.ID, order.AccountId, order.AccountUserId, order.Comment,
+		order.Currency, order.Date, order.Fee, order.IsDraft, order.Quantity,
+		order.SymbolProfileId, order.Type, order.UnitPrice, userID)
+	if err != nil {
+		return model.Order{}, fmt.Errorf("update order by user: %w", err)
+	}
+	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Order])
+}
+
 func (r *OrderRepository) Delete(ctx context.Context, id string) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM "Order" WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("delete order: %w", err)
 	}
 	return nil
+}
+
+func (r *OrderRepository) DeleteByIDAndUserID(ctx context.Context, id string, userID string) (int64, error) {
+	tag, err := r.db.Exec(ctx, `DELETE FROM "Order" WHERE id = $1 AND "userId" = $2`, id, userID)
+	if err != nil {
+		return 0, fmt.Errorf("delete order by user: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }
 
 func (r *OrderRepository) DeleteByUserID(ctx context.Context, userID string) (int64, error) {

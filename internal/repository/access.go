@@ -44,6 +44,17 @@ func (r *AccessRepository) FindByID(ctx context.Context, id string) (model.Acces
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Access])
 }
 
+func (r *AccessRepository) FindByIDAndUserID(ctx context.Context, id string, userID string) (model.Access, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT `+accessColumns+`
+		 FROM "Access"
+		 WHERE id = $1 AND "userId" = $2`, id, userID)
+	if err != nil {
+		return model.Access{}, fmt.Errorf("query access by user: %w", err)
+	}
+	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Access])
+}
+
 func (r *AccessRepository) Create(ctx context.Context, a model.Access) (model.Access, error) {
 	rows, err := r.db.Query(ctx,
 		`INSERT INTO "Access" (id, alias, "granteeUserId", permissions,
@@ -71,10 +82,31 @@ func (r *AccessRepository) Update(ctx context.Context, id string, alias *string,
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Access])
 }
 
+func (r *AccessRepository) UpdateByUserID(ctx context.Context, id string, userID string, alias *string, permissions []string, settings json.RawMessage) (model.Access, error) {
+	rows, err := r.db.Query(ctx,
+		`UPDATE "Access"
+		 SET alias = $3, permissions = $4, settings = $5
+		 WHERE id = $1 AND "userId" = $2
+		 RETURNING `+accessColumns,
+		id, userID, alias, permissions, settings)
+	if err != nil {
+		return model.Access{}, fmt.Errorf("update access by user: %w", err)
+	}
+	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.Access])
+}
+
 func (r *AccessRepository) Delete(ctx context.Context, id string) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM "Access" WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("delete access: %w", err)
 	}
 	return nil
+}
+
+func (r *AccessRepository) DeleteByUserID(ctx context.Context, id string, userID string) (int64, error) {
+	tag, err := r.db.Exec(ctx, `DELETE FROM "Access" WHERE id = $1 AND "userId" = $2`, id, userID)
+	if err != nil {
+		return 0, fmt.Errorf("delete access by user: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }

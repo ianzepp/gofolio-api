@@ -27,12 +27,14 @@ Routes + request/response shape:
 */
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 func GetOrders(deps *Deps) http.HandlerFunc {
@@ -134,9 +136,23 @@ func GetOrder(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+		if impID := Impersonation(r); impID != "" {
+			userID = impID
+		}
+
 		id := r.PathValue("id")
-		order, err := deps.OrderService.GetOrder(r.Context(), id)
+		order, err := deps.OrderService.GetOrderByUserID(r.Context(), id, userID)
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				// Legacy parity: returns not found when order is not visible to user.
+				Error(w, http.StatusNotFound, http.StatusText(http.StatusNotFound))
+				return
+			}
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -151,7 +167,25 @@ func UpdateOrder(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
 		id := r.PathValue("id")
+
+		// Legacy parity: ownership/visibility check happens before update.
+		_, err := deps.OrderService.GetOrderByUserID(r.Context(), id, userID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+				return
+			}
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
 		var body struct {
 			AccountId       *string        `json:"accountId"`
 			AccountUserId   *string        `json:"accountUserId"`
@@ -184,8 +218,12 @@ func UpdateOrder(deps *Deps) http.HandlerFunc {
 			UnitPrice:       body.UnitPrice,
 		}
 
-		updated, err := deps.OrderService.UpdateOrder(r.Context(), order)
+		updated, err := deps.OrderService.UpdateOrderByUserID(r.Context(), order, userID)
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+				return
+			}
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -200,9 +238,21 @@ func DeleteOrder(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
 		id := r.PathValue("id")
-		if err := deps.OrderService.DeleteOrder(r.Context(), id); err != nil {
+		count, err := deps.OrderService.DeleteOrderByUserID(r.Context(), id, userID)
+		if err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if count == 0 {
+			// Legacy parity: returns forbidden when order is not owned by caller.
+			Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 			return
 		}
 		JSON(w, http.StatusOK, map[string]any{})
