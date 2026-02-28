@@ -10,6 +10,7 @@ import (
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/handler"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/provider"
 	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -35,20 +36,29 @@ func main() {
 			log.Printf("database connected")
 			dbPool = pool
 			poolCloser = pool.Close
+			// Initialize data providers
+			yahooProvider := provider.NewYahooFinanceProvider()
+			manualProvider := provider.NewManualProvider(pool)
+			providers := []provider.DataProvider{yahooProvider, manualProvider}
+			dataProviderSvc := service.NewDataProviderService(pool, providers)
+			symbolSvc := service.NewSymbolService(pool, dataProviderSvc)
+
 			deps = &handler.Deps{
 				AccountBalanceService: service.NewAccountBalanceService(pool),
 				AccountService:        service.NewAccountService(pool),
 				AccessService:         service.NewAccessService(pool),
-				AdminService:      service.NewAdminService(pool),
-				AssetService:      service.NewAssetService(pool),
-				BenchmarkService:  service.NewBenchmarkService(pool),
-				ExportService:     service.NewExportService(pool),
-				InfoService:       service.NewInfoService(pool),
-				MarketDataService: service.NewMarketDataService(pool),
-				OrderService:      service.NewOrderService(pool),
-				PlatformService:   service.NewPlatformService(pool),
-				TagService:        service.NewTagService(pool),
-				UserService:       service.NewUserService(pool),
+				AdminService:          service.NewAdminService(pool),
+				AssetService:          service.NewAssetService(pool),
+				BenchmarkService:      service.NewBenchmarkService(pool),
+				DataProviderService:   dataProviderSvc,
+				ExportService:         service.NewExportService(pool),
+				InfoService:           service.NewInfoService(pool),
+				MarketDataService:     service.NewMarketDataService(pool),
+				OrderService:          service.NewOrderService(pool),
+				PlatformService:       service.NewPlatformService(pool),
+				SymbolService:         symbolSvc,
+				TagService:            service.NewTagService(pool),
+				UserService:           service.NewUserService(pool),
 			}
 		}
 	}
@@ -149,12 +159,12 @@ func main() {
 	mux.HandleFunc("POST /api/v1/cache/flush", handler.HandleFlushCache)
 
 	// Data Providers
-	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/asset-profile/{symbol}", handler.HandleGetDataProviderAssetProfile)
-	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/dividends/{symbol}", handler.HandleGetDataProviderDividends)
-	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/historical/{symbol}", handler.HandleGetDataProviderHistorical)
-	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/lookup", handler.HandleDataProviderLookup)
-	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/quotes", handler.HandleGetDataProviderQuotes)
-	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/status", handler.HandleGetDataProviderStatus)
+	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/asset-profile/{symbol}", handler.GetDataProviderAssetProfile(deps))
+	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/dividends/{symbol}", handler.GetDataProviderDividends(deps))
+	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/historical/{symbol}", handler.GetDataProviderHistorical(deps))
+	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/lookup", handler.DataProviderLookup(deps))
+	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/quotes", handler.GetDataProviderQuotes(deps))
+	mux.HandleFunc("GET /api/v1/data-providers/ghostfolio/status", handler.GetDataProviderStatus(deps))
 
 	// Exchange Rate
 	mux.HandleFunc("GET /api/v1/exchange-rate/{symbol}/{dateString}", handler.HandleGetExchangeRate)
@@ -222,9 +232,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/subscription/stripe/checkout-session", handler.HandleCreateStripeCheckoutSession)
 
 	// Symbol
-	mux.HandleFunc("GET /api/v1/symbol/lookup", auth.Authenticate(authCfg, handler.HandleSymbolLookup))
-	mux.HandleFunc("GET /api/v1/symbol/{dataSource}/{symbol}", handler.HandleGetSymbol)
-	mux.HandleFunc("GET /api/v1/symbol/{dataSource}/{symbol}/{dateString}", auth.Authenticate(authCfg, handler.HandleGetSymbolByDate))
+	mux.HandleFunc("GET /api/v1/symbol/lookup", auth.Authenticate(authCfg, handler.SymbolLookup(deps)))
+	mux.HandleFunc("GET /api/v1/symbol/{dataSource}/{symbol}", handler.GetSymbol(deps))
+	mux.HandleFunc("GET /api/v1/symbol/{dataSource}/{symbol}/{dateString}", auth.Authenticate(authCfg, handler.GetSymbolByDate(deps)))
 
 	// Tags
 	mux.HandleFunc("GET /api/v1/tags", auth.RequirePermission(authCfg, auth.ReadTags, handler.GetTags(deps)))

@@ -70,6 +70,35 @@ func (r *MarketDataRepository) FindLatestByDataSourceAndSymbol(ctx context.Conte
 	return pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[model.MarketData])
 }
 
+func (r *MarketDataRepository) FindLatestBySymbols(ctx context.Context, dataSource string, symbols []string) ([]model.MarketData, error) {
+	if len(symbols) == 0 {
+		return []model.MarketData{}, nil
+	}
+	rows, err := r.db.Query(ctx,
+		`SELECT DISTINCT ON (symbol) `+marketDataColumns+`
+		 FROM "MarketData"
+		 WHERE "dataSource" = $1 AND symbol = ANY($2)
+		 ORDER BY symbol, date DESC`, dataSource, symbols)
+	if err != nil {
+		return nil, fmt.Errorf("query latest market data by symbols: %w", err)
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByName[model.MarketData])
+}
+
+func (r *MarketDataRepository) UpsertMarketPrice(ctx context.Context, dataSource string, symbol string, date time.Time, price float64, state model.MarketDataState) error {
+	_, err := r.db.Exec(ctx,
+		`INSERT INTO "MarketData" (id, "dataSource", date, "marketPrice", state, symbol)
+		 VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)
+		 ON CONFLICT ("dataSource", date, symbol) DO UPDATE
+		   SET "marketPrice" = EXCLUDED."marketPrice",
+		       state = EXCLUDED.state`,
+		dataSource, date, price, state, symbol)
+	if err != nil {
+		return fmt.Errorf("upsert market price: %w", err)
+	}
+	return nil
+}
+
 func (r *MarketDataRepository) Create(ctx context.Context, md model.MarketData) (model.MarketData, error) {
 	rows, err := r.db.Query(ctx,
 		`INSERT INTO "MarketData" (id, "dataSource", date, "marketPrice", state, symbol)

@@ -70,6 +70,21 @@ func (r *SymbolProfileRepository) FindByIDs(ctx context.Context, ids []string) (
 	return pgx.CollectRows(rows, pgx.RowToStructByName[model.SymbolProfile])
 }
 
+func (r *SymbolProfileRepository) SearchByQuery(ctx context.Context, dataSource string, query string) ([]model.SymbolProfile, error) {
+	pattern := "%" + query + "%"
+	rows, err := r.db.Query(ctx,
+		`SELECT `+symbolProfileColumns+`
+		 FROM "SymbolProfile"
+		 WHERE "dataSource" = $1
+		   AND (name ILIKE $2 OR symbol ILIKE $2)
+		 ORDER BY symbol ASC
+		 LIMIT 50`, dataSource, pattern)
+	if err != nil {
+		return nil, fmt.Errorf("search symbol profiles: %w", err)
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByName[model.SymbolProfile])
+}
+
 func (r *SymbolProfileRepository) FindAll(ctx context.Context) ([]model.SymbolProfile, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+symbolProfileColumns+`
