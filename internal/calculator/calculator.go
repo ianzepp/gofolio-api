@@ -207,7 +207,7 @@ func (c *Calculator) ComputeSnapshot(marketData MarketData, exchangeRates Exchan
 		daysInMarket = 1
 	}
 
-	maxChartItems := 1000
+	maxChartItems := 365 // must match legacy MAX_CHART_ITEMS default
 	step := int(math.Round(float64(daysInMarket) / math.Min(float64(daysInMarket), float64(maxChartItems))))
 	if step < 1 {
 		step = 1
