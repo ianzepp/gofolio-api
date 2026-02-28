@@ -96,37 +96,38 @@ These are required for the Angular frontend to load and render the main views.
 | GET    | `/symbol/lookup`         | Symbol search                   |
 | PUT    | `/user/setting`          | Update user settings            |
 
-### Phase 2 — CRUD works (25 endpoints)
+### Phase 2 — CRUD works (26 endpoints)
 
-| Method | Path                             | Purpose                |
-| ------ | -------------------------------- | ---------------------- |
-| POST   | `/order`                         | Create activity        |
-| PUT    | `/order/:id`                     | Update activity        |
-| DELETE | `/order/:id`                     | Delete activity        |
-| DELETE | `/order`                         | Bulk delete activities |
-| GET    | `/order/:id`                     | Get single activity    |
-| POST   | `/account`                       | Create account         |
-| PUT    | `/account/:id`                   | Update account         |
-| DELETE | `/account/:id`                   | Delete account         |
-| GET    | `/account/:id`                   | Get single account     |
-| GET    | `/account/:id/balances`          | Get account balances   |
-| POST   | `/account/transfer-balance`      | Transfer balance       |
-| POST   | `/account-balance`               | Create account balance |
-| DELETE | `/account-balance/:id`           | Delete account balance |
-| POST   | `/tags`                          | Create tag             |
-| PUT    | `/tags/:id`                      | Update tag             |
-| DELETE | `/tags/:id`                      | Delete tag             |
-| POST   | `/platform`                      | Create platform        |
-| PUT    | `/platform/:id`                  | Update platform        |
-| DELETE | `/platform/:id`                  | Delete platform        |
-| POST   | `/watchlist`                     | Add watchlist item     |
-| DELETE | `/watchlist/:dataSource/:symbol` | Remove watchlist item  |
-| GET    | `/access`                        | Get access grants      |
-| POST   | `/access`                        | Create access grant    |
-| PUT    | `/access/:id`                    | Update access grant    |
-| DELETE | `/access/:id`                    | Delete access grant    |
+| Method | Path                             | Purpose                       |
+| ------ | -------------------------------- | ----------------------------- |
+| POST   | `/order`                         | Create activity               |
+| PUT    | `/order/:id`                     | Update activity               |
+| DELETE | `/order/:id`                     | Delete activity               |
+| DELETE | `/order`                         | Bulk delete activities        |
+| GET    | `/order/:id`                     | Get single activity           |
+| POST   | `/account`                       | Create account                |
+| PUT    | `/account/:id`                   | Update account                |
+| DELETE | `/account/:id`                   | Delete account                |
+| GET    | `/account/:id`                   | Get single account            |
+| GET    | `/account/:id/balances`          | Get account balances          |
+| POST   | `/account/transfer-balance`      | Transfer balance              |
+| POST   | `/account-balance`               | Create account balance        |
+| DELETE | `/account-balance/:id`           | Delete account balance        |
+| POST   | `/tags`                          | Create tag                    |
+| PUT    | `/tags/:id`                      | Update tag                    |
+| DELETE | `/tags/:id`                      | Delete tag                    |
+| POST   | `/platform`                      | Create platform               |
+| GET    | `/platform`                      | Platforms with account counts |
+| PUT    | `/platform/:id`                  | Update platform               |
+| DELETE | `/platform/:id`                  | Delete platform               |
+| POST   | `/watchlist`                     | Add watchlist item            |
+| DELETE | `/watchlist/:dataSource/:symbol` | Remove watchlist item         |
+| GET    | `/access`                        | Get access grants             |
+| POST   | `/access`                        | Create access grant           |
+| PUT    | `/access/:id`                    | Update access grant           |
+| DELETE | `/access/:id`                    | Delete access grant           |
 
-### Phase 3 — Full feature parity (remaining ~110 endpoints)
+### Phase 3 — Full feature parity (remaining ~75 endpoints)
 
 #### Portfolio (remaining)
 
