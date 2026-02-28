@@ -1,36 +1,100 @@
 package handler
 
-/*
-Stub parity reference:
-Original NestJS controller(s):
-- apps/api/src/app/account-balance/account-balance.controller.ts
+import (
+	"net/http"
+	"time"
 
-Routes + request/response shape:
-- POST /api/v1/account-balance (HandleCreateAccountBalance)
-  Request: body data: CreateAccountBalanceDto
-  Auth/permission: jwt / permissions.createAccountBalance
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-- DELETE /api/v1/account-balance/{id} (HandleDeleteAccountBalance)
-  Request: path id: string (arg: 'id')
-  Auth/permission: jwt / permissions.deleteAccountBalance
-  Response: currently stubbed (placeholder; implement to match Nest behavior).
-*/
-
-import "net/http"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
+	"github.com/google/uuid"
+)
 
 // HandleCreateAccountBalance handles POST /account-balance
-func HandleCreateAccountBalance(w http.ResponseWriter, r *http.Request) {
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+// NestJS: validates account ownership, upserts by (accountId, date).
+func HandleCreateAccountBalance(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AccountBalanceService == nil || deps.AccountService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
+		var body struct {
+			AccountId string  `json:"accountId"`
+			Balance   float64 `json:"balance"`
+			Date      string  `json:"date"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		if body.AccountId == "" || body.Date == "" {
+			Error(w, http.StatusBadRequest, "accountId and date are required")
+			return
+		}
+
+		// Validate account ownership (matches NestJS controller check).
+		_, err := deps.AccountService.GetAccount(r.Context(), body.AccountId, userID)
+		if err != nil {
+			Error(w, http.StatusNotFound, http.StatusText(http.StatusNotFound))
+			return
+		}
+
+		date, parseErr := time.Parse("2006-01-02", body.Date)
+		if parseErr != nil {
+			// Try ISO8601 with time component
+			date, parseErr = time.Parse(time.RFC3339, body.Date)
+			if parseErr != nil {
+				Error(w, http.StatusBadRequest, "invalid date format")
+				return
+			}
+		}
+		date = repository.ResetHours(date)
+
+		ab := model.AccountBalance{
+			ID:        uuid.New().String(),
+			AccountId: body.AccountId,
+			UserId:    userID,
+			Date:      date,
+			Value:     body.Balance,
+		}
+
+		created, err := deps.AccountBalanceService.CreateOrUpdateAccountBalance(r.Context(), ab)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusCreated, created)
 	}
-	_ = body
-	JSON(w, http.StatusCreated, map[string]any{})
 }
 
 // HandleDeleteAccountBalance handles DELETE /account-balance/:id
-func HandleDeleteAccountBalance(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	_ = id
-	JSON(w, http.StatusOK, map[string]any{})
+// NestJS: validates ownership, returns the deleted record.
+func HandleDeleteAccountBalance(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AccountBalanceService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+			return
+		}
+
+		id := r.PathValue("id")
+		deleted, err := deps.AccountBalanceService.DeleteAccountBalance(r.Context(), id, userID)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, deleted)
+	}
 }

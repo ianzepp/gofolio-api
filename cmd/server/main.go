@@ -36,8 +36,9 @@ func main() {
 			dbPool = pool
 			poolCloser = pool.Close
 			deps = &handler.Deps{
-				AccountService:    service.NewAccountService(pool),
-				AccessService:     service.NewAccessService(pool),
+				AccountBalanceService: service.NewAccountBalanceService(pool),
+				AccountService:        service.NewAccountService(pool),
+				AccessService:         service.NewAccessService(pool),
 				AdminService:      service.NewAdminService(pool),
 				AssetService:      service.NewAssetService(pool),
 				BenchmarkService:  service.NewBenchmarkService(pool),
@@ -79,8 +80,8 @@ func main() {
 	mux.HandleFunc("GET /api/v1/account/{id}/balances", auth.Authenticate(authCfg, handler.GetAccountBalances(deps)))
 
 	// Account Balance
-	mux.HandleFunc("POST /api/v1/account-balance", auth.RequirePermission(authCfg, auth.CreateAccountBalance, handler.HandleCreateAccountBalance))
-	mux.HandleFunc("DELETE /api/v1/account-balance/{id}", auth.RequirePermission(authCfg, auth.DeleteAccountBalance, handler.HandleDeleteAccountBalance))
+	mux.HandleFunc("POST /api/v1/account-balance", auth.RequirePermission(authCfg, auth.CreateAccountBalance, handler.HandleCreateAccountBalance(deps)))
+	mux.HandleFunc("DELETE /api/v1/account-balance/{id}", auth.RequirePermission(authCfg, auth.DeleteAccountBalance, handler.HandleDeleteAccountBalance(deps)))
 
 	// Admin
 	mux.HandleFunc("GET /api/v1/admin", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdmin(deps)))

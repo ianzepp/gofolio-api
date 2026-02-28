@@ -264,7 +264,7 @@ func UpdateAccount(deps *Deps) http.HandlerFunc {
 
 func GetAccountBalances(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if deps == nil || deps.AccountService == nil {
+		if deps == nil || deps.AccountBalanceService == nil {
 			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
 			return
 		}
@@ -275,9 +275,20 @@ func GetAccountBalances(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Legacy parity: returns { balances: [] }
-		// AccountBalance queries need a dedicated repo method; stub for now.
-		JSON(w, http.StatusOK, map[string]any{"balances": []any{}})
+		if impID := Impersonation(r); impID != "" {
+			userID = impID
+		}
+
+		accountID := r.PathValue("id")
+		balances, err := deps.AccountBalanceService.GetAccountBalances(r.Context(), accountID, userID)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if balances == nil {
+			balances = []model.AccountBalance{}
+		}
+		JSON(w, http.StatusOK, map[string]any{"balances": balances})
 	}
 }
 
