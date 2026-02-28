@@ -110,6 +110,239 @@ Current totals across all fixture files:
 - `37` JSON-compare cases
 - `20` fixture files (1:1 with handler files)
 
+## Fixture Catalog
+
+Each fixture file contains an array of test-case objects. Case names and modes:
+
+### `access.json` (4)
+
+- `access-delete-foreign-id-forbidden-parity` (`status`)
+- `access-update-foreign-id-forbidden-parity` (`status`)
+- `access-get-no-auth-unauthorized` (`status`)
+- `access-get-user-json-parity` (`json`)
+
+### `account.json` (12)
+
+- `account-transfer-missing-accounts-not-found-parity` (`status`)
+- `account-transfer-same-account-bad-request-parity` (`status`)
+- `account-transfer-insufficient-funds-bad-request-parity` (`status`)
+- `account-get-no-auth-unauthorized` (`status`)
+- `account-get-no-auth-unauthorized-json-parity` (`json`)
+- `account-transfer-no-auth-unauthorized` (`status`)
+- `account-get-by-id-no-auth-unauthorized` (`status`)
+- `account-get-by-id-user-ok-parity` (`status`)
+- `account-get-by-id-user-json-parity` (`json`)
+- `account-balances-no-auth-unauthorized` (`status`)
+- `account-balances-user-ok-parity` (`status`)
+- `account-get-json-parity` (`json`)
+
+### `account_balance.json` (5)
+
+- `account-balance-post-no-auth-unauthorized` (`status`)
+- `account-balance-delete-no-auth-unauthorized` (`status`)
+- `account-balance-post-foreign-account-forbidden-parity` (`status`)
+- `account-balance-delete-foreign-id-forbidden-parity` (`status`)
+- `account-balance-post-user-created-parity` (`status`)
+
+### `admin.json` (16)
+
+- `admin-get-no-auth-unauthorized` (`status`)
+- `admin-get-user-forbidden-parity` (`status`)
+- `admin-get-user-forbidden-json-parity` (`json`)
+- `admin-get-admin-ok-parity` (`status`)
+- `admin-market-data-no-auth-unauthorized` (`status`)
+- `admin-market-data-user-forbidden-parity` (`status`)
+- `admin-market-data-admin-ok-parity` (`status`)
+- `admin-market-data-admin-query-json-parity` (`json`)
+- `admin-market-data-admin-sort-json-parity` (`json`)
+- `admin-users-no-auth-unauthorized` (`status`)
+- `admin-users-user-forbidden-parity` (`status`)
+- `admin-users-admin-ok-parity` (`status`)
+- `admin-user-by-id-no-auth-unauthorized` (`status`)
+- `admin-user-by-id-admin-ok-parity` (`status`)
+- `admin-user-by-id-admin-missing-not-found-parity` (`status`)
+- `admin-user-by-id-admin-invalid-format-parity` (`status`)
+
+### `asset.json` (3)
+
+- `asset-get-status-parity` (`status`)
+- `asset-get-missing-symbol-json-parity` (`json`)
+- `asset-get-missing-symbol-fallback-parity` (`status`)
+
+### `benchmark.json` (6)
+
+- `benchmarks-post-no-auth-unauthorized` (`status`)
+- `benchmarks-post-user-forbidden-parity` (`status`)
+- `benchmarks-delete-no-auth-unauthorized` (`status`)
+- `benchmarks-detail-no-auth-unauthorized` (`status`)
+- `benchmarks-get-status-parity` (`status`)
+- `benchmarks-get-json-parity` (`json`)
+
+### `data_provider.json` (8)
+
+- `data-provider-ghostfolio-asset-profile-no-auth-unauthorized` (`status`)
+- `data-provider-ghostfolio-dividends-no-auth-unauthorized` (`status`)
+- `data-provider-ghostfolio-historical-no-auth-unauthorized` (`status`)
+- `data-provider-ghostfolio-lookup-no-auth-unauthorized` (`status`)
+- `data-provider-ghostfolio-quotes-no-auth-unauthorized` (`status`)
+- `data-provider-ghostfolio-status-no-auth-unauthorized` (`status`)
+- `data-provider-ghostfolio-lookup-empty-query-status-parity` (`status`)
+- `data-provider-ghostfolio-status-api-key-status-parity` (`status`)
+
+### `exchange_rate.json` (3)
+
+- `exchange-rate-no-auth-unauthorized` (`status`)
+- `exchange-rate-auth-status-parity` (`status`)
+- `exchange-rate-unknown-pair-status-parity` (`status`)
+
+### `export.json` (12)
+
+- `export-no-auth-unauthorized` (`status`)
+- `export-no-auth-unauthorized-json-parity` (`json`)
+- `export-user-ok-parity` (`status`)
+- `export-user-filtered-account-json-parity` (`json`)
+- `export-user-filtered-symbol-json-parity` (`json`)
+- `export-user-filtered-activity-id-json-parity` (`json`)
+- `export-user-filtered-account-and-activity-id-json-parity` (`json`)
+- `export-user-filtered-data-source-json-parity` (`json`)
+- `export-user-filtered-activity-ids-multi-json-parity` (`json`)
+- `export-user-filtered-symbol-msft-json-parity` (`json`)
+- `export-user-filtered-account-to-and-activity-id-json-parity` (`json`)
+- `export-user-filtered-account-and-activity-mismatch-json-parity` (`json`)
+
+### `health.json` (3)
+
+- `health-basic-status` (`status`)
+- `health-data-enhancer-status` (`status`)
+- `health-data-provider-status` (`status`)
+
+### `info.json` (2)
+
+- `info-status` (`status`)
+- `info-json-parity` (`json`)
+
+### `logo.json` (3)
+
+- `logo-by-url-status-parity` (`status`)
+- `logo-by-url-missing-url-status-parity` (`status`)
+- `logo-by-symbol-unknown-status-parity` (`status`)
+
+### `market_data.json` (7)
+
+- `market-data-by-symbol-no-auth-unauthorized` (`status`)
+- `market-data-by-symbol-no-auth-unauthorized-json-parity` (`json`)
+- `market-data-by-symbol-user-common-forbidden-parity` (`status`)
+- `market-data-by-symbol-user-common-forbidden-json-parity` (`json`)
+- `market-data-by-symbol-admin-common-ok-parity` (`status`)
+- `market-data-by-symbol-missing-noncurrency-not-found-parity` (`status`)
+- `market-data-by-symbol-missing-currency-fallback-parity` (`status`)
+
+### `order.json` (8)
+
+- `order-delete-empty-user-json-parity` (`json`)
+- `order-get-foreign-id-not-found-parity` (`status`)
+- `order-delete-foreign-id-forbidden-parity` (`status`)
+- `order-update-foreign-id-forbidden-parity` (`status`)
+- `order-get-no-auth-unauthorized` (`status`)
+- `order-get-no-auth-unauthorized-json-parity` (`json`)
+- `order-delete-no-auth-unauthorized` (`status`)
+- `order-get-json-parity` (`json`)
+
+### `platform.json` (10)
+
+- `platforms-get-user-ok-parity` (`status`)
+- `platform-get-user-forbidden-parity` (`status`)
+- `platform-get-user-forbidden-json-parity` (`json`)
+- `platforms-get-no-auth-unauthorized` (`status`)
+- `platform-get-no-auth-unauthorized` (`status`)
+- `platform-create-user-forbidden-parity` (`status`)
+- `platform-update-user-forbidden-parity` (`status`)
+- `platform-delete-user-forbidden-parity` (`status`)
+- `platform-update-admin-foreign-id-forbidden-parity` (`status`)
+- `platform-delete-admin-foreign-id-forbidden-parity` (`status`)
+
+### `portfolio.json` (38)
+
+- `portfolio-holdings-authed` (`status`)
+- `portfolio-holdings-unauthed` (`status`)
+- `portfolio-details-authed` (`status`)
+- `portfolio-details-unauthed` (`status`)
+- `portfolio-details-range-1y` (`status`)
+- `portfolio-details-range-ytd` (`status`)
+- `portfolio-performance-authed` (`status`)
+- `portfolio-performance-unauthed` (`status`)
+- `portfolio-performance-range-1d` (`status`)
+- `portfolio-performance-range-1y` (`status`)
+- `portfolio-performance-range-ytd` (`status`)
+- `portfolio-dividends-authed` (`status`)
+- `portfolio-dividends-unauthed` (`status`)
+- `portfolio-investments-authed` (`status`)
+- `portfolio-investments-unauthed` (`status`)
+- `portfolio-investments-group-by-month` (`status`)
+- `portfolio-investments-group-by-year` (`status`)
+- `portfolio-report-authed` (`status`)
+- `portfolio-report-unauthed` (`status`)
+- `portfolio-holding-aapl-authed` (`status`)
+- `portfolio-holding-msft-authed` (`status`)
+- `portfolio-holding-unknown-symbol` (`status`)
+- `portfolio-holding-unauthed` (`status`)
+- `portfolio-holdings-filter-by-account` (`status`)
+- `portfolio-details-filter-by-account` (`status`)
+- `portfolio-performance-filter-by-account` (`status`)
+- `portfolio-holdings-empty-user` (`status`)
+- `portfolio-details-empty-user` (`status`)
+- `portfolio-performance-empty-user` (`status`)
+- `portfolio-holding-tags-update-unauthed` (`status`)
+- `roai-holdings-json` (`json`)
+- `roai-details-json` (`json`)
+- `roai-performance-max-json` (`json`)
+- `roai-holding-btcusd-json` (`json`)
+- `roai-holding-msft-json` (`json`)
+- `roai-dividends-json` (`json`)
+- `roai-investments-json` (`json`)
+- `roai-holdings-filter-roai-account-json` (`json`)
+
+### `symbol.json` (4)
+
+- `symbol-lookup-no-auth-unauthorized` (`status`)
+- `symbol-by-date-no-auth-unauthorized` (`status`)
+- `symbol-get-invalid-data-source-not-found-parity` (`status`)
+- `symbol-get-missing-symbol-not-found-parity` (`status`)
+
+### `tag.json` (7)
+
+- `tags-get-no-auth-unauthorized` (`status`)
+- `tags-get-invalid-bearer-unauthorized` (`status`)
+- `tags-get-api-key-user-parity` (`status`)
+- `tags-get-user-json-parity` (`json`)
+- `tags-post-user-missing-user-id-parity` (`status`)
+- `tags-post-user-foreign-user-id-parity` (`status`)
+- `tags-post-demo-forbidden-parity` (`status`)
+
+### `user.json` (8)
+
+- `user-access-token-wrong-token-forbidden-parity` (`status`)
+- `user-delete-own-wrong-token-forbidden-parity` (`status`)
+- `user-admin-access-token-existing-user-created-parity` (`status`)
+- `user-admin-access-token-foreign-id-parity` (`status`)
+- `user-signup-public-created-parity` (`status`)
+- `user-get-no-auth-unauthorized` (`status`)
+- `user-delete-self-by-id-admin-forbidden-parity` (`status`)
+- `user-get-json-parity` (`json`)
+
+### `watchlist.json` (10)
+
+- `watchlist-get-no-auth-unauthorized` (`status`)
+- `watchlist-post-no-auth-unauthorized` (`status`)
+- `watchlist-delete-no-auth-unauthorized` (`status`)
+- `watchlist-get-no-auth-unauthorized` (`status`)
+- `watchlist-get-auth-status-parity` (`status`)
+- `watchlist-get-empty-user-json-parity` (`json`)
+- `watchlist-create-no-auth-unauthorized` (`status`)
+- `watchlist-delete-no-auth-unauthorized` (`status`)
+- `watchlist-create-unknown-symbol-bad-request-parity` (`status`)
+- `watchlist-delete-unknown-symbol-not-found-parity` (`status`)
+
 ## Auth
 
 Cases can set `"auth"`:

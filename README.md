@@ -43,9 +43,18 @@ Go eliminates the ceremony. No decorators, no DI containers, no module system. F
 Current parity snapshot:
 
 - Differential harness: `169` cases total (`132` status + `37` JSON)
+- Differential pass rate (as of February 28, 2026): `162/169` passing
 - 18 services wired into handler `Deps` struct
 - 14 repository files, 13 model files, 3 provider files, 19 service files
-- ~11K LOC of Go (target: 15-18K for full parity)
+- `11,416` Go LOC in `apps/api-go` (`15,481` total file LOC in the tree)
+- Remaining parity failures are concentrated in ROAI portfolio-calculator responses:
+  - `roai-holdings-json`
+  - `roai-details-json`
+  - `roai-holding-btcusd-json`
+  - `roai-holding-msft-json`
+  - `roai-dividends-json`
+  - `roai-investments-json`
+  - `roai-holdings-filter-roai-account-json`
 - Remaining stub areas: `portfolio/*` (calculator), `auth/*` (OAuth/WebAuthn), `admin/queue/*`, `agent/*`, `subscription/*`, `import`
 
 ## Architecture
@@ -230,6 +239,7 @@ Current test pattern:
   - Run the same request fixtures against legacy NestJS and the Go API
   - Compare status (and JSON where configured) to detect parity regressions
   - Details: [`tests/integration/README.md`](./tests/integration/README.md)
+  - Full fixture/test-case inventory: see the `Fixture Catalog` section in [`tests/integration/README.md`](./tests/integration/README.md)
   - Fixtures split per handler in `testdata/*.json` (e.g. `account.json`, `portfolio.json`)
   - Current fixture count: `169` total (`132` status compare, `37` JSON compare) across `20` files
 
@@ -251,9 +261,16 @@ Run differential integration tests:
 
 ```bash
 cd apps/api-go
+./tests/integration/run.sh
+```
+
+Manual differential run (if both APIs are already running):
+
+```bash
+cd apps/api-go
 LEGACY_BASE_URL=http://localhost:3333 \
 GO_BASE_URL=http://localhost:3334 \
-go test ./tests/integration -v
+go test ./tests/integration -v -count=1
 ```
 
 ### Differential JSON comparison
