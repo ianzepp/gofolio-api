@@ -1,0 +1,26 @@
+[
+  {
+    "name": "health-basic-status",
+    "method": "GET",
+    "path": "/api/v1/health",
+    "mode": "status"
+  },
+  {
+    "name": "health-data-enhancer-status",
+    "method": "GET",
+    "path": "/api/v1/health/data-enhancer/yahoo-finance",
+    "mode": "status"
+  },
+  {
+    "name": "health-data-provider-status",
+    "method": "GET",
+    "path": "/api/v1/health/data-provider/YAHOO",
+    "mode": "status"
+  },
+  {
+    "name": "info-status",
+    "method": "GET",
+    "path": "/api/v1/info",
+    "mode": "status"
+  }
+]

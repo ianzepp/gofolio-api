@@ -63,6 +63,11 @@ go run ./cmd/server
 # Listens on :3333 — same port as the NestJS backend
 ```
 
+## Testing
+
+Differential integration tests (legacy NestJS vs Go API) live in
+[`tests/integration/README.md`](./tests/integration/README.md). This harness runs the same request cases against both servers and compares behavior.
+
 ## Route Surface
 
 All routes are prefixed with `/api/v1`.
