@@ -128,14 +128,19 @@ func (s *ExchangeRateService) GetExchangeRatesByCurrency(
 			mdByDate[dateStr] = md.MarketPrice
 		}
 
-		// Forward-fill rates across the date range
-		lastRate := 0.0
-		for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+		// Backward-fill rates across the date range (matching legacy behavior).
+		// Legacy seeds previousExchangeRate from the last date, defaulting to 1.
+		lastDateStr := endDate.Format("2006-01-02")
+		lastRate := 1.0
+		if r, ok := mdByDate[lastDateStr]; ok {
+			lastRate = r
+		}
+		for d := endDate; !d.Before(startDate); d = d.AddDate(0, 0, -1) {
 			dateStr := d.Format("2006-01-02")
 			if r, ok := mdByDate[dateStr]; ok {
 				lastRate = r
-			}
-			if lastRate > 0 {
+				rates[dateStr] = r
+			} else {
 				rates[dateStr] = lastRate
 			}
 		}
