@@ -319,3 +319,22 @@ func (r *OrderRepository) DeleteByUserID(ctx context.Context, userID string) (in
 	}
 	return result.RowsAffected()
 }
+
+// DeleteByIDs removes orders whose IDs are in the given slice and returns the
+// number of rows deleted. Used by the filtered bulk-delete endpoint.
+func (r *OrderRepository) DeleteByIDs(ctx context.Context, ids []string) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	query, args, err := sqlx.In(`DELETE FROM "Order" WHERE id IN (?)`, ids)
+	if err != nil {
+		return 0, fmt.Errorf("build delete-by-ids query: %w", err)
+	}
+	// Rebind from ? placeholders to $N for Postgres.
+	query = sqlx.Rebind(sqlx.DOLLAR, query)
+	result, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("delete orders by ids: %w", err)
+	}
+	return result.RowsAffected()
+}

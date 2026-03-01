@@ -39,14 +39,15 @@ Routes + request/response shape:
 */
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 	"time"
 
-	"database/sql"
 	"github.com/google/uuid"
 	"github.com/ianzepp/gofolio-api/internal/auth"
 	"github.com/ianzepp/gofolio-api/internal/model"
+	"github.com/ianzepp/gofolio-api/internal/service"
 )
 
 // GetOrders handles GET /api/v1/order. Results are returned under the key
@@ -284,13 +285,10 @@ func DeleteOrder(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// DeleteOrders handles DELETE /api/v1/order (bulk delete). Filter parameters are
-// parsed for future parity but currently ignored — the implementation deletes all
-// orders for the user. The response is the integer count of deleted rows, matching
-// the NestJS contract.
-//
-// NOTE: Filter support is tracked as a known divergence. When implemented it
-// should be wired through DeleteOrdersByUserIDWithFilters, not this handler.
+// DeleteOrders handles DELETE /api/v1/order (bulk delete). Matching legacy
+// behavior: orders are fetched with filters (accounts, assetClasses, tags),
+// then deleted by collected IDs. When no filters are provided, all orders
+// for the user are deleted. Response is the integer count of deleted rows.
 func DeleteOrders(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.OrderService == nil {
@@ -304,10 +302,13 @@ func DeleteOrders(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Legacy parity: bulk delete accepts filter params but current impl
-		// deletes all orders for the user.
-		_ = ParseFilters(r)
-		count, err := deps.OrderService.DeleteOrdersByUserID(r.Context(), userID)
+		// Legacy parity: fetch orders matching filters, then delete by IDs.
+		f := ParseFilters(r)
+		count, err := deps.OrderService.DeleteOrdersWithFilters(r.Context(), userID, service.OrderFilters{
+			Accounts:     f.Accounts,
+			AssetClasses: f.AssetClasses,
+			Tags:         f.Tags,
+		})
 		if err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
