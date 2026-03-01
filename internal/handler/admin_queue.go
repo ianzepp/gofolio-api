@@ -25,9 +25,8 @@ Routes + request/response shape:
 */
 
 import (
+	"fmt"
 	"net/http"
-
-	"github.com/ianzepp/gofolio-api/internal/queue"
 )
 
 // DELETE /admin/queue/job
@@ -87,9 +86,12 @@ func ExecuteQueueJob(deps *Deps) http.HandlerFunc {
 	}
 }
 
-func enqueueGatherJob(deps *Deps, r *http.Request, name string, data map[string]any) {
+func enqueueGatherJob(deps *Deps, r *http.Request, queueName, name string, data map[string]any) error {
 	if deps == nil || deps.QueueService == nil {
-		return
+		return nil
 	}
-	_, _ = deps.QueueService.Enqueue(r.Context(), queue.DataGatheringQueueName, name, data)
+	if _, err := deps.QueueService.Enqueue(r.Context(), queueName, name, data); err != nil {
+		return fmt.Errorf("enqueue job: %w", err)
+	}
+	return nil
 }

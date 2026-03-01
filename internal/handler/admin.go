@@ -122,9 +122,8 @@ func GetAdminUser(deps *Deps) http.HandlerFunc {
 // GET /admin/demo-user/sync
 func SyncDemoUser(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		enqueueGatherJob(deps, r, queue.JobComputePortfolioSnapshot, map[string]any{
-			"source": "admin/demo-user/sync",
-		})
+		_ = deps
+		_ = r
 		JSON(w, http.StatusOK, map[string]any{})
 	}
 }
@@ -132,9 +131,12 @@ func SyncDemoUser(deps *Deps) http.HandlerFunc {
 // POST /admin/gather
 func GatherData(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		enqueueGatherJob(deps, r, queue.JobGatherHistoricalMarketData, map[string]any{
+		if err := enqueueGatherJob(deps, r, queue.DataGatheringQueueName, queue.JobGatherHistoricalMarketData, map[string]any{
 			"mode": "default",
-		})
+		}); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		JSON(w, http.StatusOK, map[string]any{})
 	}
 }
@@ -146,11 +148,14 @@ func GatherDataForSymbol(deps *Deps) http.HandlerFunc {
 		symbol := r.PathValue("symbol")
 		dateRange := r.URL.Query().Get("range")
 
-		enqueueGatherJob(deps, r, queue.JobGatherHistoricalMarketData, map[string]any{
+		if err := enqueueGatherJob(deps, r, queue.DataGatheringQueueName, queue.JobGatherHistoricalMarketData, map[string]any{
 			"dataSource": dataSource,
 			"symbol":     symbol,
 			"range":      dateRange,
-		})
+		}); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		JSON(w, http.StatusOK, map[string]any{})
 	}
 }
@@ -162,11 +167,14 @@ func GatherDataForDate(deps *Deps) http.HandlerFunc {
 		symbol := r.PathValue("symbol")
 		dateString := r.PathValue("dateString")
 
-		enqueueGatherJob(deps, r, queue.JobGatherHistoricalMarketData, map[string]any{
+		if err := enqueueGatherJob(deps, r, queue.DataGatheringQueueName, queue.JobGatherHistoricalMarketData, map[string]any{
 			"dataSource": dataSource,
 			"symbol":     symbol,
 			"dateString": dateString,
-		})
+		}); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		JSON(w, http.StatusOK, map[string]any{})
 	}
 }
@@ -174,9 +182,12 @@ func GatherDataForDate(deps *Deps) http.HandlerFunc {
 // POST /admin/gather/max
 func GatherMax(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		enqueueGatherJob(deps, r, queue.JobGatherHistoricalMarketData, map[string]any{
+		if err := enqueueGatherJob(deps, r, queue.DataGatheringQueueName, queue.JobGatherHistoricalMarketData, map[string]any{
 			"mode": "max",
-		})
+		}); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		JSON(w, http.StatusOK, map[string]any{})
 	}
 }
@@ -184,9 +195,12 @@ func GatherMax(deps *Deps) http.HandlerFunc {
 // POST /admin/gather/profile-data
 func GatherProfileData(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		enqueueGatherJob(deps, r, queue.JobGatherAssetProfile, map[string]any{
+		if err := enqueueGatherJob(deps, r, queue.DataGatheringQueueName, queue.JobGatherAssetProfile, map[string]any{
 			"mode": "all",
-		})
+		}); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		JSON(w, http.StatusOK, map[string]any{})
 	}
 }
@@ -197,10 +211,13 @@ func GatherProfileDataForSymbol(deps *Deps) http.HandlerFunc {
 		dataSource := r.PathValue("dataSource")
 		symbol := r.PathValue("symbol")
 
-		enqueueGatherJob(deps, r, queue.JobGatherAssetProfile, map[string]any{
+		if err := enqueueGatherJob(deps, r, queue.DataGatheringQueueName, queue.JobGatherAssetProfile, map[string]any{
 			"dataSource": dataSource,
 			"symbol":     symbol,
-		})
+		}); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		JSON(w, http.StatusOK, map[string]any{})
 	}
 }
@@ -215,12 +232,15 @@ func TestMarketData(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		enqueueGatherJob(deps, r, queue.JobGatherHistoricalMarketData, map[string]any{
+		if err := enqueueGatherJob(deps, r, queue.DataGatheringQueueName, queue.JobGatherHistoricalMarketData, map[string]any{
 			"mode":       "test",
 			"dataSource": dataSource,
 			"symbol":     symbol,
 			"payload":    body,
-		})
+		}); err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		JSON(w, http.StatusOK, map[string]any{})
 	}
 }

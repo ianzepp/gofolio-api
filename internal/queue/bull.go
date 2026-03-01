@@ -110,11 +110,26 @@ func (s *Service) ListJobs(ctx context.Context, limit int64) ([]AdminJob, error)
 	var refs []queueJob
 
 	for _, queueName := range s.queues {
-		waitIDs, _ := s.rdb.LRange(ctx, s.key(queueName, "wait"), 0, limit-1).Result()
-		activeIDs, _ := s.rdb.LRange(ctx, s.key(queueName, "active"), 0, limit-1).Result()
-		delayedIDs, _ := s.rdb.ZRevRange(ctx, s.key(queueName, "delayed"), 0, limit-1).Result()
-		completedIDs, _ := s.rdb.ZRevRange(ctx, s.key(queueName, "completed"), 0, limit-1).Result()
-		failedIDs, _ := s.rdb.ZRevRange(ctx, s.key(queueName, "failed"), 0, limit-1).Result()
+		waitIDs, err := s.rdb.LRange(ctx, s.key(queueName, "wait"), 0, limit-1).Result()
+		if err != nil {
+			return nil, fmt.Errorf("list wait jobs for %s: %w", queueName, err)
+		}
+		activeIDs, err := s.rdb.LRange(ctx, s.key(queueName, "active"), 0, limit-1).Result()
+		if err != nil {
+			return nil, fmt.Errorf("list active jobs for %s: %w", queueName, err)
+		}
+		delayedIDs, err := s.rdb.ZRevRange(ctx, s.key(queueName, "delayed"), 0, limit-1).Result()
+		if err != nil {
+			return nil, fmt.Errorf("list delayed jobs for %s: %w", queueName, err)
+		}
+		completedIDs, err := s.rdb.ZRevRange(ctx, s.key(queueName, "completed"), 0, limit-1).Result()
+		if err != nil {
+			return nil, fmt.Errorf("list completed jobs for %s: %w", queueName, err)
+		}
+		failedIDs, err := s.rdb.ZRevRange(ctx, s.key(queueName, "failed"), 0, limit-1).Result()
+		if err != nil {
+			return nil, fmt.Errorf("list failed jobs for %s: %w", queueName, err)
+		}
 
 		appendIDs := func(ids []string, state string) {
 			for _, id := range ids {
@@ -136,7 +151,10 @@ func (s *Service) ListJobs(ctx context.Context, limit int64) ([]AdminJob, error)
 	jobs := make([]AdminJob, 0, len(refs))
 	for _, ref := range refs {
 		raw, err := s.rdb.HGetAll(ctx, s.key(ref.queue, ref.id)).Result()
-		if err != nil || len(raw) == 0 {
+		if err != nil {
+			return nil, fmt.Errorf("load job %s from %s: %w", ref.id, ref.queue, err)
+		}
+		if len(raw) == 0 {
 			continue
 		}
 
@@ -182,6 +200,10 @@ func (s *Service) ListJobs(ctx context.Context, limit int64) ([]AdminJob, error)
 		return jobs[i].Timestamp > jobs[j].Timestamp
 	})
 
+	if int64(len(jobs)) > limit {
+		jobs = jobs[:limit]
+	}
+
 	return jobs, nil
 }
 
@@ -201,13 +223,15 @@ func (s *Service) DeleteAllJobs(ctx context.Context) error {
 	if s == nil || s.rdb == nil {
 		return nil
 	}
-	jobs, err := s.ListJobs(ctx, 1000)
-	if err != nil {
-		return err
-	}
 	for _, queueName := range s.queues {
-		for _, job := range jobs {
-			_ = s.deleteJobFromQueue(ctx, queueName, job.ID)
+		ids, err := s.allJobIDsFromQueue(ctx, queueName)
+		if err != nil {
+			return err
+		}
+		for id := range ids {
+			if err := s.deleteJobFromQueue(ctx, queueName, id); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -256,4 +280,47 @@ func (s *Service) deleteJobFromQueue(ctx context.Context, queueName, id string) 
 
 func (s *Service) key(queueName, suffix string) string {
 	return fmt.Sprintf("%s:%s:%s", s.prefix, queueName, suffix)
+}
+
+func (s *Service) allJobIDsFromQueue(ctx context.Context, queueName string) (map[string]struct{}, error) {
+	ids := map[string]struct{}{}
+
+	waitIDs, err := s.rdb.LRange(ctx, s.key(queueName, "wait"), 0, -1).Result()
+	if err != nil {
+		return nil, fmt.Errorf("list wait jobs for %s: %w", queueName, err)
+	}
+	activeIDs, err := s.rdb.LRange(ctx, s.key(queueName, "active"), 0, -1).Result()
+	if err != nil {
+		return nil, fmt.Errorf("list active jobs for %s: %w", queueName, err)
+	}
+	delayedIDs, err := s.rdb.ZRange(ctx, s.key(queueName, "delayed"), 0, -1).Result()
+	if err != nil {
+		return nil, fmt.Errorf("list delayed jobs for %s: %w", queueName, err)
+	}
+	completedIDs, err := s.rdb.ZRange(ctx, s.key(queueName, "completed"), 0, -1).Result()
+	if err != nil {
+		return nil, fmt.Errorf("list completed jobs for %s: %w", queueName, err)
+	}
+	failedIDs, err := s.rdb.ZRange(ctx, s.key(queueName, "failed"), 0, -1).Result()
+	if err != nil {
+		return nil, fmt.Errorf("list failed jobs for %s: %w", queueName, err)
+	}
+
+	for _, id := range waitIDs {
+		ids[id] = struct{}{}
+	}
+	for _, id := range activeIDs {
+		ids[id] = struct{}{}
+	}
+	for _, id := range delayedIDs {
+		ids[id] = struct{}{}
+	}
+	for _, id := range completedIDs {
+		ids[id] = struct{}{}
+	}
+	for _, id := range failedIDs {
+		ids[id] = struct{}{}
+	}
+
+	return ids, nil
 }
