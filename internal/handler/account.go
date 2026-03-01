@@ -77,15 +77,10 @@ func GetAccounts(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		userID := auth.UserID(r)
-		if userID == "" {
-			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+		userID, err := resolveUserID(r, deps)
+		if err != nil {
+			writeResolveUserError(w, err)
 			return
-		}
-
-		// Support impersonation
-		if impID := Impersonation(r); impID != "" {
-			userID = impID
 		}
 
 		accounts, err := deps.AccountService.GetAccounts(r.Context(), userID)
@@ -227,14 +222,10 @@ func GetAccount(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		userID := auth.UserID(r)
-		if userID == "" {
-			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+		userID, err := resolveUserID(r, deps)
+		if err != nil {
+			writeResolveUserError(w, err)
 			return
-		}
-
-		if impID := Impersonation(r); impID != "" {
-			userID = impID
 		}
 
 		id := r.PathValue("id")
@@ -300,14 +291,10 @@ func GetAccountBalances(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		userID := auth.UserID(r)
-		if userID == "" {
-			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+		userID, err := resolveUserID(r, deps)
+		if err != nil {
+			writeResolveUserError(w, err)
 			return
-		}
-
-		if impID := Impersonation(r); impID != "" {
-			userID = impID
 		}
 
 		accountID := r.PathValue("id")

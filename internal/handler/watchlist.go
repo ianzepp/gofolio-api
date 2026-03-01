@@ -16,13 +16,10 @@ func GetWatchlist(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		userID := auth.UserID(r)
-		if userID == "" {
-			Error(w, http.StatusUnauthorized, "unauthorized")
+		userID, err := resolveUserID(r, deps)
+		if err != nil {
+			writeResolveUserError(w, err)
 			return
-		}
-		if impID := Impersonation(r); impID != "" {
-			userID = impID
 		}
 
 		items, err := deps.WatchlistService.GetWatchlist(r.Context(), userID)

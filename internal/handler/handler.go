@@ -31,11 +31,17 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/ianzepp/gofolio-api/internal/auth"
 )
+
+var errResolveUserUnauthorized = errors.New("unauthorized")
+var errResolveUserForbidden = errors.New("forbidden")
 
 // --- Response helpers ---
 
@@ -202,4 +208,44 @@ func queryInt(s string, defaultVal int) int {
 		return defaultVal
 	}
 	return v
+}
+
+// resolveUserID returns the effective user ID, considering impersonation.
+// If the Impersonation-Id header is set, the caller must have the
+// ImpersonateAllUsers permission (matching legacy NestJS behavior where the
+// ImpersonationService validates via the Access table / admin role).
+func resolveUserID(r *http.Request, deps *Deps) (string, error) {
+	userID := auth.UserID(r)
+	if userID == "" {
+		return "", errResolveUserUnauthorized
+	}
+
+	impersonationID := Impersonation(r)
+	if impersonationID == "" {
+		return userID, nil
+	}
+
+	if deps == nil || deps.UserService == nil {
+		return "", errResolveUserForbidden
+	}
+	user, err := deps.UserService.GetUser(r.Context(), userID)
+	if err != nil {
+		return "", errResolveUserForbidden
+	}
+	if !auth.HasPermission(user.Role, auth.ImpersonateAllUsers) {
+		return "", errResolveUserForbidden
+	}
+
+	return impersonationID, nil
+}
+
+func writeResolveUserError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, errResolveUserUnauthorized):
+		Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+	case errors.Is(err, errResolveUserForbidden):
+		Error(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+	default:
+		Error(w, http.StatusInternalServerError, err.Error())
+	}
 }

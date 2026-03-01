@@ -59,14 +59,10 @@ func GetOrders(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		userID := auth.UserID(r)
-		if userID == "" {
-			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+		userID, err := resolveUserID(r, deps)
+		if err != nil {
+			writeResolveUserError(w, err)
 			return
-		}
-
-		if impID := Impersonation(r); impID != "" {
-			userID = impID
 		}
 
 		orders, err := deps.OrderService.GetOrders(r.Context(), userID)
@@ -155,13 +151,10 @@ func GetOrder(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		userID := auth.UserID(r)
-		if userID == "" {
-			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+		userID, err := resolveUserID(r, deps)
+		if err != nil {
+			writeResolveUserError(w, err)
 			return
-		}
-		if impID := Impersonation(r); impID != "" {
-			userID = impID
 		}
 
 		id := r.PathValue("id")
@@ -305,14 +298,10 @@ func DeleteOrders(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		userID := auth.UserID(r)
-		if userID == "" {
-			Error(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+		userID, err := resolveUserID(r, deps)
+		if err != nil {
+			writeResolveUserError(w, err)
 			return
-		}
-
-		if impID := Impersonation(r); impID != "" {
-			userID = impID
 		}
 
 		// Legacy parity: bulk delete accepts filter params but current impl
