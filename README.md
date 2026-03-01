@@ -1,6 +1,11 @@
-# Ghostfolio API (Go)
+# Gofolio API
 
-Drop-in Go replacement for the Ghostfolio NestJS backend. Same REST contract, same database, same Angular frontend.
+Go backend for the Gofolio portfolio tracker, originally a drop-in replacement for the [Ghostfolio](https://github.com/ghostfolio/ghostfolio) NestJS backend. Same REST contract, same database schema.
+
+### Related projects
+
+- **[gofolio-web](https://github.com/ianzepp/gofolio-web)** — SvelteKit frontend (replaces the Angular client)
+- **[gofolio-cli](https://github.com/ianzepp/gofolio-cli)** — Rust CLI with LLM-powered portfolio tools
 
 ## Why
 
@@ -21,10 +26,9 @@ Go eliminates the ceremony. No decorators, no DI containers, no module system. F
 
 ### The approach
 
-1. **Keep the Angular frontend untouched.** It's a compiled SPA that makes HTTP calls — it doesn't care what language the server is. Same REST contract, same JSON shapes, same auth tokens.
-2. **Keep the same PostgreSQL database.** Generate Go structs from the existing Prisma schema. Zero migration.
-3. **Stubs first, logic second.** Every route gets a stub returning valid empty JSON so the frontend never crashes. Then fill in real implementations starting with the critical path.
-4. **Same repo, side by side.** The Go backend lives in `apps/api-go/` next to the original `apps/api/`. One git log tells the whole story.
+1. **Keep the same REST contract.** Same JSON shapes, same auth tokens. Clients (gofolio-web, gofolio-cli) don't care what language the server is.
+2. **Keep the same PostgreSQL schema.** Go structs generated from the existing Prisma schema. Zero migration.
+3. **Stubs first, logic second.** Every route gets a stub returning valid empty JSON so clients never crash. Then fill in real implementations starting with the critical path.
 
 ### Why Go
 
@@ -36,7 +40,7 @@ Go eliminates the ceremony. No decorators, no DI containers, no module system. F
 
 ## Status
 
-**Phase 1 — Stubs** (complete): Every route returns 200 with empty/mock JSON so the Angular frontend loads without errors.
+**Phase 1 — Stubs** (complete): Every route returns 200 with empty/mock JSON so clients load without errors.
 
 **Phase 2 — DB harness** (complete): 3-layer architecture (handler → service → repository) with `sqlx` queries. Migrated from `pgx` to `jmoiron/sqlx` for simpler scanning and `database/sql` compatibility. CRUD domains wired: tag, account, account-balance, order, access, platform, watchlist. Read-only data paths wired: info, benchmarks, admin dashboard, admin market-data, admin users, asset, market-data by symbol, exchange-rate, logo, symbol, export. Data provider layer wired with Yahoo Finance and Manual providers.
 
@@ -62,18 +66,17 @@ Current parity snapshot:
 ## Architecture
 
 ```
-apps/api-go/
-  cmd/server/main.go        # Entry point, wiring, router setup
-  internal/
-    db/                      # Pool management, DBTX interface, transaction helper
-    handler/                 # HTTP handlers (one file per controller)
-      deps.go                # Deps struct injected into handlers via closures
-    service/                 # Business logic, orchestration
-    repository/              # SQL queries, struct scanning
-    model/                   # Go structs with db:"column" tags, enums
-    middleware/              # Auth (JWT), logging, interceptors
-    calculator/              # Portfolio calculator (ROAI port)
-    provider/                # Data provider integrations
+cmd/server/main.go            # Entry point, wiring, router setup
+internal/
+  auth/                       # JWT, API key, permissions, middleware
+  db/                         # Pool management, DBTX interface, migrations
+  handler/                    # HTTP handlers (one file per controller)
+    deps.go                   # Deps struct injected into handlers via closures
+  service/                    # Business logic, orchestration
+  repository/                 # SQL queries, struct scanning
+  model/                      # Go structs with db:"column" tags, enums
+  calculator/                 # Portfolio calculator (ROAI port)
+  provider/                   # Data provider integrations
 ```
 
 ### Layering
@@ -218,18 +221,60 @@ Scanning uses `sqlx.Select`/`sqlx.Get` with struct tags — no manual field scan
 - Go currently logs DB init issues and continues boot in a degraded mode
 - Go uses raw SQL with `sqlx` instead of Prisma's query builder — more explicit, no codegen
 
-## Running
+## Quick Start
 
-Environment variable reference: [`ENV.md`](./ENV.md).
+### Option A: Docker Compose (Postgres + API)
 
 ```bash
-cd apps/api-go
-export DATABASE_URL="postgresql://user:password@localhost:5432/ghostfolio?sslmode=prefer"
-go run ./cmd/server
-# Listens on :3334 by default (override with PORT)
+cp .env.example .env
+docker compose up -d
+# API listens on http://localhost:3334
 ```
 
-Startup opens a PostgreSQL connection pool via `sqlx`. If DB init fails, the API still starts in degraded mode and logs the issue.
+### Option B: Local Go + external Postgres
+
+```bash
+cp .env.example .env
+# Edit .env if your Postgres is not at localhost:5432
+go run ./cmd/server
+```
+
+On first startup the server automatically creates the schema and seeds an admin user.
+
+### Authenticate
+
+**Admin (seeded):**
+```bash
+curl -X POST http://localhost:3334/api/v1/auth/anonymous \
+  -H 'Content-Type: application/json' \
+  -d '{"accessToken":"gofolio-admin-token"}'
+# Returns {"authToken":"<jwt>"}
+```
+
+**Create a new user:**
+```bash
+curl -X POST http://localhost:3334/api/v1/user
+# Returns {"accessToken":"<uuid>","authToken":"<jwt>","role":"USER"}
+```
+
+The access token is returned once at signup — store it. Exchange it for a JWT anytime via `POST /api/v1/auth/anonymous`.
+
+### Environment variables
+
+See [`ENV.md`](./ENV.md) for the full reference. Key variables:
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `DATABASE_URL` | Yes | — | Postgres DSN |
+| `JWT_SECRET_KEY` | Yes | — | HMAC key for JWT signing |
+| `ACCESS_TOKEN_SALT` | Yes | — | HMAC key for access token hashing |
+| `PORT` | No | `3333` | HTTP listen port |
+
+The `.env.example` ships with working dev defaults (`1234` for secrets, port `3334`).
+
+### Graceful degradation
+
+Startup opens a PostgreSQL connection pool via `sqlx`. If DB init fails, the API still starts in degraded mode — health checks remain available while DB-backed endpoints return 503.
 
 ## Testing
 
@@ -250,28 +295,24 @@ Current test pattern:
 Run all tests:
 
 ```bash
-cd apps/api-go
 go test ./...
 ```
 
 Run with race detector:
 
 ```bash
-cd apps/api-go
 go test -race ./...
 ```
 
 Run differential integration tests:
 
 ```bash
-cd apps/api-go
 ./tests/integration/run.sh
 ```
 
 Manual differential run (if both APIs are already running):
 
 ```bash
-cd apps/api-go
 LEGACY_BASE_URL=http://localhost:3333 \
 GO_BASE_URL=http://localhost:3334 \
 go test ./tests/integration -v -count=1
@@ -288,24 +329,6 @@ When a case uses `"mode": "json"`, the harness:
 
 This lets fixtures focus on stable contract fields while ignoring volatile
 paths (timestamps, generated IDs, dynamic arrays, etc.).
-
-### Legacy scope guard
-
-To ensure work on `api-go` does not unintentionally change unrelated legacy behavior in
-`apps/api` and `apps/client`, run:
-
-```bash
-npm run check:legacy-agent-scope
-```
-
-This guard compares `HEAD` to the merge-base with `upstream/main` and fails if
-legacy changes are outside the allowed Agent-extension integration surface.
-
-You can also run the script directly with a custom base ref or commit:
-
-```bash
-./tools/check-legacy-agent-scope.sh <base-ref-or-commit>
-```
 
 Optional auth env vars for integration fixtures:
 
@@ -325,7 +348,7 @@ All routes are prefixed with `/api/v1`.
 
 ### Phase 1 — App boots and navigates (15 endpoints)
 
-These are required for the Angular frontend to load and render the main views.
+These are required for clients (gofolio-web, gofolio-cli) to load and render the main views.
 
 | Method | Path                     | Purpose                         |
 | ------ | ------------------------ | ------------------------------- |

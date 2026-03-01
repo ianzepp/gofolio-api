@@ -158,9 +158,15 @@ func CreateUser(deps *Deps) http.HandlerFunc {
 		id := uuid.New().String()
 		accessToken := uuid.New().String()
 
+		hashed, err := hashAccessToken(accessToken)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
 		user := model.User{
 			ID:          id,
-			AccessToken: &accessToken,
+			AccessToken: &hashed,
 			Provider:    model.ProviderAnonymous,
 			Role:        model.RoleUser,
 		}

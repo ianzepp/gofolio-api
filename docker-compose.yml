@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ghostfolio-db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: "1234"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d ghostfolio-db"]
+      interval: 5s
+      retries: 5
+
+  api:
+    build: .
+    ports:
+      - "3334:3334"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://user:1234@postgres:5432/ghostfolio-db?sslmode=disable
+
+volumes:
+  pgdata:
