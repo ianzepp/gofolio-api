@@ -3,6 +3,7 @@ package handler
 import (
 	"database/sql"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 
@@ -57,9 +58,18 @@ func GetPublicPortfolio(deps *Deps) http.HandlerFunc {
 		}
 
 		// Get performance for 1d, max, ytd
-		perf1d, _ := deps.PortfolioService.GetPerformance(r.Context(), ownerID, "1d", nil)
-		perfMax, _ := deps.PortfolioService.GetPerformance(r.Context(), ownerID, "max", nil)
-		perfYtd, _ := deps.PortfolioService.GetPerformance(r.Context(), ownerID, "ytd", nil)
+		perf1d, err := deps.PortfolioService.GetPerformance(r.Context(), ownerID, "1d", nil)
+		if err != nil {
+			log.Printf("public portfolio: 1d performance error for user %s: %v", ownerID, err)
+		}
+		perfMax, err := deps.PortfolioService.GetPerformance(r.Context(), ownerID, "max", nil)
+		if err != nil {
+			log.Printf("public portfolio: max performance error for user %s: %v", ownerID, err)
+		}
+		perfYtd, err := deps.PortfolioService.GetPerformance(r.Context(), ownerID, "ytd", nil)
+		if err != nil {
+			log.Printf("public portfolio: ytd performance error for user %s: %v", ownerID, err)
+		}
 
 		// Build performance response
 		performance := map[string]any{

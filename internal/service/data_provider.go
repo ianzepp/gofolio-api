@@ -77,7 +77,12 @@ func (s *DataProviderService) GetQuotes(ctx context.Context, items []provider.As
 		for _, batch := range batches {
 			batch := batch
 			p := p
-			g.Go(func() error {
+			g.Go(func() (retErr error) {
+				defer func() {
+					if rv := recover(); rv != nil {
+						retErr = fmt.Errorf("provider panic: %v", rv)
+					}
+				}()
 				quotes, err := p.GetQuotes(gCtx, batch)
 				if err != nil {
 					return err
@@ -151,7 +156,7 @@ func (s *DataProviderService) GetHistoricalRaw(ctx context.Context, items []prov
 		if !ok {
 			continue
 		}
-		g.Go(func() error {
+		g.Go(func() (retErr error) {
 			data, err := p.GetHistorical(gCtx, item.Symbol, from, to)
 			if err != nil {
 				return err
@@ -194,7 +199,7 @@ func (s *DataProviderService) Search(ctx context.Context, query string, includeI
 	var allItems []provider.LookupItem
 	for _, p := range s.providers {
 		p := p
-		g.Go(func() error {
+		g.Go(func() (retErr error) {
 			resp, err := p.Search(gCtx, query, includeIndices)
 			if err != nil {
 				// Non-fatal: skip this provider
@@ -234,7 +239,7 @@ func (s *DataProviderService) GetAssetProfiles(ctx context.Context, items []prov
 		if !ok {
 			continue
 		}
-		g.Go(func() error {
+		g.Go(func() (retErr error) {
 			profile, err := p.GetAssetProfile(gCtx, item.Symbol)
 			if err != nil {
 				return nil // non-fatal

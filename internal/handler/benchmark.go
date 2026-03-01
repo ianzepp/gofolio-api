@@ -62,14 +62,23 @@ func DeleteBenchmark(deps *Deps) http.HandlerFunc {
 	}
 }
 
-func HandleGetBenchmarkDetail(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
-	symbol := r.PathValue("symbol")
-	startDateString := r.PathValue("startDateString")
-	filters := ParseFilters(r)
-	_ = dataSource
-	_ = symbol
-	_ = startDateString
-	_ = filters
-	JSON(w, http.StatusOK, map[string]any{})
+func GetBenchmarkDetail(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps.BenchmarkService == nil {
+			JSON(w, http.StatusOK, map[string]any{"marketData": []any{}})
+			return
+		}
+
+		dataSource := r.PathValue("dataSource")
+		symbol := r.PathValue("symbol")
+		startDateString := r.PathValue("startDateString")
+
+		resp, err := deps.BenchmarkService.GetBenchmarkDetail(r.Context(), dataSource, symbol, startDateString)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		JSON(w, http.StatusOK, resp)
+	}
 }

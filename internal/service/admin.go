@@ -484,6 +484,34 @@ func (s *AdminService) UpdateProfileData(ctx context.Context, dataSource, symbol
 	return err
 }
 
+// PutSetting upserts or deletes a system Property by key. Mirrors the legacy
+// NestJS AdminService.putSetting() including the read-only-mode side-effect.
+func (s *AdminService) PutSetting(ctx context.Context, key, value string) (model.Property, error) {
+	propRepo := repository.NewPropertyRepository(s.db)
+
+	var result model.Property
+	var err error
+
+	if value != "" {
+		result, err = propRepo.Upsert(ctx, model.Property{Key: key, Value: value})
+	} else {
+		err = propRepo.Delete(ctx, key)
+		result = model.Property{Key: key, Value: ""}
+	}
+	if err != nil {
+		return model.Property{}, fmt.Errorf("put setting %q: %w", key, err)
+	}
+
+	// Side-effect: enabling read-only mode also disables user signup.
+	if key == "IS_READ_ONLY_MODE" && value == "true" {
+		if _, err := s.PutSetting(ctx, "IS_USER_SIGNUP_ENABLED", "false"); err != nil {
+			return result, fmt.Errorf("cascade read-only side-effect: %w", err)
+		}
+	}
+
+	return result, nil
+}
+
 // DeleteProfileData removes all market data and the symbol profile for a given
 // dataSource+symbol pair. Mirrors NestJS AdminService.deleteProfileData().
 func (s *AdminService) DeleteProfileData(ctx context.Context, dataSource, symbol string) error {

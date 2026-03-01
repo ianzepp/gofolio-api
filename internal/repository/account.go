@@ -127,3 +127,16 @@ func (r *AccountRepository) UpdateBalance(ctx context.Context, id string, userID
 	}
 	return nil
 }
+
+// GetBalanceForUpdate locks the account row and returns its current balance.
+// Must be called inside a transaction to hold the lock until commit.
+func (r *AccountRepository) GetBalanceForUpdate(ctx context.Context, id string, userID string) (float64, error) {
+	var balance float64
+	err := r.db.QueryRowxContext(ctx,
+		`SELECT balance FROM "Account" WHERE id = $1 AND "userId" = $2 FOR UPDATE`,
+		id, userID).Scan(&balance)
+	if err != nil {
+		return 0, fmt.Errorf("lock account for balance check: %w", err)
+	}
+	return balance, nil
+}

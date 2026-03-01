@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/ianzepp/gofolio-api/internal/model"
 	"github.com/ianzepp/gofolio-api/internal/repository"
@@ -143,6 +144,53 @@ func (s *BenchmarkService) DeleteBenchmark(ctx context.Context, dataSource, symb
 	}
 
 	return s.saveBenchmarkProps(ctx, propRepo, filtered)
+}
+
+// BenchmarkDetailResponse is the response for GET /benchmarks/:ds/:sym/:start.
+type BenchmarkDetailResponse struct {
+	MarketData []BenchmarkMarketDataItem `json:"marketData"`
+}
+
+// BenchmarkMarketDataItem is a single data point in the benchmark detail response.
+type BenchmarkMarketDataItem struct {
+	Date           string  `json:"date"`
+	Value          float64 `json:"value"`
+	PerformPercent float64 `json:"performancePercent"`
+}
+
+// GetBenchmarkDetail returns historical market data for a benchmark symbol
+// with performance percentages calculated relative to the start date's price.
+func (s *BenchmarkService) GetBenchmarkDetail(ctx context.Context, dataSource, symbol, startDateString string) (BenchmarkDetailResponse, error) {
+	startDate, err := time.Parse("2006-01-02", startDateString)
+	if err != nil {
+		return BenchmarkDetailResponse{MarketData: []BenchmarkMarketDataItem{}}, fmt.Errorf("parse start date: %w", err)
+	}
+
+	mdRepo := repository.NewMarketDataRepository(s.db)
+	data, err := mdRepo.FindBySymbolAndDateRange(ctx, dataSource, symbol, startDate, time.Now().UTC())
+	if err != nil {
+		return BenchmarkDetailResponse{MarketData: []BenchmarkMarketDataItem{}}, fmt.Errorf("fetch market data: %w", err)
+	}
+
+	if len(data) == 0 {
+		return BenchmarkDetailResponse{MarketData: []BenchmarkMarketDataItem{}}, nil
+	}
+
+	baseValue := data[0].MarketPrice
+	items := make([]BenchmarkMarketDataItem, len(data))
+	for i, d := range data {
+		perfPct := float64(0)
+		if baseValue > 0 {
+			perfPct = (d.MarketPrice/baseValue - 1)
+		}
+		items[i] = BenchmarkMarketDataItem{
+			Date:           d.Date.Format("2006-01-02T15:04:05.000Z"),
+			Value:          d.MarketPrice,
+			PerformPercent: perfPct,
+		}
+	}
+
+	return BenchmarkDetailResponse{MarketData: items}, nil
 }
 
 func (s *BenchmarkService) loadBenchmarkProps(ctx context.Context, propRepo *repository.PropertyRepository) ([]BenchmarkProperty, error) {

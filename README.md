@@ -51,8 +51,9 @@ Current parity snapshot:
 - Differential pass rate (verified): `196/196` passing on `2026-03-01` via `./tests/integration/run.sh` against legacy (`localhost:3333`) and Go (`localhost:3334`)
 - 20 services wired into handler `Deps` struct
 - 14 repository files, 13 model files, 3 provider files, 22 service files, 6 calculator files
-- Recently wired: benchmark create/delete, admin profile-data delete/update, market-data write, portfolio holding tags update, `auth/anonymous`, `api-keys`, `ai/prompt`, `cache/flush`, `auth-device`, `public` portfolio
-- Remaining stub/partial areas: admin gather worker execution semantics, admin settings, benchmark detail, portfolio report, profile-data create route semantics
+- Recently wired: admin settings (upsert/delete with side-effects), benchmark detail (historical performance), portfolio report (X-Ray rules engine with 17 rules across 8 categories), graceful shutdown (SIGTERM/SIGINT with 15s drain)
+- Correctness fixes: TransferBalance race condition (SELECT FOR UPDATE), `isCurrencyLikeSymbol` suffix matching, Yahoo forex/crypto disambiguation, public portfolio error logging, errgroup panic recovery
+- Remaining stub/partial areas: admin gather worker execution semantics, admin demo-user sync, profile-data create route semantics
 - Excluded from scope: `agent/*` (local-only code), `subscription/*` (Stripe-only), `auth/oauth` (Google/OIDC server-side), `auth/webauthn` (FIDO2 crypto)
 - See [`GAPS.md`](./GAPS.md) for the full remaining-work inventory
 

@@ -157,7 +157,7 @@ func HandleGetMarkets(w http.ResponseWriter, r *http.Request) {
 // rather than 404, because currency data is expected to always be present. This
 // helper lets GetMarketData replicate that different error path.
 func isCurrencyLikeSymbol(symbol string) bool {
-	candidate := strings.Replace(symbol, "USD", "", 1)
+	candidate := strings.TrimSuffix(symbol, "USD")
 	if candidate == "" {
 		return false
 	}

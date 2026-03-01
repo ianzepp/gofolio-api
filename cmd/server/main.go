@@ -29,7 +29,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/ianzepp/gofolio-api/internal/auth"
@@ -191,7 +193,7 @@ func main() {
 	mux.HandleFunc("DELETE /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.DeleteProfileData(deps)))
 	mux.HandleFunc("PATCH /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.UpdateProfileData(deps)))
 	mux.HandleFunc("POST /api/v1/admin/profile-data/{dataSource}/{symbol}", handler.CreateProfileData(deps))
-	mux.HandleFunc("PUT /api/v1/admin/settings/{key}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleUpdateAdminSetting))
+	mux.HandleFunc("PUT /api/v1/admin/settings/{key}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.UpdateAdminSetting(deps)))
 	mux.HandleFunc("GET /api/v1/admin/user", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminUsers(deps)))
 	mux.HandleFunc("GET /api/v1/admin/user/{id}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminUser(deps)))
 
@@ -236,7 +238,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/benchmarks", handler.GetBenchmarks(deps))
 	mux.HandleFunc("POST /api/v1/benchmarks", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.CreateBenchmark(deps)))
 	mux.HandleFunc("DELETE /api/v1/benchmarks/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.DeleteBenchmark(deps)))
-	mux.HandleFunc("GET /api/v1/benchmarks/{dataSource}/{symbol}/{startDateString}", auth.Authenticate(authCfg, handler.HandleGetBenchmarkDetail))
+	mux.HandleFunc("GET /api/v1/benchmarks/{dataSource}/{symbol}/{startDateString}", auth.Authenticate(authCfg, handler.GetBenchmarkDetail(deps)))
 
 	// Cache
 	mux.HandleFunc("POST /api/v1/cache/flush", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.FlushCache(deps)))
@@ -359,7 +361,23 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
+	// Graceful shutdown: listen for SIGTERM/SIGINT (Railway sends SIGTERM on
+	// deploy), then drain in-flight requests before exiting.
+	shutdownCh := make(chan os.Signal, 1)
+	signal.Notify(shutdownCh, syscall.SIGTERM, syscall.SIGINT)
+
+	go func() {
+		sig := <-shutdownCh
+		log.Printf("received %s, starting graceful shutdown…", sig)
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			log.Printf("graceful shutdown error: %v", err)
+		}
+	}()
+
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
+	log.Println("server stopped")
 }

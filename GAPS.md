@@ -2,7 +2,7 @@
 
 Tracked inventory of everything between current state and full parity with the NestJS backend. Each section is a workstream; items within are ordered by priority/dependency.
 
-Last updated: 2026-03-01 (post-parity run)
+Last updated: 2026-03-01 (final push)
 
 ---
 
@@ -45,15 +45,15 @@ Status: routes now enqueue Redis-backed queue jobs. Remaining work is worker-sid
 Delete + update are wired through `AdminService`.
 Create currently returns legacy-style `404` parity response and needs full implementation semantics.
 
-### 2c. Admin — Misc (3 routes) — 1/3 PARTIAL
+### ~~2c. Admin — Misc (3 routes)~~ 2/3 DONE
 
-| Method | Path                                          | Purpose                  |
-| ------ | --------------------------------------------- | ------------------------ |
-| PUT    | `/admin/settings/:key`                        | Update admin setting     |
-| GET    | `/admin/demo-user/sync`                       | Sync demo user           |
-| POST   | `/admin/market-data/:dataSource/:symbol/test` | Test market data scraper |
+| Method | Path                                          | Purpose                  | Status |
+| ------ | --------------------------------------------- | ------------------------ | ------ |
+| PUT    | `/admin/settings/:key`                        | Update admin setting     | DONE   |
+| GET    | `/admin/demo-user/sync`                       | Sync demo user           | Stub   |
+| POST   | `/admin/market-data/:dataSource/:symbol/test` | Test market data scraper | DONE   |
 
-Status: `POST /admin/market-data/:dataSource/:symbol/test` now enqueues queue jobs; settings and demo-user-sync are still stubs.
+Status: `PUT /admin/settings/:key` now upserts/deletes Property rows with read-only-mode side-effect. `POST .../test` enqueues queue jobs. Demo-user sync remains a stub.
 
 ### ~~2d. Import (2 routes)~~ DONE
 
@@ -63,23 +63,19 @@ Wired: POST /import creates orders from Ghostfolio interchange JSON. GET /import
 
 Wired: Bulk upsert via existing `UpsertMarketPrice` repo method.
 
-### 2f. Benchmark Management (3 routes) — 2/3 DONE
-
-Create and delete wired. Detail (GET with performance calc) remains a stub.
+### ~~2f. Benchmark Management (3 routes)~~ DONE
 
 | Method | Path                                               | Status |
 | ------ | -------------------------------------------------- | ------ |
 | POST   | `/benchmarks`                                      | DONE   |
 | DELETE | `/benchmarks/:dataSource/:symbol`                  | DONE   |
-| GET    | `/benchmarks/:dataSource/:symbol/:startDateString` | Stub   |
+| GET    | `/benchmarks/:dataSource/:symbol/:startDateString` | DONE   |
 
-### 2g. Portfolio — Remaining (2 routes) — 1/2 DONE
-
-Holding tags update wired. Report remains a stub.
+### ~~2g. Portfolio — Remaining (2 routes)~~ DONE
 
 | Method | Path                                          | Status |
 | ------ | --------------------------------------------- | ------ |
-| GET    | `/portfolio/report`                           | Stub   |
+| GET    | `/portfolio/report`                           | DONE   |
 | PUT    | `/portfolio/holding/:dataSource/:symbol/tags` | DONE   |
 
 ### ~~2h. Symbol Date Lookup (1 route)~~ DONE
@@ -113,9 +109,8 @@ Areas with no or minimal differential test coverage:
 - [ ] Import endpoints (no dedicated fixtures)
 - [ ] Admin gather endpoints (no JSON fixtures — enqueue semantics only)
 - [ ] Admin profile data CRUD (minimal fixtures; create semantics not covered)
-- [ ] Benchmark create/delete/detail (status-only coverage; no JSON fixtures)
+- [ ] Benchmark detail (status-only coverage; no JSON fixtures)
 - [ ] Market data create (no dedicated fixtures)
-- [ ] Portfolio report (status-only coverage; handler is stub)
 - [ ] Holding tags update (status-only coverage; no JSON fixtures)
 - [ ] Symbol date lookup (no JSON fixture)
 
@@ -131,32 +126,31 @@ None open. Previously reported HIGH issues were fixed.
 
 ### MEDIUM
 
-| #   | Issue                                        | Location                     | Description                                                                                          |
-| --- | -------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
-| 1   | Swallowed errors in `GetPublicPortfolio`     | `handler/public.go:59-61`    | Three `GetPerformance` calls discard errors with `_`. Silent zero-data on failure.                   |
-| 2   | Double `buildCalculator` in `GetDetails`     | `service/portfolio.go:432`   | Calls `buildCalculator`+`computeSnapshot`, then calls `GetHoldings` which does it again. 2x DB load. |
-| 3   | Double query in `GetDividends`               | `service/portfolio.go:524`   | `buildCalculator` loads all orders, then `GetDividends` queries them again separately.               |
-| 4   | `TransferBalance` race condition             | `handler/account.go:360`     | Balance check outside transaction; concurrent transfers can overdraw.                                |
-| 5   | `isCurrencyLikeSymbol` uses `strings.Replace` | `handler/market_data.go:160` | Should use `strings.TrimSuffix`; "USDJPY" misidentified as currency-like.                           |
-| 6   | Yahoo forex detection too broad              | `provider/yahoo.go:621`      | 6-letter uppercase stock tickers treated as forex pairs and appended with `=X`.                      |
-| 7   | No graceful shutdown                         | `main.go:324`                | No signal handling or `server.Shutdown()`; in-flight requests dropped on SIGTERM.                    |
+| #   | Issue                                        | Location                     | Status |
+| --- | -------------------------------------------- | ---------------------------- | ------ |
+| ~~1~~   | ~~Swallowed errors in `GetPublicPortfolio`~~     | ~~`handler/public.go:59-61`~~    | **FIXED** — errors now logged |
+| 2   | Double `buildCalculator` in `GetDetails`     | `service/portfolio.go:432`   | Open — perf optimization, not correctness |
+| 3   | Double query in `GetDividends`               | `service/portfolio.go:524`   | Open — perf optimization, not correctness |
+| ~~4~~   | ~~`TransferBalance` race condition~~             | ~~`handler/account.go:360`~~     | **FIXED** — SELECT FOR UPDATE inside tx |
+| ~~5~~   | ~~`isCurrencyLikeSymbol` uses `strings.Replace`~~ | ~~`handler/market_data.go:160`~~ | **FIXED** — uses `strings.TrimSuffix` |
+| ~~6~~   | ~~Yahoo forex detection too broad~~              | ~~`provider/yahoo.go:621`~~      | **FIXED** — known crypto base list |
+| ~~7~~   | ~~No graceful shutdown~~                         | ~~`main.go:324`~~                | **FIXED** — SIGTERM/SIGINT + 15s drain |
 
 ### LOW
 
-| #   | Issue                                   | Location                       | Description                                                                      |
-| --- | --------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------- |
-| 1   | Errgroup panic leaks goroutine          | `service/data_provider.go:84`  | Panic in provider goroutine prevents channel close; request goroutine blocks forever. |
-| 2   | Large dynamic SQL OR-chains             | `repository/market_data.go:207`| Many-symbol queries build huge OR-chains; consider CTE or temp table at scale.   |
-| 3   | `GetAccounts` totalValue semantically wrong | `handler/account.go:100`   | Adds cost basis + dividends + interest; not actual portfolio value.               |
+| #   | Issue                                   | Location                       | Status |
+| --- | --------------------------------------- | ------------------------------ | ------ |
+| ~~1~~   | ~~Errgroup panic leaks goroutine~~          | ~~`service/data_provider.go:84`~~  | **FIXED** — defer/recover in goroutine |
+| 2   | Large dynamic SQL OR-chains             | `repository/market_data.go:207`| Open — perf optimization at scale |
+| 3   | `GetAccounts` totalValue semantically wrong | `handler/account.go:100`   | Open — display-only, non-blocking |
 
 ---
 
-## 7. Suggested Priority Order
+## 7. Remaining Work (post-48h)
 
-1. **Admin gather execution parity** — Redis queue enqueue is wired; worker-side execution semantics still need parity.
-2. **Benchmark detail endpoint** — Implement `GET /benchmarks/:dataSource/:symbol/:startDateString`.
-3. **Portfolio report** — Implement `GET /portfolio/report`.
-4. **Admin settings + demo-user sync** — Replace remaining stubs with service-backed behavior.
-5. **Profile data create semantics** — Replace legacy-404 parity stub with full implementation once parity target is defined.
-6. **Coverage expansion** — Add dedicated fixtures for import, market-data write, profile-data CRUD, and benchmark detail JSON.
-7. **Correctness fixes (MEDIUM/LOW)** — Performance double-queries, race conditions, graceful shutdown.
+1. **Admin gather worker execution** — Redis queue enqueue is wired; worker-side execution semantics still need parity.
+2. **Admin demo-user sync** — Stub, low priority.
+3. **Profile data create semantics** — Replace legacy-404 parity stub with full implementation.
+4. **Performance optimizations** — Double `buildCalculator` calls (MEDIUM #2, #3).
+5. **Coverage expansion** — Add dedicated fixtures for import, market-data write, profile-data CRUD, and benchmark detail JSON.
+6. **Regional/economic market rules** — Portfolio report currently passes regional/economic rules by default; needs country-level holding data for real evaluation.

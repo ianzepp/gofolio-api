@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ianzepp/gofolio-api/internal/db"
 	"github.com/ianzepp/gofolio-api/internal/model"
@@ -71,6 +72,15 @@ type TransferRequest struct {
 func (s *AccountService) TransferBalance(ctx context.Context, req TransferRequest) error {
 	return db.WithTx(ctx, s.db, func(tx *sqlx.Tx) error {
 		repo := repository.NewAccountRepository(tx)
+		// Lock the source account row and verify sufficient balance inside
+		// the transaction to prevent concurrent overdraw.
+		balance, err := repo.GetBalanceForUpdate(ctx, req.FromID, req.FromUserID)
+		if err != nil {
+			return fmt.Errorf("lock source account: %w", err)
+		}
+		if balance < req.Amount {
+			return fmt.Errorf("insufficient balance")
+		}
 		if err := repo.UpdateBalance(ctx, req.FromID, req.FromUserID, -req.Amount); err != nil {
 			return err
 		}

@@ -619,26 +619,37 @@ type yahooSearchResponse struct {
 // Ghostfolio stores forex as "USDCHF" and crypto as "BTCUSD"; Yahoo uses
 // "USDCHF=X" and "BTC-USD" respectively.
 func convertToYahooSymbol(symbol string) string {
+	// Crypto: BTCUSD -> BTC-USD (check before forex to avoid misclassifying
+	// 6-char crypto pairs like BTCUSD as forex)
+	if strings.HasSuffix(symbol, "USD") && len(symbol) > 3 && len(symbol) <= 10 {
+		base := symbol[:len(symbol)-3]
+		if isAllAlpha(base) && strings.ToUpper(base) == base && strings.ToUpper(symbol) == symbol {
+			if isKnownCryptoBase(base) {
+				return base + "-USD"
+			}
+		}
+	}
 	// Forex: USDCHF -> USDCHF=X
 	if len(symbol) == 6 && isAllAlpha(symbol) && !strings.Contains(symbol, "-") {
-		// Check if it looks like a forex pair (6 uppercase letters)
 		upper := strings.ToUpper(symbol)
 		if upper == symbol {
 			return symbol + "=X"
 		}
 	}
-	// Crypto: BTCUSD -> BTC-USD
-	if strings.HasSuffix(symbol, "USD") && len(symbol) > 3 && len(symbol) <= 10 {
-		base := symbol[:len(symbol)-3]
-		if isAllAlpha(base) && strings.ToUpper(base) == base && strings.ToUpper(symbol) == symbol {
-			// Only convert if it's all uppercase and looks like crypto
-			// But not 6-char forex pairs (handled above)
-			if len(symbol) != 6 {
-				return base + "-USD"
-			}
-		}
-	}
 	return symbol
+}
+
+// isKnownCryptoBase returns true for common crypto base currencies that would
+// otherwise be misidentified as forex pairs when combined with USD (e.g. BTCUSD).
+func isKnownCryptoBase(base string) bool {
+	switch base {
+	case "BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOT", "AVAX", "MATIC", "LINK",
+		"DOGE", "SHIB", "UNI", "LTC", "ATOM", "XLM", "ALGO", "FIL", "NEAR", "APE",
+		"AAVE", "CRV", "MKR", "SNX", "COMP", "SUSHI", "YFI", "BAT", "ENJ", "MANA",
+		"SAND", "AXS", "FTM", "ONE", "HBAR", "EOS", "XTZ", "THETA", "ICP", "VET":
+		return true
+	}
+	return false
 }
 
 // convertFromYahooSymbol is the inverse of convertToYahooSymbol: it maps Yahoo

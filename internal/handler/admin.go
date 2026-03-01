@@ -309,13 +309,26 @@ func CreateProfileData(deps *Deps) http.HandlerFunc {
 }
 
 // PUT /admin/settings/:key
-func HandleUpdateAdminSetting(w http.ResponseWriter, r *http.Request) {
-	key := r.PathValue("key")
-	_ = key
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+func UpdateAdminSetting(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.AdminService == nil {
+			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+			return
+		}
+
+		key := r.PathValue("key")
+		var body struct {
+			Value string `json:"value"`
+		}
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		result, err := deps.AdminService.PutSetting(r.Context(), key, body.Value)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, result)
 	}
-	_ = body
-	JSON(w, http.StatusOK, map[string]any{})
 }
