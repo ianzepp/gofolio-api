@@ -28,7 +28,7 @@ var knownDataEnhancers = map[string]struct{}{
 // free means it stays available even when the DB pool is nil.
 func HandleGetHealth(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]string{
-		"status": "ok",
+		"status": "OK",
 	})
 }
 
@@ -58,9 +58,7 @@ func HandleGetHealthDataEnhancer(w http.ResponseWriter, r *http.Request) {
 // a non-ok status when the provider is unreachable, matching the richer health
 // check behavior in the NestJS HealthIndicator pattern.
 func HandleGetHealthDataProvider(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
 	JSON(w, http.StatusOK, map[string]any{
-		"dataSource": dataSource,
-		"status":     "ok",
+		"status": "OK",
 	})
 }

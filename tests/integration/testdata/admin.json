@@ -3,7 +3,7 @@
     "name": "admin-get-no-auth-unauthorized",
     "method": "GET",
     "path": "/api/v1/admin",
-    "mode": "status"
+    "mode": "json"
   },
   {
     "name": "admin-get-user-forbidden-parity",
@@ -33,7 +33,7 @@
     "name": "admin-market-data-no-auth-unauthorized",
     "method": "GET",
     "path": "/api/v1/admin/market-data",
-    "mode": "status"
+    "mode": "json"
   },
   {
     "name": "admin-market-data-user-forbidden-parity",
@@ -73,7 +73,7 @@
     "name": "admin-users-no-auth-unauthorized",
     "method": "GET",
     "path": "/api/v1/admin/user",
-    "mode": "status"
+    "mode": "json"
   },
   {
     "name": "admin-users-user-forbidden-parity",
@@ -154,5 +154,59 @@
     "mode": "status",
     "auth": "jwt:JWT_ADMIN_TOKEN",
     "requiredEnv": ["JWT_ADMIN_TOKEN"]
+  },
+  {
+    "name": "admin-demo-user-sync-no-auth-unauthorized-json-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/demo-user/sync",
+    "mode": "json"
+  },
+  {
+    "name": "admin-demo-user-sync-user-forbidden-json-parity",
+    "method": "GET",
+    "path": "/api/v1/admin/demo-user/sync",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "admin-settings-put-no-auth-unauthorized-json-parity",
+    "method": "PUT",
+    "path": "/api/v1/admin/settings/locale",
+    "mode": "json",
+    "body": {
+      "value": "en-US"
+    }
+  },
+  {
+    "name": "admin-settings-put-user-forbidden-json-parity",
+    "method": "PUT",
+    "path": "/api/v1/admin/settings/locale",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": {
+      "value": "en-US"
+    }
+  },
+  {
+    "name": "admin-market-data-test-no-auth-unauthorized-json-parity",
+    "method": "POST",
+    "path": "/api/v1/admin/market-data/YAHOO/AAPL/test",
+    "mode": "json",
+    "body": {
+      "dateString": "2024-01-15"
+    }
+  },
+  {
+    "name": "admin-market-data-test-user-forbidden-json-parity",
+    "method": "POST",
+    "path": "/api/v1/admin/market-data/YAHOO/AAPL/test",
+    "mode": "json",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": {
+      "dateString": "2024-01-15"
+    }
   }
 ]

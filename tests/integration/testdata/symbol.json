@@ -3,7 +3,7 @@
     "name": "symbol-lookup-no-auth-unauthorized",
     "method": "GET",
     "path": "/api/v1/symbol/lookup?query=apple",
-    "mode": "status"
+    "mode": "json"
   },
   {
     "name": "symbol-by-date-no-auth-unauthorized",

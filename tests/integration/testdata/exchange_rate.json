@@ -3,7 +3,7 @@
     "name": "exchange-rate-no-auth-unauthorized",
     "method": "GET",
     "path": "/api/v1/exchange-rate/USDEUR/2024-01-15",
-    "mode": "status"
+    "mode": "json"
   },
   {
     "name": "exchange-rate-auth-status-parity",

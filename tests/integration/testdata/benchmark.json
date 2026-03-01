@@ -3,7 +3,7 @@
     "name": "benchmarks-post-no-auth-unauthorized",
     "method": "POST",
     "path": "/api/v1/benchmarks",
-    "mode": "status",
+    "mode": "json",
     "body": {
       "dataSource": "YAHOO",
       "symbol": "AAPL"
