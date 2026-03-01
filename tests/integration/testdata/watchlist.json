@@ -63,7 +63,7 @@
     "name": "watchlist-create-unknown-symbol-bad-request-parity",
     "method": "POST",
     "path": "/api/v1/watchlist",
-    "mode": "status",
+    "mode": "json",
     "auth": "jwt:JWT_USER_TOKEN",
     "requiredEnv": ["JWT_USER_TOKEN"],
     "body": {
@@ -75,7 +75,7 @@
     "name": "watchlist-delete-unknown-symbol-not-found-parity",
     "method": "DELETE",
     "path": "/api/v1/watchlist/YAHOO/INTEGRATION_UNKNOWN_WATCHLIST",
-    "mode": "status",
+    "mode": "json",
     "auth": "jwt:JWT_USER_TOKEN",
     "requiredEnv": ["JWT_USER_TOKEN"]
   }

@@ -13,9 +13,12 @@ package handler
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/ianzepp/gofolio-api/internal/queue"
+	"github.com/google/uuid"
 )
 
 // GetAdmin handles GET /api/v1/admin and returns the admin dashboard summary.
@@ -104,7 +107,15 @@ func GetAdminUser(deps *Deps) http.HandlerFunc {
 		user, err := deps.AdminService.GetUser(r.Context(), id)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				Error(w, http.StatusNotFound, "User not found")
+				displayID := id
+				if _, parseErr := uuid.Parse(id); parseErr == nil {
+					displayID = strings.ToUpper(id)
+				}
+				JSON(w, http.StatusNotFound, map[string]any{
+					"error":      "Not Found",
+					"message":    fmt.Sprintf("User with ID %s not found", displayID),
+					"statusCode": http.StatusNotFound,
+				})
 				return
 			}
 			Error(w, http.StatusInternalServerError, "Internal server error")

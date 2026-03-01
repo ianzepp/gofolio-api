@@ -59,7 +59,7 @@ func CreateWatchlistItem(deps *Deps) http.HandlerFunc {
 
 		if err := deps.WatchlistService.AddWatchlistItem(r.Context(), userID, body.DataSource, body.Symbol); err != nil {
 			if errors.Is(err, service.ErrSymbolProfileNotFound) {
-				Error(w, http.StatusInternalServerError, err.Error())
+				Error(w, http.StatusInternalServerError, "Internal server error")
 				return
 			}
 			Error(w, http.StatusInternalServerError, err.Error())

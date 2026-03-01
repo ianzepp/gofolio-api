@@ -15,7 +15,7 @@
     "name": "symbol-get-invalid-data-source-not-found-parity",
     "method": "GET",
     "path": "/api/v1/symbol/INTEGRATION_INVALID/AAPL",
-    "mode": "status"
+    "mode": "json"
   },
   {
     "name": "symbol-get-missing-symbol-not-found-parity",

@@ -37,7 +37,7 @@
     "name": "api-keys-post-no-auth-unauthorized",
     "method": "POST",
     "path": "/api/v1/api-keys",
-    "mode": "status"
+    "mode": "json"
   },
   {
     "name": "api-keys-post-user-json-parity",
@@ -74,13 +74,13 @@
     "name": "cache-flush-no-auth-unauthorized",
     "method": "POST",
     "path": "/api/v1/cache/flush",
-    "mode": "status"
+    "mode": "json"
   },
   {
     "name": "cache-flush-user-forbidden-parity",
     "method": "POST",
     "path": "/api/v1/cache/flush",
-    "mode": "status",
+    "mode": "json",
     "auth": "jwt:JWT_USER_TOKEN",
     "requiredEnv": ["JWT_USER_TOKEN"]
   },

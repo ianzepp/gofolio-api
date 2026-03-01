@@ -110,7 +110,7 @@
     "name": "admin-user-by-id-admin-missing-not-found-parity",
     "method": "GET",
     "path": "/api/v1/admin/user/${ADMIN_USER_ID}",
-    "mode": "status",
+    "mode": "json",
     "auth": "jwt:JWT_ADMIN_TOKEN",
     "requiredEnv": ["JWT_ADMIN_TOKEN", "ADMIN_USER_ID"]
   },
@@ -118,7 +118,7 @@
     "name": "admin-user-by-id-admin-invalid-format-parity",
     "method": "GET",
     "path": "/api/v1/admin/user/not-a-uuid",
-    "mode": "status",
+    "mode": "json",
     "auth": "jwt:JWT_ADMIN_TOKEN",
     "requiredEnv": ["JWT_ADMIN_TOKEN"]
   },

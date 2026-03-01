@@ -39,7 +39,7 @@
     "name": "market-data-by-symbol-missing-noncurrency-not-found-parity",
     "method": "GET",
     "path": "/api/v1/market-data/YAHOO/INTEGRATION_UNKNOWN_ASSET",
-    "mode": "status",
+    "mode": "json",
     "auth": "jwt:JWT_USER_TOKEN",
     "requiredEnv": ["JWT_USER_TOKEN"]
   },
