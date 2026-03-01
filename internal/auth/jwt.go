@@ -8,6 +8,7 @@ package auth
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -45,12 +46,13 @@ func ParseJWT(tokenStr string, secretKey string) (string, error) {
 }
 
 // SignJWT creates an HS256-signed JWT with the given user ID in the "id" claim.
-// The minimal claim set (only "id", no expiry) mirrors the NestJS implementation.
-// If token expiry is needed in the future, an "exp" claim should be added here
-// and ParseJWT will automatically enforce it via the golang-jwt library.
+// The "exp" claim is set to 180 days, matching the NestJS JwtModule configuration
+// (signOptions: { expiresIn: '180 days' }). ParseJWT automatically enforces
+// expiration via the golang-jwt library.
 func SignJWT(userID string, secretKey string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"id": userID,
+		"id":  userID,
+		"exp": time.Now().Add(180 * 24 * time.Hour).Unix(),
 	})
 	return token.SignedString([]byte(secretKey))
 }
