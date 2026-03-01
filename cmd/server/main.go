@@ -242,7 +242,7 @@ func main() {
 	// Market Data
 	mux.HandleFunc("GET /api/v1/market-data/markets", handler.HandleGetMarkets)
 	mux.HandleFunc("GET /api/v1/market-data/{dataSource}/{symbol}", auth.Authenticate(authCfg, handler.GetMarketData(deps)))
-	mux.HandleFunc("POST /api/v1/market-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.CreateMarketData(deps)))
+	mux.HandleFunc("POST /api/v1/market-data/{dataSource}/{symbol}", auth.Authenticate(authCfg, handler.CreateMarketData(deps)))
 
 	// Order
 	mux.HandleFunc("DELETE /api/v1/order", auth.RequirePermission(authCfg, auth.DeleteOrder, handler.DeleteOrders(deps)))

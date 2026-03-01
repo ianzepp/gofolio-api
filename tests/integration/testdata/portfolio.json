@@ -224,6 +224,26 @@
     "mode": "status",
     "body": { "tags": [] }
   },
+  {
+    "name": "portfolio-holding-tags-update-user-object-payload-status-parity",
+    "method": "PUT",
+    "path": "/api/v1/portfolio/holding/YAHOO/AAPL/tags",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": {
+      "tags": [{ "id": "integration-non-uuid-tag-id" }]
+    }
+  },
+  {
+    "name": "portfolio-holding-tags-update-user-missing-holding-status-parity",
+    "method": "PUT",
+    "path": "/api/v1/portfolio/holding/YAHOO/DOESNOTEXIST999/tags",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": { "tags": [] }
+  },
 
   {
     "name": "roai-holdings-json",

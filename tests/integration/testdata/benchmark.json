@@ -28,6 +28,26 @@
     "mode": "status"
   },
   {
+    "name": "benchmarks-post-admin-missing-symbol-status-parity",
+    "method": "POST",
+    "path": "/api/v1/benchmarks",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"],
+    "body": {
+      "dataSource": "YAHOO",
+      "symbol": "INTEGRATION_UNKNOWN_ASSET"
+    }
+  },
+  {
+    "name": "benchmarks-delete-admin-missing-symbol-status-parity",
+    "method": "DELETE",
+    "path": "/api/v1/benchmarks/YAHOO/INTEGRATION_UNKNOWN_ASSET",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"]
+  },
+  {
     "name": "benchmarks-detail-no-auth-unauthorized",
     "method": "GET",
     "path": "/api/v1/benchmarks/YAHOO/AAPL/2024-01-01",

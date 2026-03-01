@@ -12,8 +12,11 @@ package handler
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
+
+	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
 )
 
 // GetAdmin handles GET /api/v1/admin and returns the admin dashboard summary.
@@ -243,7 +246,26 @@ func CreateProfileData(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if err := deps.AdminService.CreateProfileData(r.Context(), dataSource, symbol, body.Currency); err != nil {
+		currency := body.Currency
+		if currency == "" {
+			currency = "USD"
+			if deps.UserService != nil {
+				userID := auth.UserID(r)
+				if userID != "" {
+					settings, err := deps.UserService.GetSettings(r.Context(), userID)
+					if err == nil && settings.Settings != nil {
+						settingsMap := map[string]any{}
+						if err := json.Unmarshal([]byte(*settings.Settings), &settingsMap); err == nil {
+							if baseCurrency, ok := settingsMap["baseCurrency"].(string); ok && baseCurrency != "" {
+								currency = baseCurrency
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if err := deps.AdminService.CreateProfileData(r.Context(), dataSource, symbol, currency); err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
 		}

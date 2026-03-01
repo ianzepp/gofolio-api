@@ -84,6 +84,11 @@ func CreateMarketData(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dataSource := r.PathValue("dataSource")
 		symbol := r.PathValue("symbol")
+		userID := auth.UserID(r)
+		if userID == "" {
+			Error(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
 
 		var body struct {
 			MarketData []struct {
@@ -95,8 +100,38 @@ func CreateMarketData(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if deps.MarketDataService == nil {
+		if deps.MarketDataService == nil || deps.UserService == nil {
 			Error(w, http.StatusInternalServerError, "Service unavailable")
+			return
+		}
+
+		user, err := deps.UserService.GetUser(r.Context(), userID)
+		if err != nil {
+			Error(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+
+		profileResp, err := deps.MarketDataService.GetBySymbol(r.Context(), dataSource, symbol)
+		profileExists := err == nil
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			Error(w, http.StatusInternalServerError, "Internal server error")
+			return
+		}
+		if !profileExists && !isCurrencyLikeSymbol(symbol) {
+			Error(w, http.StatusNotFound, "Not Found")
+			return
+		}
+
+		canUpsertAllAssetProfiles := auth.HasPermission(user.Role, auth.CreateMarketData) &&
+			auth.HasPermission(user.Role, auth.UpdateMarketData)
+		canUpsertOwnAssetProfile := profileExists &&
+			profileResp.AssetProfile.UserId != nil &&
+			*profileResp.AssetProfile.UserId == userID &&
+			auth.HasPermission(user.Role, auth.CreateMarketDataOfOwnAssetProfile) &&
+			auth.HasPermission(user.Role, auth.UpdateMarketDataOfOwnAssetProfile)
+
+		if !canUpsertAllAssetProfiles && !canUpsertOwnAssetProfile {
+			Error(w, http.StatusForbidden, "Forbidden")
 			return
 		}
 

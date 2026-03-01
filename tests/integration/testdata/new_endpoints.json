@@ -202,5 +202,11 @@
     "mode": "status",
     "auth": "jwt:JWT_ADMIN_TOKEN",
     "requiredEnv": ["ADMIN_USER_ID", "JWT_ADMIN_TOKEN"]
+  },
+  {
+    "name": "api-unknown-route-status-parity",
+    "method": "GET",
+    "path": "/api/v1/integration/does-not-exist",
+    "mode": "status"
   }
 ]

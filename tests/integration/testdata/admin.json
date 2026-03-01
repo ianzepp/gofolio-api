@@ -121,5 +121,38 @@
     "mode": "status",
     "auth": "jwt:JWT_ADMIN_TOKEN",
     "requiredEnv": ["JWT_ADMIN_TOKEN"]
+  },
+  {
+    "name": "admin-profile-data-create-no-auth-unauthorized",
+    "method": "POST",
+    "path": "/api/v1/admin/profile-data/YAHOO/INTEGRATION_UNKNOWN_ASSET",
+    "mode": "status",
+    "body": null
+  },
+  {
+    "name": "admin-profile-data-create-user-forbidden-parity",
+    "method": "POST",
+    "path": "/api/v1/admin/profile-data/YAHOO/INTEGRATION_UNKNOWN_ASSET",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": null
+  },
+  {
+    "name": "admin-profile-data-create-admin-null-body-status-parity",
+    "method": "POST",
+    "path": "/api/v1/admin/profile-data/MANUAL/INTEGRATION_NULL_BODY_ASSET",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"],
+    "body": null
+  },
+  {
+    "name": "admin-profile-data-delete-admin-null-body-asset-status-parity",
+    "method": "DELETE",
+    "path": "/api/v1/admin/profile-data/MANUAL/INTEGRATION_NULL_BODY_ASSET",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"]
   }
 ]

@@ -50,5 +50,36 @@
     "mode": "status",
     "auth": "jwt:JWT_USER_TOKEN",
     "requiredEnv": ["JWT_USER_TOKEN"]
+  },
+  {
+    "name": "market-data-update-no-auth-unauthorized",
+    "method": "POST",
+    "path": "/api/v1/market-data/YAHOO/AAPL",
+    "mode": "status",
+    "body": {
+      "marketData": [{ "date": "2024-01-02", "marketPrice": 123.45 }]
+    }
+  },
+  {
+    "name": "market-data-update-user-common-forbidden-parity",
+    "method": "POST",
+    "path": "/api/v1/market-data/YAHOO/AAPL",
+    "mode": "status",
+    "auth": "jwt:JWT_USER_TOKEN",
+    "requiredEnv": ["JWT_USER_TOKEN"],
+    "body": {
+      "marketData": [{ "date": "2024-01-02", "marketPrice": 123.45 }]
+    }
+  },
+  {
+    "name": "market-data-update-admin-status-parity",
+    "method": "POST",
+    "path": "/api/v1/market-data/YAHOO/AAPL",
+    "mode": "status",
+    "auth": "jwt:JWT_ADMIN_TOKEN",
+    "requiredEnv": ["JWT_ADMIN_TOKEN"],
+    "body": {
+      "marketData": [{ "date": "2024-01-02", "marketPrice": 123.45 }]
+    }
   }
 ]

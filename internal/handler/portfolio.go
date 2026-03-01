@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -103,21 +104,37 @@ func UpdatePortfolioHoldingTags(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dataSource := r.PathValue("dataSource")
 		symbol := r.PathValue("symbol")
-		userID := auth.UserID(r)
+		userID := resolveUserID(r)
 
 		var body struct {
-			Tags []string `json:"tags"`
+			Tags json.RawMessage `json:"tags"`
 		}
 		if !Bind(w, r, &body) {
 			return
 		}
 
-		if deps.OrderService == nil {
+		tagIDs, err := parseTagIDs(body.Tags)
+		if err != nil {
+			Error(w, http.StatusBadRequest, "Invalid request body: "+err.Error())
+			return
+		}
+
+		if deps.OrderService == nil || deps.PortfolioService == nil {
 			Error(w, http.StatusInternalServerError, "Service unavailable")
 			return
 		}
 
-		if err := deps.OrderService.UpdateTagsForHolding(r.Context(), userID, dataSource, symbol, body.Tags); err != nil {
+		holding, err := deps.PortfolioService.GetHolding(r.Context(), userID, dataSource, symbol)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if holding == nil {
+			Error(w, http.StatusNotFound, "Not Found")
+			return
+		}
+
+		if err := deps.OrderService.UpdateTagsForHolding(r.Context(), userID, dataSource, symbol, tagIDs); err != nil {
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -214,4 +231,30 @@ func resolveUserID(r *http.Request) string {
 		return impersonationID
 	}
 	return auth.UserID(r)
+}
+
+func parseTagIDs(raw json.RawMessage) ([]string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return []string{}, nil
+	}
+
+	var ids []string
+	if err := json.Unmarshal(raw, &ids); err == nil {
+		return ids, nil
+	}
+
+	var tags []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(raw, &tags); err != nil {
+		return nil, err
+	}
+
+	ids = make([]string, 0, len(tags))
+	for _, t := range tags {
+		if t.ID != "" {
+			ids = append(ids, t.ID)
+		}
+	}
+	return ids, nil
 }
