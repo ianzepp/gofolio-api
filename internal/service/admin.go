@@ -490,6 +490,10 @@ func (s *AdminService) DeleteProfileData(ctx context.Context, dataSource, symbol
 	mdRepo := repository.NewMarketDataRepository(s.db)
 	spRepo := repository.NewSymbolProfileRepository(s.db)
 
+	if _, err := spRepo.FindByDataSourceAndSymbol(ctx, dataSource, symbol); err != nil {
+		return fmt.Errorf("find symbol profile: %w", err)
+	}
+
 	if err := mdRepo.DeleteByDataSourceAndSymbol(ctx, dataSource, symbol); err != nil {
 		return fmt.Errorf("delete market data: %w", err)
 	}

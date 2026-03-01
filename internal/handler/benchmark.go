@@ -1,10 +1,6 @@
 package handler
 
-import (
-	"database/sql"
-	"errors"
-	"net/http"
-)
+import "net/http"
 
 func GetBenchmarks(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -39,10 +35,6 @@ func CreateBenchmark(deps *Deps) http.HandlerFunc {
 		}
 
 		if err := deps.BenchmarkService.AddBenchmark(r.Context(), body.DataSource, body.Symbol); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				Error(w, http.StatusNotFound, "Not Found")
-				return
-			}
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -62,10 +54,6 @@ func DeleteBenchmark(deps *Deps) http.HandlerFunc {
 		}
 
 		if err := deps.BenchmarkService.DeleteBenchmark(r.Context(), dataSource, symbol); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				Error(w, http.StatusNotFound, "Not Found")
-				return
-			}
 			Error(w, http.StatusInternalServerError, err.Error())
 			return
 		}

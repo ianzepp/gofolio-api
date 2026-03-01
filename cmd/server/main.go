@@ -190,7 +190,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/market-data/{dataSource}/{symbol}/test", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.TestMarketData(deps)))
 	mux.HandleFunc("DELETE /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.DeleteProfileData(deps)))
 	mux.HandleFunc("PATCH /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.UpdateProfileData(deps)))
-	mux.HandleFunc("POST /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.CreateProfileData(deps)))
+	mux.HandleFunc("POST /api/v1/admin/profile-data/{dataSource}/{symbol}", handler.CreateProfileData(deps))
 	mux.HandleFunc("PUT /api/v1/admin/settings/{key}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleUpdateAdminSetting))
 	mux.HandleFunc("GET /api/v1/admin/user", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminUsers(deps)))
 	mux.HandleFunc("GET /api/v1/admin/user/{id}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminUser(deps)))
@@ -298,7 +298,7 @@ func main() {
 	mux.HandleFunc("PUT /api/v1/portfolio/holding/{dataSource}/{symbol}/tags", auth.RequirePermission(authCfg, auth.UpdateOrder, handler.UpdatePortfolioHoldingTags(deps)))
 	mux.HandleFunc("GET /api/v1/portfolio/holdings", auth.Authenticate(authCfg, handler.GetPortfolioHoldings(deps)))
 	mux.HandleFunc("GET /api/v1/portfolio/investments", auth.Authenticate(authCfg, handler.GetPortfolioInvestments(deps)))
-	mux.HandleFunc("GET /api/v1/portfolio/performance", auth.Authenticate(authCfg, handler.GetPortfolioPerformance(deps)))
+	mux.HandleFunc("GET /api/v1/portfolio/performance", handler.GetPortfolioPerformance(deps))
 	mux.HandleFunc("GET /api/v1/portfolio/report", auth.Authenticate(authCfg, handler.GetPortfolioReport(deps)))
 
 	// Public

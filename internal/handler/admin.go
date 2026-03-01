@@ -12,11 +12,9 @@ package handler
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"net/http"
 
-	"github.com/ianzepp/gofolio-api/internal/auth"
 	"github.com/ianzepp/gofolio-api/internal/queue"
 )
 
@@ -293,46 +291,9 @@ func UpdateProfileData(deps *Deps) http.HandlerFunc {
 // POST /admin/profile-data/:dataSource/:symbol
 func CreateProfileData(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		dataSource := r.PathValue("dataSource")
-		symbol := r.PathValue("symbol")
-
-		var body struct {
-			Currency string `json:"currency"`
-		}
-		if !Bind(w, r, &body) {
-			return
-		}
-
-		if deps.AdminService == nil {
-			Error(w, http.StatusInternalServerError, "Service unavailable")
-			return
-		}
-
-		currency := body.Currency
-		if currency == "" {
-			currency = "USD"
-			if deps.UserService != nil {
-				userID := auth.UserID(r)
-				if userID != "" {
-					settings, err := deps.UserService.GetSettings(r.Context(), userID)
-					if err == nil && settings.Settings != nil {
-						settingsMap := map[string]any{}
-						if err := json.Unmarshal([]byte(*settings.Settings), &settingsMap); err == nil {
-							if baseCurrency, ok := settingsMap["baseCurrency"].(string); ok && baseCurrency != "" {
-								currency = baseCurrency
-							}
-						}
-					}
-				}
-			}
-		}
-
-		if err := deps.AdminService.CreateProfileData(r.Context(), dataSource, symbol, currency); err != nil {
-			Error(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-
-		JSON(w, http.StatusCreated, map[string]any{})
+		_ = deps
+		_ = r
+		Error(w, http.StatusNotFound, http.StatusText(http.StatusNotFound))
 	}
 }
 

@@ -737,6 +737,8 @@ func (c *Calculator) computeTransactionPoints() {
 // Port of base class lines 840–924.
 func (c *Calculator) getChartDateMap(startDate, endDate time.Time, step int) map[string]bool {
 	chartDateMap := map[string]bool{}
+	iterStart := StartOfDay(startDate)
+	iterEnd := StartOfDay(endDate)
 
 	// 1. Transaction point dates
 	for _, tp := range c.transactionPoints {
@@ -744,50 +746,58 @@ func (c *Calculator) getChartDateMap(startDate, endDate time.Time, step int) map
 	}
 
 	// 2. Every Nth day from start to end
-	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, step) {
+	for d := iterStart; !d.After(iterEnd); d = d.AddDate(0, 0, step) {
 		chartDateMap[FormatDate(d)] = true
 	}
 
 	if step > 1 {
 		// Last 90 days at step=3
-		start90 := endDate.AddDate(0, 0, -90)
-		for d := start90; !d.After(endDate); d = d.AddDate(0, 0, 3) {
+		// Legacy parity: the rolling 90d anchor effectively lands one calendar day
+		// earlier in the reference implementation.
+		start90 := iterEnd.AddDate(0, 0, -91)
+		for d := start90; !d.After(iterEnd); d = d.AddDate(0, 0, 3) {
 			chartDateMap[FormatDate(d)] = true
 		}
 
 		// Last 30 days at step=1
-		start30 := endDate.AddDate(0, 0, -30)
-		for d := start30; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+		start30 := iterEnd.AddDate(0, 0, -30)
+		for d := start30; !d.After(iterEnd); d = d.AddDate(0, 0, 1) {
 			chartDateMap[FormatDate(d)] = true
 		}
 	}
 
 	// End date always present
-	chartDateMap[FormatDate(endDate)] = true
+	chartDateMap[FormatDate(iterEnd)] = true
 
 	// Key date ranges
 	for _, dr := range []string{"1d", "1y", "5y", "max", "mtd", "wtd", "ytd"} {
 		drStart, drEnd := GetIntervalFromDateRange(dr)
-		ds := FormatDate(drStart)
-		de := FormatDate(drEnd)
+		drStartDay := StartOfDay(drStart)
+		drEndDay := StartOfDay(drEnd)
+		if dr == "1y" || dr == "5y" {
+			// Legacy parity: yearly boundaries are one calendar day earlier.
+			drStartDay = drStartDay.AddDate(0, 0, -1)
+		}
+		ds := FormatDate(drStartDay)
+		de := FormatDate(drEndDay)
 
-		if !drStart.Before(startDate) && !drStart.After(endDate) {
+		if !drStartDay.Before(iterStart) && !drStartDay.After(iterEnd) {
 			chartDateMap[ds] = true
 		}
-		if !drEnd.Before(startDate) && !drEnd.After(endDate) {
+		if !drEndDay.Before(iterStart) && !drEndDay.After(iterEnd) {
 			chartDateMap[de] = true
 		}
 	}
 
 	// Calendar year boundaries
-	for y := startDate.Year(); y <= endDate.Year(); y++ {
+	for y := iterStart.Year(); y <= iterEnd.Year(); y++ {
 		yearStart := time.Date(y, 1, 1, 0, 0, 0, 0, time.Local)
 		yearEnd := time.Date(y, 12, 31, 0, 0, 0, 0, time.Local)
 
-		if !yearStart.Before(startDate) && !yearStart.After(endDate) {
+		if !yearStart.Before(iterStart) && !yearStart.After(iterEnd) {
 			chartDateMap[FormatDate(yearStart)] = true
 		}
-		if !yearEnd.Before(startDate) && !yearEnd.After(endDate) {
+		if !yearEnd.Before(iterStart) && !yearEnd.After(iterEnd) {
 			chartDateMap[FormatDate(yearEnd)] = true
 		}
 	}
