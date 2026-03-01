@@ -239,15 +239,16 @@ cp .env.example .env
 go run ./cmd/server
 ```
 
-On first startup the server automatically creates the schema and seeds an admin user.
+On first startup the server automatically creates the schema and runs seed data.
+If no admin exists, startup bootstraps one from `BOOTSTRAP_ADMIN_TOKEN`.
 
 ### Authenticate
 
-**Admin (seeded):**
+**Admin (bootstrapped):**
 ```bash
 curl -X POST http://localhost:3334/api/v1/auth/anonymous \
   -H 'Content-Type: application/json' \
-  -d '{"accessToken":"gofolio-admin-token"}'
+  -d '{"accessToken":"<BOOTSTRAP_ADMIN_TOKEN>"}'
 # Returns {"authToken":"<jwt>"}
 ```
 
@@ -268,9 +269,11 @@ See [`ENV.md`](./ENV.md) for the full reference. Key variables:
 | `DATABASE_URL` | Yes | — | Postgres DSN |
 | `JWT_SECRET_KEY` | Yes | — | HMAC key for JWT signing |
 | `ACCESS_TOKEN_SALT` | Yes | — | HMAC key for access token hashing |
+| `BOOTSTRAP_ADMIN_TOKEN` | Yes (prod-first boot) | — | One-time admin bootstrap token |
+| `BOOTSTRAP_ADMIN_ID` | No | `00000000-0000-0000-0000-000000000001` | Admin user ID override |
 | `PORT` | No | `3333` | HTTP listen port |
 
-The `.env.example` ships with working dev defaults (`1234` for secrets, port `3334`).
+The `.env.example` ships with dev defaults (`1234` for local secrets, port `3334`), plus placeholders for bootstrap admin envs.
 
 ### Graceful degradation
 

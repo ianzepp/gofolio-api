@@ -15,6 +15,8 @@ This file documents environment variables currently used by `gofolio-api`.
 | `PORT` | No | `3333` | `cmd/server/main.go` | HTTP listen port. |
 | `JWT_SECRET_KEY` | Yes (for auth) | none | `cmd/server/main.go`, handlers | Required to sign/validate JWTs. If empty, authenticated requests fail. |
 | `ACCESS_TOKEN_SALT` | Yes (for anonymous token flows) | none | `internal/handler/user.go` | Required to hash access tokens (HMAC-SHA512). |
+| `BOOTSTRAP_ADMIN_TOKEN` | Required when no admin user exists in production | none | `internal/db/migrate.go` | One-time bootstrap admin token. Startup hashes it with `ACCESS_TOKEN_SALT` and inserts an `ADMIN` user if none exists. |
+| `BOOTSTRAP_ADMIN_ID` | No | `00000000-0000-0000-0000-000000000001` | `internal/db/migrate.go` | Optional fixed ID for the bootstrap admin row. |
 | `ROOT_URL` | No | `http://localhost:4200` | `internal/handler/auth.go` | Base frontend URL for OAuth callback redirects. |
 | `ENABLE_FEATURE_AUTH_OIDC` | No | effectively `false` | `internal/handler/auth.go`, `internal/service/info.go` | Controls OIDC auth exposure. Handler checks strict string equality (`"true"`). |
 | `ENABLE_FEATURE_SUBSCRIPTION` | No | effectively `false` | `internal/handler/public.go`, `internal/service/info.go` | Enables subscription-gated behavior and `info` global permission. Handler checks strict string equality (`"true"`). |
@@ -31,9 +33,14 @@ For `internal/service/info.go`, truthy feature-flag values are: `1`, `true`, `ye
 
 On startup, if DB connection and ping succeed, the server checks for `public."User"`.
 
-- If `public."User"` exists: migrations are skipped.
+- If `public."User"` exists: schema migration is skipped.
 - If missing: it executes the embedded initial schema SQL (`internal/db/migrations/000001_initial_schema.up.sql`).
-- If migration fails: DB is closed and server continues in degraded mode.
+- Seed SQL (`internal/db/migrations/000002_seed.up.sql`) runs on every startup.
+- After schema/seed, startup ensures at least one `ADMIN` user exists:
+  - If an admin already exists: no-op.
+  - If no admin exists and `BOOTSTRAP_ADMIN_TOKEN` is set: creates admin user using hashed token.
+  - If no admin exists and token is missing in production (`RAILWAY_ENVIRONMENT` set, or `APP_ENV`/`GO_ENV`/`NODE_ENV`/`ENVIRONMENT` = `production`): startup migration fails.
+- If migration/bootstrap fails: DB is closed and server continues in degraded mode.
 
 There is currently no env flag to disable startup migration.
 
@@ -56,6 +63,8 @@ DATABASE_URL=postgresql://user:password@localhost:5432/ghostfolio?sslmode=disabl
 PORT=3333
 JWT_SECRET_KEY=replace-me
 ACCESS_TOKEN_SALT=replace-me
+BOOTSTRAP_ADMIN_TOKEN=replace-with-long-random-secret
+BOOTSTRAP_ADMIN_ID=00000000-0000-0000-0000-000000000001
 ROOT_URL=http://localhost:4200
 
 DB_CONNECT_TIMEOUT=10s
