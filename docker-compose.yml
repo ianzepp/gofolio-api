@@ -14,6 +14,17 @@ services:
       interval: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
   api:
     build: .
     ports:
@@ -21,9 +32,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file: .env
     environment:
       DATABASE_URL: postgresql://user:1234@postgres:5432/ghostfolio-db?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
 
 volumes:
   pgdata:
+  redisdata:
