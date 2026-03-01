@@ -7,8 +7,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/calculator"
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
+	"github.com/ianzepp/gofolio-api/internal/calculator"
+	"github.com/ianzepp/gofolio-api/internal/repository"
 	"github.com/jmoiron/sqlx"
 	"github.com/shopspring/decimal"
 )

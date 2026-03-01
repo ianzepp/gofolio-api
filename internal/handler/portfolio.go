@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
+	"github.com/ianzepp/gofolio-api/internal/auth"
+	"github.com/ianzepp/gofolio-api/internal/service"
 )
 
 // filtersToPortfolioFilter converts handler.Filters to service.PortfolioFilter.

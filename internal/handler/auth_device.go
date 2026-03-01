@@ -3,7 +3,7 @@ package handler
 import (
 	"net/http"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
+	"github.com/ianzepp/gofolio-api/internal/auth"
 )
 
 // DeleteAuthDevice handles DELETE /api/v1/auth-device/{id}.

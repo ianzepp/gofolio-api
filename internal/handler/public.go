@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
+	"github.com/ianzepp/gofolio-api/internal/db"
+	"github.com/ianzepp/gofolio-api/internal/repository"
 )
 
 // GetPublicPortfolio handles GET /api/v1/public/{accessId}/portfolio.

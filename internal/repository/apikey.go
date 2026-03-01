@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
+	"github.com/ianzepp/gofolio-api/internal/db"
 )
 
 // ApiKeyRepository handles persistence for the ApiKey table, which stores

@@ -36,8 +36,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
+	"github.com/ianzepp/gofolio-api/internal/model"
+	"github.com/ianzepp/gofolio-api/internal/service"
 )
 
 // GetSymbol handles GET /api/v1/symbol/{dataSource}/{symbol}. The optional

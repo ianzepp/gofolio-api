@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
+	"github.com/ianzepp/gofolio-api/internal/service"
 	"github.com/jmoiron/sqlx"
 )
 

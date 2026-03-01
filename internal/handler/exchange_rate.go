@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
+	"github.com/ianzepp/gofolio-api/internal/service"
 )
 
 // GetExchangeRate returns the exchange rate for a currency-pair symbol on a

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
+	"github.com/ianzepp/gofolio-api/internal/service"
 )
 
 // GetLogo fetches a favicon for the URL provided in the ?url= query parameter.

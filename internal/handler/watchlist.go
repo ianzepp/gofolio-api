@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
+	"github.com/ianzepp/gofolio-api/internal/auth"
+	"github.com/ianzepp/gofolio-api/internal/service"
 )
 
 // GetWatchlist returns the user's watched symbols. Supports impersonation.

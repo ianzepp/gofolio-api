@@ -71,6 +71,15 @@ func NoContent(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// HandleNotFound returns a JSON 404 for any unmatched route.
+func HandleNotFound(w http.ResponseWriter, r *http.Request) {
+	JSON(w, http.StatusNotFound, map[string]any{
+		"error":      "Not Found",
+		"message":    "Cannot " + r.Method + " " + r.URL.RequestURI(),
+		"statusCode": http.StatusNotFound,
+	})
+}
+
 // --- Request helpers ---
 
 // Bind decodes the JSON request body into target. It returns true on success.

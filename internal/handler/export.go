@@ -3,7 +3,7 @@ package handler
 import (
 	"net/http"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
+	"github.com/ianzepp/gofolio-api/internal/auth"
 )
 
 func GetExport(deps *Deps) http.HandlerFunc {

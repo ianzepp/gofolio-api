@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
+	"github.com/ianzepp/gofolio-api/internal/auth"
 )
 
 // AuthAnonymous handles POST /api/v1/auth/anonymous.

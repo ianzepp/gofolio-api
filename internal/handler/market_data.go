@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
+	"github.com/ianzepp/gofolio-api/internal/auth"
 	"golang.org/x/text/currency"
 )
 

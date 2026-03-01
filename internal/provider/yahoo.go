@@ -46,7 +46,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
+	"github.com/ianzepp/gofolio-api/internal/model"
 )
 
 const (

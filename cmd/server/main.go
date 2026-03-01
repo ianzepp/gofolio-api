@@ -29,14 +29,13 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"time"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/db"
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/handler"
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/provider"
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
+	"github.com/ianzepp/gofolio-api/internal/auth"
+	"github.com/ianzepp/gofolio-api/internal/db"
+	"github.com/ianzepp/gofolio-api/internal/handler"
+	"github.com/ianzepp/gofolio-api/internal/provider"
+	"github.com/ianzepp/gofolio-api/internal/service"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -65,8 +64,13 @@ func main() {
 			// WHY: Close the database here — a handle that cannot reach the server
 			// wastes OS file descriptors and confuses health checks downstream.
 			d.Close()
+		} else if migrateErr := db.MigrateIfSchemaMissing(context.Background(), d, db.InitialSchemaMigrationSQL()); migrateErr != nil {
+			log.Printf("database migration warning: %v", migrateErr)
+			// WHY: Close unusable pool on migration failure so handlers don't
+			// execute against an uninitialized schema.
+			d.Close()
 		} else {
-			log.Printf("database connected")
+			log.Printf("database connected and schema ready")
 			database = d
 			dbCloser = d.Close
 
@@ -184,8 +188,6 @@ func main() {
 	// Asset
 	mux.HandleFunc("GET /api/v1/asset/{dataSource}/{symbol}", handler.GetAsset(deps))
 
-	// Assets (web manifest)
-	mux.HandleFunc("GET /assets/{languageCode}/site.webmanifest", handler.HandleGetWebManifest)
 
 	// Auth
 	mux.HandleFunc("POST /api/v1/auth/anonymous", handler.AuthAnonymous(deps))
@@ -274,8 +276,6 @@ func main() {
 	// Public
 	mux.HandleFunc("GET /api/v1/public/{accessId}/portfolio", handler.GetPublicPortfolio(deps))
 
-	// Sitemap
-	mux.HandleFunc("GET /sitemap.xml", handler.HandleGetSitemap)
 
 	// Subscription
 	mux.HandleFunc("POST /api/v1/subscription/redeem-coupon", handler.HandleRedeemCoupon)
@@ -307,16 +307,8 @@ func main() {
 	mux.HandleFunc("POST /api/v1/watchlist", auth.RequirePermission(authCfg, auth.CreateWatchlistItem, handler.CreateWatchlistItem(deps)))
 	mux.HandleFunc("DELETE /api/v1/watchlist/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.DeleteWatchlistItem, handler.DeleteWatchlistItem(deps)))
 
-	// Static file serving (Angular frontend)
-	// In Docker, the working directory is /ghostfolio/apps/api, so ../client
-	// resolves to /ghostfolio/apps/client where the Angular build output lives.
-	// CLIENT_DIR env var overrides for local development.
-	clientDir := os.Getenv("CLIENT_DIR")
-	if clientDir == "" {
-		clientDir = filepath.Join("..", "client")
-	}
-	staticHandler := handler.NewStaticHandler(clientDir)
-	mux.Handle("/", staticHandler)
+	// Catch-all: return JSON 404 for any unmatched route.
+	mux.HandleFunc("/", handler.HandleNotFound)
 
 	// PHASE 5: HTTP SERVER START
 	// WHY: Explicit timeouts are set on all phases of a request lifecycle to

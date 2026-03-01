@@ -19,7 +19,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
+	"github.com/ianzepp/gofolio-api/internal/model"
 )
 
 // WHY: A typed int key prevents accidental collisions when multiple packages

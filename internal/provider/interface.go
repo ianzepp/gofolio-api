@@ -22,7 +22,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
+	"github.com/ianzepp/gofolio-api/internal/model"
 )
 
 // DataProviderResponse holds a single live-quote result from a data provider.

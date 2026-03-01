@@ -17,7 +17,7 @@
 // here will cause the Go server to enforce different access rules than NestJS.
 package auth
 
-import "github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
+import "github.com/ianzepp/gofolio-api/internal/model"
 
 // Permission constants matching libs/common/src/lib/permissions.ts.
 // Each constant is the string literal used as a key in the rolePermissions map

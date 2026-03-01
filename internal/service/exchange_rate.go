@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/model"
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
+	"github.com/ianzepp/gofolio-api/internal/model"
+	"github.com/ianzepp/gofolio-api/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
 

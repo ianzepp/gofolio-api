@@ -16,7 +16,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
+	"github.com/ianzepp/gofolio-api/internal/auth"
 )
 
 // GetAdmin handles GET /api/v1/admin and returns the admin dashboard summary.

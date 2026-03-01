@@ -220,6 +220,8 @@ Scanning uses `sqlx.Select`/`sqlx.Get` with struct tags — no manual field scan
 
 ## Running
 
+Environment variable reference: [`ENV.md`](./ENV.md).
+
 ```bash
 cd apps/api-go
 export DATABASE_URL="postgresql://user:password@localhost:5432/ghostfolio?sslmode=prefer"

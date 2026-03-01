@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/repository"
+	"github.com/ianzepp/gofolio-api/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
 

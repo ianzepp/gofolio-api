@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/auth"
-	"github.com/ghostfolio/ghostfolio/apps/api-go/internal/service"
+	"github.com/ianzepp/gofolio-api/internal/auth"
+	"github.com/ianzepp/gofolio-api/internal/service"
 )
 
 // GetAiPrompt handles GET /api/v1/ai/prompt/{mode}.
