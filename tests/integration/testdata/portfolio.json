@@ -396,7 +396,10 @@
     "mode": "json",
     "auth": "jwt:JWT_ROAI_TOKEN",
     "requiredEnv": ["JWT_ROAI_TOKEN", "ROAI_SEEDED"],
-    "ignoreJsonPaths": ["investments.*.investment"]
+    "ignoreJsonPaths": ["investments.*.investment"],
+    "flexibleArrayPath": "investments",
+    "flexibleArrayLengthDelta": 2,
+    "flexibleArrayEnforceItemShape": true
   },
   {
     "name": "roai-holdings-filter-roai-account-json",

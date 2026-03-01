@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -22,15 +23,18 @@ const (
 )
 
 type testCase struct {
-	Name            string            `json:"name"`
-	Method          string            `json:"method"`
-	Path            string            `json:"path"`
-	Mode            compareMode       `json:"mode"`
-	Headers         map[string]string `json:"headers"`
-	Auth            string            `json:"auth"` // "", "jwt", "api-key"
-	RequiredEnv     []string          `json:"requiredEnv"`
-	Body            json.RawMessage   `json:"body"`
-	IgnoreJSONPaths []string          `json:"ignoreJsonPaths"`
+	Name                     string            `json:"name"`
+	Method                   string            `json:"method"`
+	Path                     string            `json:"path"`
+	Mode                     compareMode       `json:"mode"`
+	Headers                  map[string]string `json:"headers"`
+	Auth                     string            `json:"auth"` // "", "jwt", "api-key"
+	RequiredEnv              []string          `json:"requiredEnv"`
+	Body                     json.RawMessage   `json:"body"`
+	IgnoreJSONPaths          []string          `json:"ignoreJsonPaths"`
+	FlexibleArrayPath        string            `json:"flexibleArrayPath"`
+	FlexibleArrayLengthDelta int               `json:"flexibleArrayLengthDelta"`
+	FlexibleArrayItemShape   bool              `json:"flexibleArrayEnforceItemShape"`
 }
 
 type response struct {
@@ -304,6 +308,21 @@ func assertJSONEqual(t *testing.T, tc testCase, legacyBody, goBody []byte) {
 		goValue = removeJSONPath(goValue, parts)
 	}
 
+	if tc.FlexibleArrayPath != "" {
+		parts := strings.Split(tc.FlexibleArrayPath, ".")
+		if err := assertFlexibleArrayEqual(legacyValue, goValue, parts, tc.FlexibleArrayLengthDelta, tc.FlexibleArrayItemShape); err != nil {
+			t.Fatalf(
+				"JSON mismatch for %s %s (flexible array rule)\nerror=%v",
+				tc.Method,
+				tc.Path,
+				err,
+			)
+		}
+		// Compare remaining JSON strictly after removing the flexible array path.
+		legacyValue = removeJSONPath(legacyValue, parts)
+		goValue = removeJSONPath(goValue, parts)
+	}
+
 	legacyCanonical, err := canonicalJSON(legacyValue)
 	if err != nil {
 		t.Fatalf("canonicalize legacy JSON: %v", err)
@@ -381,4 +400,145 @@ func removeJSONPath(v any, parts []string) any {
 	default:
 		return v
 	}
+}
+
+func assertFlexibleArrayEqual(legacyRoot, goRoot any, pathParts []string, allowedDelta int, enforceItemShape bool) error {
+	legacyTarget, ok := getJSONPath(legacyRoot, pathParts)
+	if !ok {
+		return fmt.Errorf("legacy missing path %q", strings.Join(pathParts, "."))
+	}
+	goTarget, ok := getJSONPath(goRoot, pathParts)
+	if !ok {
+		return fmt.Errorf("go missing path %q", strings.Join(pathParts, "."))
+	}
+
+	legacyArr, ok := legacyTarget.([]any)
+	if !ok {
+		return fmt.Errorf("legacy path %q is not an array", strings.Join(pathParts, "."))
+	}
+	goArr, ok := goTarget.([]any)
+	if !ok {
+		return fmt.Errorf("go path %q is not an array", strings.Join(pathParts, "."))
+	}
+
+	if absInt(len(legacyArr)-len(goArr)) > allowedDelta {
+		return fmt.Errorf(
+			"array length difference exceeds allowed delta at %q (legacy=%d go=%d allowed=%d)",
+			strings.Join(pathParts, "."),
+			len(legacyArr),
+			len(goArr),
+			allowedDelta,
+		)
+	}
+
+	if enforceItemShape {
+		legacyShapes := collectArrayItemShapes(legacyArr)
+		goShapes := collectArrayItemShapes(goArr)
+		if !equalStringSlices(legacyShapes, goShapes) {
+			return fmt.Errorf(
+				"array item shape mismatch at %q (legacyShapes=%v goShapes=%v)",
+				strings.Join(pathParts, "."),
+				legacyShapes,
+				goShapes,
+			)
+		}
+	}
+
+	return nil
+}
+
+func getJSONPath(v any, parts []string) (any, bool) {
+	cur := v
+	for _, part := range parts {
+		switch typed := cur.(type) {
+		case map[string]any:
+			next, ok := typed[part]
+			if !ok {
+				return nil, false
+			}
+			cur = next
+		case []any:
+			idx, err := strconv.Atoi(part)
+			if err != nil || idx < 0 || idx >= len(typed) {
+				return nil, false
+			}
+			cur = typed[idx]
+		default:
+			return nil, false
+		}
+	}
+	return cur, true
+}
+
+func collectArrayItemShapes(items []any) []string {
+	uniq := map[string]struct{}{}
+	for _, item := range items {
+		uniq[shapeSignature(item)] = struct{}{}
+	}
+	result := make([]string, 0, len(uniq))
+	for sig := range uniq {
+		result = append(result, sig)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func shapeSignature(v any) string {
+	shape := buildShape(v)
+	b, err := json.Marshal(shape)
+	if err != nil {
+		return fmt.Sprintf("shape-marshal-error:%T", v)
+	}
+	return string(b)
+}
+
+func buildShape(v any) any {
+	switch cur := v.(type) {
+	case nil:
+		return "null"
+	case bool:
+		return "bool"
+	case string:
+		return "string"
+	case json.Number:
+		return "number"
+	case float64, float32, int, int64, int32, uint, uint64, uint32:
+		return "number"
+	case map[string]any:
+		fields := make(map[string]any, len(cur))
+		for k, val := range cur {
+			fields[k] = buildShape(val)
+		}
+		return map[string]any{
+			"type":   "object",
+			"fields": fields,
+		}
+	case []any:
+		itemShapes := collectArrayItemShapes(cur)
+		return map[string]any{
+			"type":  "array",
+			"items": itemShapes,
+		}
+	default:
+		return fmt.Sprintf("unknown:%T", v)
+	}
+}
+
+func equalStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func absInt(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
