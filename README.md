@@ -48,19 +48,11 @@ Go eliminates the ceremony. No decorators, no DI containers, no module system. F
 Current parity snapshot:
 
 - Differential harness: `196` cases total (`156` status + `40` JSON) across `21` fixture files
-- Differential pass rate (estimated): `~189/196` passing
+- Differential pass rate (verified): `196/196` passing on `2026-03-01` via `./tests/integration/run.sh` against legacy (`localhost:3333`) and Go (`localhost:3334`)
 - 20 services wired into handler `Deps` struct
 - 14 repository files, 13 model files, 3 provider files, 22 service files, 6 calculator files
-- Remaining parity failures are concentrated in ROAI portfolio-calculator JSON responses:
-  - `roai-holdings-json`
-  - `roai-details-json`
-  - `roai-holding-btcusd-json`
-  - `roai-holding-msft-json`
-  - `roai-dividends-json`
-  - `roai-investments-json`
-  - `roai-holdings-filter-roai-account-json`
-- Recently wired: benchmark create/delete, admin profile-data CRUD, market-data write, portfolio holding tags update, `auth/anonymous`, `api-keys`, `ai/prompt`, `cache/flush`, `auth-device`, `public` portfolio
-- Remaining stub areas: admin gather worker execution semantics, admin settings, benchmark detail, portfolio report
+- Recently wired: benchmark create/delete, admin profile-data delete/update, market-data write, portfolio holding tags update, `auth/anonymous`, `api-keys`, `ai/prompt`, `cache/flush`, `auth-device`, `public` portfolio
+- Remaining stub/partial areas: admin gather worker execution semantics, admin settings, benchmark detail, portfolio report, profile-data create route semantics
 - Excluded from scope: `agent/*` (local-only code), `subscription/*` (Stripe-only), `auth/oauth` (Google/OIDC server-side), `auth/webauthn` (FIDO2 crypto)
 - See [`GAPS.md`](./GAPS.md) for the full remaining-work inventory
 
@@ -297,7 +289,7 @@ Current test pattern:
   - Details: [`tests/integration/README.md`](./tests/integration/README.md)
   - Full fixture/test-case inventory: see the `Fixture Catalog` section in [`tests/integration/README.md`](./tests/integration/README.md)
   - Fixtures split per handler in `testdata/*.json` (e.g. `account.json`, `portfolio.json`)
-  - Current fixture count: `169` total (`132` status compare, `37` JSON compare) across `20` files
+  - Current fixture count: `196` total (`156` status compare, `40` JSON compare) across `21` files
 
 Run all tests:
 

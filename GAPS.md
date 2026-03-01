@@ -2,35 +2,22 @@
 
 Tracked inventory of everything between current state and full parity with the NestJS backend. Each section is a workstream; items within are ordered by priority/dependency.
 
-Last updated: 2026-02-28 (post-commit scan)
+Last updated: 2026-03-01 (post-parity run)
 
 ---
 
-## 1. ROAI Calculator JSON Parity (8 failures)
+## 1. Differential Baseline
 
-The calculator engine is structurally complete (~2,000 LOC) but output values diverge from NestJS. All 7 failing differential tests are JSON-mode comparisons against the ROAI-seeded user.
+Current differential baseline is fully green:
 
-| #   | Test Case                                | Endpoint                               | Key Ignored Fields                                                                                   |
-| --- | ---------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| 1   | `roai-holdings-json`                     | `GET /portfolio/holdings`              | marketPrice, grossPerformance, netPerformance, allocation, investment, dividend, valueInBaseCurrency |
-| 2   | `roai-details-json`                      | `GET /portfolio/details`               | accounts, platforms, holdings, markets, marketsAdvanced, summary                                     |
-| 3   | `roai-holding-btcusd-json`               | `GET /portfolio/holding/YAHOO/BTCUSD`  | historicalData, averagePrice, gross/net performance (all variants), marketPrice, value               |
-| 4   | `roai-holding-msft-json`                 | `GET /portfolio/holding/YAHOO/MSFT`    | same as #3                                                                                           |
-| 5   | `roai-dividends-json`                    | `GET /portfolio/dividends`             | dividends.\*.investment                                                                              |
-| 6   | `roai-investments-json`                  | `GET /portfolio/investments`           | investments.\*.investment                                                                            |
-| 7   | `roai-performance-max-json`              | `GET /portfolio/performance?range=max` | chart, performance values                                                                            |
-| 8   | `roai-holdings-filter-roai-account-json` | `GET /portfolio/holdings?accounts=...` | same as #1                                                                                           |
+- `196/196` passing (`156` status + `40` JSON)
+- Verified on `2026-03-01` with `./tests/integration/run.sh`
+- Baseline env used for Go API in parity run:
+  - `JWT_SECRET_KEY=1234`
+  - `ACCESS_TOKEN_SALT=1234`
+  - `DATABASE_URL=postgresql://user:1234@localhost:5432/ghostfolio-db?connect_timeout=300&sslmode=prefer`
 
-**Root causes to investigate:**
-
-- [ ] Rounding differences (shopspring/decimal vs big.js)
-- [ ] Exchange rate lookup timing (which date's rate is used for conversion)
-- [ ] Currency effect calculations
-- [ ] Date boundary handling (local timezone vs UTC)
-- [ ] `details` response missing `accounts`, `platforms`, `markets`, `marketsAdvanced`, `summary` aggregations
-- [ ] Single-holding `historicalData` and `performances` are stubbed empty
-
-**Approach:** Run tests without `ignoreJsonPaths`, diff actual vs expected, fix line-by-line.
+Remaining parity work is now about unimplemented/stubbed in-scope routes and untested semantics, not currently failing differential fixtures.
 
 ---
 
@@ -53,17 +40,20 @@ Background job triggers. NestJS uses BullMQ to enqueue gather tasks.
 
 Status: routes now enqueue Redis-backed queue jobs. Remaining work is worker-side execution parity and payload semantics.
 
-### ~~2b. Admin — Profile Data CRUD (3 routes)~~ DONE
+### 2b. Admin — Profile Data CRUD (3 routes) — 2/3 PARTIAL
 
-Wired: Create, Update, Delete profile data with auth guards.
+Delete + update are wired through `AdminService`.
+Create currently returns legacy-style `404` parity response and needs full implementation semantics.
 
-### 2c. Admin — Misc (3 routes)
+### 2c. Admin — Misc (3 routes) — 1/3 PARTIAL
 
 | Method | Path                                          | Purpose                  |
 | ------ | --------------------------------------------- | ------------------------ |
 | PUT    | `/admin/settings/:key`                        | Update admin setting     |
 | GET    | `/admin/demo-user/sync`                       | Sync demo user           |
 | POST   | `/admin/market-data/:dataSource/:symbol/test` | Test market data scraper |
+
+Status: `POST /admin/market-data/:dataSource/:symbol/test` now enqueues queue jobs; settings and demo-user-sync are still stubs.
 
 ### ~~2d. Import (2 routes)~~ DONE
 
@@ -120,13 +110,13 @@ Main README parity snapshot updated to reflect 196 cases across 21 fixture files
 
 Areas with no or minimal differential test coverage:
 
-- [ ] Import endpoints (no fixtures — stubbed)
+- [ ] Import endpoints (no dedicated fixtures)
 - [ ] Admin gather endpoints (no JSON fixtures — enqueue semantics only)
-- [ ] Admin profile data CRUD (no fixtures — stubbed)
-- [ ] Benchmark create/delete/detail (status only, no JSON)
-- [ ] Market data create (no fixtures — stubbed)
-- [ ] Portfolio report (no fixtures — stubbed)
-- [ ] Holding tags update (no fixtures — stubbed)
+- [ ] Admin profile data CRUD (minimal fixtures; create semantics not covered)
+- [ ] Benchmark create/delete/detail (status-only coverage; no JSON fixtures)
+- [ ] Market data create (no dedicated fixtures)
+- [ ] Portfolio report (status-only coverage; handler is stub)
+- [ ] Holding tags update (status-only coverage; no JSON fixtures)
 - [ ] Symbol date lookup (no JSON fixture)
 
 ---
@@ -163,12 +153,10 @@ None open. Previously reported HIGH issues were fixed.
 
 ## 7. Suggested Priority Order
 
-1. **ROAI calculator parity** — Fix the 8 JSON failures. This is the hardest and highest-value work. The calculator is the core differentiator of the app.
-2. **Details response enrichment** — Wire `accounts`, `platforms`, `markets`, `summary` into the details endpoint. Partially blocks ROAI parity.
-3. ~~**Import**~~ DONE
-4. ~~**Admin profile data CRUD**~~ DONE
-5. ~~**Benchmark create/delete**~~ DONE (detail still stub)
-6. **Admin gather execution parity** — Redis queue is wired; worker execution semantics still need parity.
-7. **Portfolio report** — Rules engine, lower priority.
-8. **Correctness fixes (MEDIUM/LOW)** — Performance double-queries, race conditions, graceful shutdown.
-9. ~~**README update**~~ DONE
+1. **Admin gather execution parity** — Redis queue enqueue is wired; worker-side execution semantics still need parity.
+2. **Benchmark detail endpoint** — Implement `GET /benchmarks/:dataSource/:symbol/:startDateString`.
+3. **Portfolio report** — Implement `GET /portfolio/report`.
+4. **Admin settings + demo-user sync** — Replace remaining stubs with service-backed behavior.
+5. **Profile data create semantics** — Replace legacy-404 parity stub with full implementation once parity target is defined.
+6. **Coverage expansion** — Add dedicated fixtures for import, market-data write, profile-data CRUD, and benchmark detail JSON.
+7. **Correctness fixes (MEDIUM/LOW)** — Performance double-queries, race conditions, graceful shutdown.

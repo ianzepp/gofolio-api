@@ -7,6 +7,8 @@ This test suite runs the same HTTP requests against:
 
 and compares responses per case.
 
+Latest verified full run: `2026-03-01`, `196/196` passing with `./tests/integration/run.sh`.
+
 ## Run
 
 Preferred (auto-start `api-go`, preflight checks, auto-cleanup):
