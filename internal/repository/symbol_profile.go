@@ -4,6 +4,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/ianzepp/gofolio-api/internal/db"
 	"github.com/ianzepp/gofolio-api/internal/model"
@@ -108,21 +109,23 @@ func (r *SymbolProfileRepository) FindByIDs(ctx context.Context, ids []string) (
 	return items, nil
 }
 
-// SearchByQuery performs a case-insensitive substring search on name and
-// symbol within a given data source, returning up to 50 results. The hard
-// limit prevents accidental full-table scans on broad search terms.
-// TRADE-OFF: ILIKE with a leading wildcard prevents index use on name/symbol
-// but is acceptable given the 50-row cap and the expectation that the symbol
-// profile table is small relative to market data or orders.
+// SearchByQuery performs a case-insensitive prefix search on id, isin, name,
+// and symbol within a given data source, returning up to 50 results. Matches
+// the legacy Prisma startsWith behavior. LIKE metacharacters in the query are
+// escaped to prevent wildcard injection.
 func (r *SymbolProfileRepository) SearchByQuery(ctx context.Context, dataSource string, query string) ([]model.SymbolProfile, error) {
-	pattern := "%" + query + "%"
+	escaped := escapeLike(query)
+	pattern := escaped + "%"
 	var items []model.SymbolProfile
 	err := sqlx.SelectContext(ctx, r.db,
 		&items,
 		`SELECT `+symbolProfileColumns+`
 		 FROM "SymbolProfile"
 		 WHERE "dataSource" = $1
-		   AND (LOWER(name) LIKE LOWER($2) OR LOWER(symbol) LIKE LOWER($2))
+		   AND (LOWER(id) LIKE LOWER($2) ESCAPE '\'
+		     OR LOWER(isin) LIKE LOWER($2) ESCAPE '\'
+		     OR LOWER(name) LIKE LOWER($2) ESCAPE '\'
+		     OR LOWER(symbol) LIKE LOWER($2) ESCAPE '\')
 		 ORDER BY symbol ASC
 		 LIMIT 50`, dataSource, pattern)
 	if err != nil {
@@ -203,4 +206,11 @@ func (r *SymbolProfileRepository) FindAll(ctx context.Context) ([]model.SymbolPr
 		return nil, fmt.Errorf("query symbol profiles: %w", err)
 	}
 	return items, nil
+}
+
+// escapeLike escapes SQL LIKE metacharacters (%, _, \) so user input is treated
+// as literal text in LIKE patterns.
+func escapeLike(s string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return r.Replace(s)
 }
