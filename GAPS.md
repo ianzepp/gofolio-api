@@ -10,7 +10,7 @@ Last updated: 2026-03-01 (final push)
 
 Current differential baseline is fully green:
 
-- `196/196` passing (`156` status + `40` JSON)
+- `214/214` passing (`150` status + `64` JSON)
 - Verified on `2026-03-01` with `./tests/integration/run.sh`
 - Baseline env used for Go API in parity run:
   - `JWT_SECRET_KEY=1234`
@@ -143,6 +143,7 @@ None open. Previously reported HIGH issues were fixed.
 | ~~1~~   | ~~Errgroup panic leaks goroutine~~          | ~~`service/data_provider.go:84`~~  | **FIXED** — defer/recover in goroutine |
 | 2   | Large dynamic SQL OR-chains             | `repository/market_data.go:207`| Open — perf optimization at scale |
 | 3   | `GetAccounts` totalValue semantically wrong | `handler/account.go:100`   | Open — display-only, non-blocking |
+| 4   | Overly permissive SQL regex in tests may hide query regressions | `internal/repository/symbol_profile_test.go:44`, `internal/service/exchange_rate_test.go:70` | Open — tighten expectations with `regexp.QuoteMeta` on full SQL where feasible |
 
 ---
 

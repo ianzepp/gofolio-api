@@ -23,7 +23,7 @@ A 48-hour public coding challenge: rewrite a production backend from scratch in 
 
 Most of that 39K is framework ceremony — NestJS decorators, module wiring, DI boilerplate. The actual business logic is ~5-8K LOC concentrated in portfolio calculations, order handling, exchange rate conversion, and data provider integrations. The rest is mechanical CRUD.
 
-Go eliminates the ceremony. No decorators, no DI containers, no module system. Functions take requests, return responses. The same backend should land at ~15-18K LOC of Go, with less indirection and faster compilation.
+Go eliminates the ceremony. No decorators, no DI containers, no module system. Functions take requests, return responses. The same backend lands at ~18.5K LOC of Go, with less indirection and faster compilation.
 
 ### The approach
 
@@ -50,7 +50,7 @@ Current parity snapshot:
 - Differential harness: `214` cases total (`150` status + `64` JSON) across `21` fixture files
 - Differential pass rate (verified): `214/214` passing on `2026-03-01` via `./tests/integration/run.sh` against legacy (`localhost:3333`) and Go (`localhost:3334`)
 - Differential JSON comparator supports optional flexible array tolerance for ROAI-sensitive series (`flexibleArrayPath`, `flexibleArrayLengthDelta`, `flexibleArrayEnforceItemShape`)
-- 20 services wired into handler `Deps` struct
+- 22 services wired into handler `Deps` struct
 - 14 repository files, 13 model files, 3 provider files, 22 service files, 6 calculator files
 - Recently wired: admin settings (upsert/delete with side-effects), benchmark detail (historical performance), portfolio report (X-Ray rules engine with 17 rules across 8 categories), graceful shutdown (SIGTERM/SIGINT with 15s drain)
 - Correctness fixes: TransferBalance race condition (SELECT FOR UPDATE), `isCurrencyLikeSymbol` suffix matching, Yahoo forex/crypto disambiguation, public portfolio error logging, errgroup panic recovery
@@ -120,7 +120,7 @@ func GetTags(deps *Deps) http.HandlerFunc {
 }
 ```
 
-Stub handlers that aren't yet wired to services remain as plain `func(w, r)` functions. They will be converted to the closure pattern incrementally.
+Most handlers are fully wired through the closure/Deps pattern. The ~30 remaining stubs (see [`GAPS.md`](./GAPS.md)) return valid empty JSON so clients never crash.
 
 ## Database
 
@@ -250,10 +250,10 @@ curl -X POST http://localhost:3334/api/v1/auth/anonymous \
 **Create a new user:**
 ```bash
 curl -X POST http://localhost:3334/api/v1/user
-# Returns {"accessToken":"<uuid>","authToken":"<jwt>","role":"USER"}
+# Returns {"accessToken":"<128-char-hex>","authToken":"<jwt>","role":"USER"}
 ```
 
-The access token is returned once at signup — store it. Exchange it for a JWT anytime via `POST /api/v1/auth/anonymous`.
+The access token (a 128-character hex string matching Ghostfolio's format) is returned once at signup — store it. Exchange it for a JWT anytime via `POST /api/v1/auth/anonymous`.
 
 ### Environment variables
 
@@ -291,7 +291,7 @@ Current test pattern:
   - Details: [`tests/integration/README.md`](./tests/integration/README.md)
   - Full fixture/test-case inventory: see the `Fixture Catalog` section in [`tests/integration/README.md`](./tests/integration/README.md)
   - Fixtures split per handler in `testdata/*.json` (e.g. `account.json`, `portfolio.json`)
-  - Current fixture count: `196` total (`156` status compare, `40` JSON compare) across `21` files
+  - Current fixture count: `214` total (`150` status compare, `64` JSON compare) across `21` files
 
 Run all tests:
 
