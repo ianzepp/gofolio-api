@@ -54,16 +54,16 @@ Routes + request/response shape:
 import (
 	"crypto/hmac"
 	"crypto/sha512"
-	"encoding/json"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
 
+	"database/sql"
+	"github.com/google/uuid"
 	"github.com/ianzepp/gofolio-api/internal/auth"
 	"github.com/ianzepp/gofolio-api/internal/model"
-	"github.com/google/uuid"
-	"database/sql"
 )
 
 // GetUser handles GET /api/v1/user and assembles the rich user object expected by

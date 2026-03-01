@@ -496,12 +496,12 @@ type yahooQuoteSummaryResponse struct {
 	QuoteSummary struct {
 		Result []struct {
 			Price struct {
-				Symbol             string         `json:"symbol"`
-				RegularMarketPrice yahooRawValue  `json:"regularMarketPrice"`
-				Currency           string         `json:"currency"`
-				MarketState        string         `json:"marketState"`
-				ShortName          string         `json:"shortName"`
-				QuoteType          string         `json:"quoteType"`
+				Symbol             string        `json:"symbol"`
+				RegularMarketPrice yahooRawValue `json:"regularMarketPrice"`
+				Currency           string        `json:"currency"`
+				MarketState        string        `json:"marketState"`
+				ShortName          string        `json:"shortName"`
+				QuoteType          string        `json:"quoteType"`
 			} `json:"price"`
 		} `json:"result"`
 	} `json:"quoteSummary"`

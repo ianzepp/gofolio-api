@@ -37,9 +37,9 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/ianzepp/gofolio-api/internal/auth"
 	"github.com/ianzepp/gofolio-api/internal/model"
-	"github.com/google/uuid"
 )
 
 // GetAccesses handles GET /api/v1/access and returns the caller's outbound

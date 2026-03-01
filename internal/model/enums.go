@@ -72,7 +72,7 @@ const (
 	DataSourceFinancialModelingPrep DataSource = "FINANCIAL_MODELING_PREP"
 	// DataSourceGhostfolio is the Ghostfolio premium data service, distinct from
 	// the self-hosted instance — it acts as a curated market data proxy.
-	DataSourceGhostfolio DataSource = "GHOSTFOLIO"
+	DataSourceGhostfolio   DataSource = "GHOSTFOLIO"
 	DataSourceGoogleSheets DataSource = "GOOGLE_SHEETS"
 	// DataSourceManual indicates user-entered prices with no external sync.
 	DataSourceManual   DataSource = "MANUAL"
@@ -101,8 +101,8 @@ type Provider string
 const (
 	// ProviderAnonymous creates a passwordless guest session using a local token.
 	// These accounts are ephemeral and are typically deleted after the session ends.
-	ProviderAnonymous        Provider = "ANONYMOUS"
-	ProviderGoogle           Provider = "GOOGLE"
+	ProviderAnonymous Provider = "ANONYMOUS"
+	ProviderGoogle    Provider = "GOOGLE"
 	// ProviderInternetIdentity uses the Internet Computer (ICP) blockchain identity.
 	ProviderInternetIdentity Provider = "INTERNET_IDENTITY"
 	ProviderOIDC             Provider = "OIDC"

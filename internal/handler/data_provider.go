@@ -43,11 +43,11 @@ import (
 	"strings"
 	"time"
 
+	"database/sql"
 	"github.com/ianzepp/gofolio-api/internal/auth"
 	"github.com/ianzepp/gofolio-api/internal/model"
 	"github.com/ianzepp/gofolio-api/internal/provider"
 	"github.com/ianzepp/gofolio-api/internal/repository"
-	"database/sql"
 )
 
 // GetDataProviderAssetProfile handles GET /api/v1/data-providers/ghostfolio/asset-profile/{symbol}.

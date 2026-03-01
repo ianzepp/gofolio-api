@@ -20,11 +20,11 @@ import (
 	"net/http"
 	"time"
 
+	"database/sql"
+	"github.com/google/uuid"
 	"github.com/ianzepp/gofolio-api/internal/auth"
 	"github.com/ianzepp/gofolio-api/internal/model"
 	"github.com/ianzepp/gofolio-api/internal/repository"
-	"github.com/google/uuid"
-	"database/sql"
 )
 
 // HandleCreateAccountBalance handles POST /api/v1/account-balance. It validates

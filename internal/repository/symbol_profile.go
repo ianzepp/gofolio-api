@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/ianzepp/gofolio-api/internal/db"
 	"github.com/ianzepp/gofolio-api/internal/model"
-	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 

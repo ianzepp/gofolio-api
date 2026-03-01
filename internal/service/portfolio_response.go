@@ -137,32 +137,32 @@ type PortfolioReportResponse struct {
 // PortfolioHoldingDetailResponse is the JSON shape for GET /portfolio/holding/:ds/:sym.
 // This matches the legacy NestJS PortfolioHoldingResponse interface exactly.
 type PortfolioHoldingDetailResponse struct {
-	ActivitiesCount                           int                          `json:"activitiesCount"`
-	AveragePrice                              float64                      `json:"averagePrice"`
-	DataProviderInfo                          *HoldingDataProviderInfo     `json:"dataProviderInfo"`
-	DateOfFirstActivity                       string                       `json:"dateOfFirstActivity"`
-	DividendInBaseCurrency                    float64                      `json:"dividendInBaseCurrency"`
-	DividendYieldPercent                      float64                      `json:"dividendYieldPercent"`
-	DividendYieldPercentWithCurrencyEffect    float64                      `json:"dividendYieldPercentWithCurrencyEffect"`
-	FeeInBaseCurrency                         float64                      `json:"feeInBaseCurrency"`
-	GrossPerformance                          *float64                     `json:"grossPerformance"`
-	GrossPerformancePercent                   *float64                     `json:"grossPerformancePercent"`
-	GrossPerformancePercentWithCurrencyEffect *float64                     `json:"grossPerformancePercentWithCurrencyEffect"`
-	GrossPerformanceWithCurrencyEffect        *float64                     `json:"grossPerformanceWithCurrencyEffect"`
-	HistoricalData                            []map[string]any             `json:"historicalData"`
-	InvestmentInBaseCurrencyWithCurrencyEffect float64                     `json:"investmentInBaseCurrencyWithCurrencyEffect"`
-	MarketPrice                               float64                      `json:"marketPrice"`
-	MarketPriceMax                            float64                      `json:"marketPriceMax"`
-	MarketPriceMin                            float64                      `json:"marketPriceMin"`
-	NetPerformance                            *float64                     `json:"netPerformance"`
-	NetPerformancePercent                     *float64                     `json:"netPerformancePercent"`
-	NetPerformancePercentWithCurrencyEffect   *float64                     `json:"netPerformancePercentWithCurrencyEffect"`
-	NetPerformanceWithCurrencyEffect          *float64                     `json:"netPerformanceWithCurrencyEffect"`
-	Performances                              *HoldingPerformances         `json:"performances"`
-	Quantity                                  float64                      `json:"quantity"`
-	SymbolProfile                             *HoldingSymbolProfile        `json:"SymbolProfile"`
-	Tags                                      []any                        `json:"tags"`
-	Value                                     float64                      `json:"value"`
+	ActivitiesCount                            int                      `json:"activitiesCount"`
+	AveragePrice                               float64                  `json:"averagePrice"`
+	DataProviderInfo                           *HoldingDataProviderInfo `json:"dataProviderInfo"`
+	DateOfFirstActivity                        string                   `json:"dateOfFirstActivity"`
+	DividendInBaseCurrency                     float64                  `json:"dividendInBaseCurrency"`
+	DividendYieldPercent                       float64                  `json:"dividendYieldPercent"`
+	DividendYieldPercentWithCurrencyEffect     float64                  `json:"dividendYieldPercentWithCurrencyEffect"`
+	FeeInBaseCurrency                          float64                  `json:"feeInBaseCurrency"`
+	GrossPerformance                           *float64                 `json:"grossPerformance"`
+	GrossPerformancePercent                    *float64                 `json:"grossPerformancePercent"`
+	GrossPerformancePercentWithCurrencyEffect  *float64                 `json:"grossPerformancePercentWithCurrencyEffect"`
+	GrossPerformanceWithCurrencyEffect         *float64                 `json:"grossPerformanceWithCurrencyEffect"`
+	HistoricalData                             []map[string]any         `json:"historicalData"`
+	InvestmentInBaseCurrencyWithCurrencyEffect float64                  `json:"investmentInBaseCurrencyWithCurrencyEffect"`
+	MarketPrice                                float64                  `json:"marketPrice"`
+	MarketPriceMax                             float64                  `json:"marketPriceMax"`
+	MarketPriceMin                             float64                  `json:"marketPriceMin"`
+	NetPerformance                             *float64                 `json:"netPerformance"`
+	NetPerformancePercent                      *float64                 `json:"netPerformancePercent"`
+	NetPerformancePercentWithCurrencyEffect    *float64                 `json:"netPerformancePercentWithCurrencyEffect"`
+	NetPerformanceWithCurrencyEffect           *float64                 `json:"netPerformanceWithCurrencyEffect"`
+	Performances                               *HoldingPerformances     `json:"performances"`
+	Quantity                                   float64                  `json:"quantity"`
+	SymbolProfile                              *HoldingSymbolProfile    `json:"SymbolProfile"`
+	Tags                                       []any                    `json:"tags"`
+	Value                                      float64                  `json:"value"`
 }
 
 // HoldingDataProviderInfo mirrors the legacy DataProviderInfo interface.
@@ -180,7 +180,7 @@ type HoldingPerformances struct {
 
 // HoldingAllTimeHigh is the all-time-high sub-object in performances.
 type HoldingAllTimeHigh struct {
-	Date             *string  `json:"date"`
+	Date               *string `json:"date"`
 	PerformancePercent float64 `json:"performancePercent"`
 }
 

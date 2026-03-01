@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/ianzepp/gofolio-api/internal/auth"
 	"github.com/ianzepp/gofolio-api/internal/repository"
-	"github.com/google/uuid"
 )
 
 // CreateApiKey handles POST /api/v1/api-keys.

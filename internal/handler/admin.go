@@ -17,8 +17,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ianzepp/gofolio-api/internal/queue"
 	"github.com/google/uuid"
+	"github.com/ianzepp/gofolio-api/internal/queue"
 )
 
 // GetAdmin handles GET /api/v1/admin and returns the admin dashboard summary.

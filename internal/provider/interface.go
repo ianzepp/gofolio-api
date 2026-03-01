@@ -29,14 +29,14 @@ import (
 // MarketState indicates trading session status: "open", "closed", or "delayed"
 // (the last is used by manual/DB-backed providers that have no real-time feed).
 type DataProviderResponse struct {
-	Currency       string  `json:"currency"`
-	DataSource     string  `json:"dataSource"`
-	MarketPrice    float64 `json:"marketPrice"`
-	MarketState    string  `json:"marketState"` // "open", "closed", "delayed"
-	Name           string  `json:"name,omitempty"`
-	Symbol         string  `json:"symbol,omitempty"`
-	AssetClass     string  `json:"assetClass,omitempty"`
-	AssetSubClass  string  `json:"assetSubClass,omitempty"`
+	Currency      string  `json:"currency"`
+	DataSource    string  `json:"dataSource"`
+	MarketPrice   float64 `json:"marketPrice"`
+	MarketState   string  `json:"marketState"` // "open", "closed", "delayed"
+	Name          string  `json:"name,omitempty"`
+	Symbol        string  `json:"symbol,omitempty"`
+	AssetClass    string  `json:"assetClass,omitempty"`
+	AssetSubClass string  `json:"assetSubClass,omitempty"`
 }
 
 // HistoricalResponse holds a single historical price data point. The map key
@@ -50,10 +50,10 @@ type HistoricalResponse struct {
 // IsPremium signals that the provider requires a paid API key or subscription;
 // this is surfaced in the admin status dashboard.
 type DataProviderInfo struct {
-	IsPremium        bool   `json:"isPremium"`
-	Name             string `json:"name"`
-	URL              string `json:"url"`
-	AssetProfileCount int   `json:"assetProfileCount,omitempty"`
+	IsPremium         bool   `json:"isPremium"`
+	Name              string `json:"name"`
+	URL               string `json:"url"`
+	AssetProfileCount int    `json:"assetProfileCount,omitempty"`
 }
 
 // LookupItem is a single search result entry.

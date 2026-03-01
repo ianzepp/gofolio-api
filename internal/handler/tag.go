@@ -43,10 +43,10 @@ import (
 	"net/http"
 	"strings"
 
+	"database/sql"
+	"github.com/google/uuid"
 	"github.com/ianzepp/gofolio-api/internal/auth"
 	"github.com/ianzepp/gofolio-api/internal/model"
-	"github.com/google/uuid"
-	"database/sql"
 )
 
 // GetTags handles GET /api/v1/tags and returns all tags with their associated

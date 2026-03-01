@@ -47,9 +47,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ianzepp/gofolio-api/internal/model"
-	"github.com/google/uuid"
 	"database/sql"
+	"github.com/google/uuid"
+	"github.com/ianzepp/gofolio-api/internal/model"
 )
 
 // GetPlatformsWithAccountCount handles GET /api/v1/platform. Emits accountCount=0
