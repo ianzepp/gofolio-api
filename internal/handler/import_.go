@@ -3,13 +3,16 @@ package handler
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/ianzepp/gofolio-api/internal/auth"
+	dbpkg "github.com/ianzepp/gofolio-api/internal/db"
 	"github.com/ianzepp/gofolio-api/internal/model"
 	"github.com/ianzepp/gofolio-api/internal/repository"
+	"github.com/jmoiron/sqlx"
 )
 
 // importActivity is the inbound shape for a single activity in a portfolio
@@ -33,12 +36,14 @@ type importRequest struct {
 	Activities []importActivity `json:"activities"`
 }
 
+var errMissingImportFields = errors.New("each activity requires dataSource and symbol")
+
 // HandleCreateImport imports portfolio activities from a Ghostfolio-format JSON
 // payload. Each activity's dataSource+symbol pair is resolved to a SymbolProfile
 // (auto-created if missing), then an Order is inserted for the authenticated user.
 func HandleCreateImport(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if deps == nil || deps.OrderService == nil || deps.DB == nil {
+		if deps == nil || deps.DB == nil {
 			Error(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
 			return
 		}
@@ -59,55 +64,63 @@ func HandleCreateImport(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		spRepo := repository.NewSymbolProfileRepository(deps.DB)
 		created := make([]model.Order, 0, len(body.Activities))
+		if err := dbpkg.WithTx(r.Context(), deps.DB, func(tx *sqlx.Tx) error {
+			spRepo := repository.NewSymbolProfileRepository(tx)
+			orderRepo := repository.NewOrderRepository(tx)
 
-		for _, act := range body.Activities {
-			if act.DataSource == "" || act.Symbol == "" {
-				Error(w, http.StatusBadRequest, "each activity requires dataSource and symbol")
+			for _, act := range body.Activities {
+				if act.DataSource == "" || act.Symbol == "" {
+					return errMissingImportFields
+				}
+
+				// Resolve dataSource+symbol → SymbolProfile, creating if absent.
+				sp, err := spRepo.FindByDataSourceAndSymbol(r.Context(), act.DataSource, act.Symbol)
+				if errors.Is(err, sql.ErrNoRows) {
+					sp, err = spRepo.Create(r.Context(), model.SymbolProfile{
+						DataSource: model.DataSource(act.DataSource),
+						Symbol:     act.Symbol,
+						Currency:   currencyOrDefault(act.Currency),
+					})
+				}
+				if err != nil {
+					return fmt.Errorf("resolve symbol profile: %w", err)
+				}
+
+				var accountUserId *string
+				if act.AccountId != nil {
+					accountUserId = &userID
+				}
+
+				order := model.Order{
+					ID:              uuid.New().String(),
+					AccountId:       act.AccountId,
+					AccountUserId:   accountUserId,
+					Comment:         act.Comment,
+					Currency:        act.Currency,
+					Date:            act.Date,
+					Fee:             act.Fee,
+					Quantity:        act.Quantity,
+					SymbolProfileId: sp.ID,
+					Type:            act.Type,
+					UnitPrice:       act.UnitPrice,
+					UserId:          userID,
+				}
+
+				inserted, err := orderRepo.Create(r.Context(), order)
+				if err != nil {
+					return fmt.Errorf("create order: %w", err)
+				}
+				created = append(created, inserted)
+			}
+			return nil
+		}); err != nil {
+			if errors.Is(err, errMissingImportFields) {
+				Error(w, http.StatusBadRequest, err.Error())
 				return
 			}
-
-			// Resolve dataSource+symbol → SymbolProfile, creating if absent.
-			sp, err := spRepo.FindByDataSourceAndSymbol(r.Context(), act.DataSource, act.Symbol)
-			if errors.Is(err, sql.ErrNoRows) {
-				sp, err = spRepo.Create(r.Context(), model.SymbolProfile{
-					DataSource: model.DataSource(act.DataSource),
-					Symbol:     act.Symbol,
-					Currency:   currencyOrDefault(act.Currency),
-				})
-			}
-			if err != nil {
-				Error(w, http.StatusInternalServerError, "resolve symbol profile: "+err.Error())
-				return
-			}
-
-			var accountUserId *string
-			if act.AccountId != nil {
-				accountUserId = &userID
-			}
-
-			order := model.Order{
-				ID:              uuid.New().String(),
-				AccountId:       act.AccountId,
-				AccountUserId:   accountUserId,
-				Comment:         act.Comment,
-				Currency:        act.Currency,
-				Date:            act.Date,
-				Fee:             act.Fee,
-				Quantity:        act.Quantity,
-				SymbolProfileId: sp.ID,
-				Type:            act.Type,
-				UnitPrice:       act.UnitPrice,
-				UserId:          userID,
-			}
-
-			inserted, err := deps.OrderService.CreateOrder(r.Context(), order)
-			if err != nil {
-				Error(w, http.StatusInternalServerError, "create order: "+err.Error())
-				return
-			}
-			created = append(created, inserted)
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
 		}
 
 		JSON(w, http.StatusCreated, map[string]any{"activities": created})
