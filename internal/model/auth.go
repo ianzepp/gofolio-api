@@ -33,7 +33,7 @@ type AuthDevice struct {
 type ApiKey struct {
 	ID        string    `db:"id" json:"id"`
 	CreatedAt time.Time `db:"createdAt" json:"createdAt"`
-	HashedKey string    `db:"hashedKey" json:"hashedKey"`
+	HashedKey string    `db:"hashedKey" json:"-"`
 	UpdatedAt time.Time `db:"updatedAt" json:"updatedAt"`
 	UserId    string    `db:"userId" json:"userId"`
 }

@@ -14,8 +14,8 @@ import "time"
 // returned to other users. Callers should project only the fields they need.
 type User struct {
 	ID            string    `db:"id" json:"id"`
-	AccessToken   *string   `db:"accessToken" json:"accessToken,omitempty"`
-	AuthChallenge *string   `db:"authChallenge" json:"authChallenge,omitempty"`
+	AccessToken   *string   `db:"accessToken" json:"-"`
+	AuthChallenge *string   `db:"authChallenge" json:"-"`
 	CreatedAt     time.Time `db:"createdAt" json:"createdAt"`
 	Provider      Provider  `db:"provider" json:"provider"`
 	Role          Role      `db:"role" json:"role"`
