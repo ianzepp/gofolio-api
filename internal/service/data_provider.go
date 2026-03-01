@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/ianzepp/gofolio-api/internal/model"
@@ -61,13 +62,8 @@ func (s *DataProviderService) GetQuotes(ctx context.Context, items []provider.As
 	}
 
 	result := make(map[string]provider.DataProviderResponse)
+	var mu sync.Mutex
 	g, gCtx := errgroup.WithContext(ctx)
-
-	type batchResult struct {
-		quotes map[string]provider.DataProviderResponse
-	}
-
-	var mu = make(chan batchResult, len(items))
 
 	for ds, symbols := range grouped {
 		p, ok := s.providers[ds]
@@ -86,26 +82,17 @@ func (s *DataProviderService) GetQuotes(ctx context.Context, items []provider.As
 				if err != nil {
 					return err
 				}
-				mu <- batchResult{quotes: quotes}
+				mu.Lock()
+				for k, v := range quotes {
+					result[k] = v
+				}
+				mu.Unlock()
 				return nil
 			})
 		}
 	}
 
-	// Wait in a separate goroutine so we can collect results
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- g.Wait()
-		close(mu)
-	}()
-
-	for br := range mu {
-		for k, v := range br.quotes {
-			result[k] = v
-		}
-	}
-
-	if err := <-errCh; err != nil {
+	if err := g.Wait(); err != nil {
 		return result, fmt.Errorf("get quotes: %w", err)
 	}
 
@@ -155,13 +142,8 @@ func (s *DataProviderService) GetHistorical(ctx context.Context, dataSource mode
 // guarantees the most up-to-date series for any requested date range.
 func (s *DataProviderService) GetHistoricalRaw(ctx context.Context, items []provider.AssetProfileIdentifier, from, to time.Time) (map[string]map[string]provider.HistoricalResponse, error) {
 	result := make(map[string]map[string]provider.HistoricalResponse)
+	var mu sync.Mutex
 	g, gCtx := errgroup.WithContext(ctx)
-
-	type itemResult struct {
-		symbol string
-		data   map[string]provider.HistoricalResponse
-	}
-	ch := make(chan itemResult, len(items))
 
 	for _, item := range items {
 		item := item
@@ -174,22 +156,14 @@ func (s *DataProviderService) GetHistoricalRaw(ctx context.Context, items []prov
 			if err != nil {
 				return err
 			}
-			ch <- itemResult{symbol: item.Symbol, data: data}
+			mu.Lock()
+			result[item.Symbol] = data
+			mu.Unlock()
 			return nil
 		})
 	}
 
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- g.Wait()
-		close(ch)
-	}()
-
-	for ir := range ch {
-		result[ir.symbol] = ir.data
-	}
-
-	if err := <-errCh; err != nil {
+	if err := g.Wait(); err != nil {
 		return result, fmt.Errorf("historical raw: %w", err)
 	}
 	return result, nil
@@ -214,9 +188,10 @@ func (s *DataProviderService) GetDividends(ctx context.Context, dataSource model
 // WHY: Users should be able to add positions from any provider, and a global
 // search makes provider selection transparent at the UI layer.
 func (s *DataProviderService) Search(ctx context.Context, query string, includeIndices bool) (provider.LookupResponse, error) {
+	var mu sync.Mutex
 	g, gCtx := errgroup.WithContext(ctx)
-	ch := make(chan []provider.LookupItem, len(s.providers))
 
+	var allItems []provider.LookupItem
 	for _, p := range s.providers {
 		p := p
 		g.Go(func() error {
@@ -225,20 +200,14 @@ func (s *DataProviderService) Search(ctx context.Context, query string, includeI
 				// Non-fatal: skip this provider
 				return nil
 			}
-			ch <- resp.Items
+			mu.Lock()
+			allItems = append(allItems, resp.Items...)
+			mu.Unlock()
 			return nil
 		})
 	}
 
-	go func() {
-		g.Wait()
-		close(ch)
-	}()
-
-	var allItems []provider.LookupItem
-	for items := range ch {
-		allItems = append(allItems, items...)
-	}
+	g.Wait()
 
 	sort.Slice(allItems, func(i, j int) bool {
 		return allItems[i].Name < allItems[j].Name
@@ -256,13 +225,8 @@ func (s *DataProviderService) Search(ctx context.Context, query string, includeI
 // than eagerly, so a batch-concurrent fetch keeps latency manageable.
 func (s *DataProviderService) GetAssetProfiles(ctx context.Context, items []provider.AssetProfileIdentifier) (map[string]*model.SymbolProfile, error) {
 	result := make(map[string]*model.SymbolProfile)
+	var mu sync.Mutex
 	g, gCtx := errgroup.WithContext(ctx)
-
-	type profileResult struct {
-		symbol  string
-		profile *model.SymbolProfile
-	}
-	ch := make(chan profileResult, len(items))
 
 	for _, item := range items {
 		item := item
@@ -275,22 +239,14 @@ func (s *DataProviderService) GetAssetProfiles(ctx context.Context, items []prov
 			if err != nil {
 				return nil // non-fatal
 			}
-			ch <- profileResult{symbol: item.Symbol, profile: profile}
+			mu.Lock()
+			result[item.Symbol] = profile
+			mu.Unlock()
 			return nil
 		})
 	}
 
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- g.Wait()
-		close(ch)
-	}()
-
-	for pr := range ch {
-		result[pr.symbol] = pr.profile
-	}
-
-	if err := <-errCh; err != nil {
+	if err := g.Wait(); err != nil {
 		return result, fmt.Errorf("asset profiles: %w", err)
 	}
 	return result, nil
