@@ -2,11 +2,11 @@
 
 Tracked inventory of everything between current state and full parity with the NestJS backend. Each section is a workstream; items within are ordered by priority/dependency.
 
-Last updated: 2026-02-28 (fast wins pass)
+Last updated: 2026-02-28 (post-commit scan)
 
 ---
 
-## 1. ROAI Calculator JSON Parity (7 failures)
+## 1. ROAI Calculator JSON Parity (8 failures)
 
 The calculator engine is structurally complete (~2,000 LOC) but output values diverge from NestJS. All 7 failing differential tests are JSON-mode comparisons against the ROAI-seeded user.
 
@@ -18,7 +18,8 @@ The calculator engine is structurally complete (~2,000 LOC) but output values di
 | 4   | `roai-holding-msft-json`                 | `GET /portfolio/holding/YAHOO/MSFT`    | same as #3                                                                                           |
 | 5   | `roai-dividends-json`                    | `GET /portfolio/dividends`             | dividends.\*.investment                                                                              |
 | 6   | `roai-investments-json`                  | `GET /portfolio/investments`           | investments.\*.investment                                                                            |
-| 7   | `roai-holdings-filter-roai-account-json` | `GET /portfolio/holdings?accounts=...` | same as #1                                                                                           |
+| 7   | `roai-performance-max-json`              | `GET /portfolio/performance?range=max` | chart, performance values                                                                            |
+| 8   | `roai-holdings-filter-roai-account-json` | `GET /portfolio/holdings?accounts=...` | same as #1                                                                                           |
 
 **Root causes to investigate:**
 
@@ -64,12 +65,9 @@ Wired: Create, Update, Delete profile data with auth guards.
 | GET    | `/admin/demo-user/sync`                       | Sync demo user           |
 | POST   | `/admin/market-data/:dataSource/:symbol/test` | Test market data scraper |
 
-### 2d. Import (2 routes)
+### ~~2d. Import (2 routes)~~ DONE
 
-| Method | Path                                    | Purpose                                |
-| ------ | --------------------------------------- | -------------------------------------- |
-| POST   | `/import`                               | Import portfolio (activities CSV/JSON) |
-| GET    | `/import/dividends/:dataSource/:symbol` | Import dividends for symbol            |
+Wired: POST /import creates orders from Ghostfolio interchange JSON. GET /import/dividends returns existing dividend orders for a symbol.
 
 ### ~~2e. Market Data Write (1 route)~~ DONE
 
@@ -94,11 +92,9 @@ Holding tags update wired. Report remains a stub.
 | GET    | `/portfolio/report`                           | Stub   |
 | PUT    | `/portfolio/holding/:dataSource/:symbol/tags` | DONE   |
 
-### 2h. Symbol Date Lookup (1 route, partially wired)
+### ~~2h. Symbol Date Lookup (1 route)~~ DONE
 
-| Method | Path                                      | Purpose                           |
-| ------ | ----------------------------------------- | --------------------------------- |
-| GET    | `/symbol/:dataSource/:symbol/:dateString` | Get symbol data for specific date |
+Wired: Full implementation with date parsing and DB lookup.
 
 ### 2i. Infrastructure (2 routes)
 

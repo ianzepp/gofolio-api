@@ -231,8 +231,8 @@ func main() {
 	mux.HandleFunc("GET /api/v1/health/data-provider/{dataSource}", handler.HandleGetHealthDataProvider)
 
 	// Import
-	mux.HandleFunc("POST /api/v1/import", handler.HandleCreateImport)
-	mux.HandleFunc("GET /api/v1/import/dividends/{dataSource}/{symbol}", handler.HandleGetImportDividends)
+	mux.HandleFunc("POST /api/v1/import", auth.RequirePermission(authCfg, auth.CreateOrder, handler.HandleCreateImport(deps)))
+	mux.HandleFunc("GET /api/v1/import/dividends/{dataSource}/{symbol}", auth.Authenticate(authCfg, handler.HandleGetImportDividends(deps)))
 
 	// Info
 	mux.HandleFunc("GET /api/v1/info", handler.GetInfo(deps))
