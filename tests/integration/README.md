@@ -7,24 +7,28 @@ This test suite runs the same HTTP requests against:
 
 and compares responses per case.
 
-Latest verified full run: `2026-03-01`, `196/196` passing with `./tests/integration/run.sh`.
+Latest verified full run: `2026-03-01`, `214/214` passing with `./tests/integration/run.sh`.
 
 ## Run
 
-Preferred (auto-start `api-go`, preflight checks, auto-cleanup):
+From repo root:
 
 ```bash
-cd apps/api-go
 ./tests/integration/run.sh
 ```
 
-Manual:
+Run a subset (for example one case):
 
 ```bash
-cd apps/api-go
+./tests/integration/run.sh -run 'TestDifferentialAPI/benchmarks-get-json-parity$'
+```
+
+Manual `go test`:
+
+```bash
 LEGACY_BASE_URL=http://127.0.0.1:3333 \
 GO_BASE_URL=http://127.0.0.1:3334 \
-go test ./tests/integration -v
+go test ./tests/integration -v -count=1
 ```
 
 If base URLs are unset, defaults are used:
@@ -79,7 +83,7 @@ Useful env vars:
 - `LEGACY_BASE_URL` (default `http://127.0.0.1:3333`)
 - `GO_BASE_URL` (default `http://127.0.0.1:3334`)
 - `GO_PORT` (default `3334`)
-- `GO_BINARY_PATH` (default `apps/api-go/bin/api-go`)
+- `GO_BINARY_PATH` (default `bin/api-go`)
 - `START_TIMEOUT_SECONDS` (default `20`)
 - `BOOTSTRAP_LEGACY_USER` (`1` default; set `0` to disable auto user bootstrap)
 
@@ -115,9 +119,9 @@ harness auto-loads all `*.json` files in that directory.
 
 Current totals across all fixture files:
 
-- `196` total cases
-- `156` status-compare cases
-- `40` JSON-compare cases
+- `214` total cases
+- `150` status-compare cases
+- `64` JSON-compare cases
 - `21` fixture files
 - HTTP client timeout: `60s` per request (legacy can be slow on some seeded
   portfolio filter cases)
@@ -156,24 +160,34 @@ Each fixture file contains an array of test-case objects. Case names and modes:
 - `account-balance-delete-foreign-id-forbidden-parity` (`status`)
 - `account-balance-post-user-created-parity` (`status`)
 
-### `admin.json` (16)
+### `admin.json` (26)
 
-- `admin-get-no-auth-unauthorized` (`status`)
+- `admin-get-no-auth-unauthorized` (`json`)
 - `admin-get-user-forbidden-parity` (`status`)
 - `admin-get-user-forbidden-json-parity` (`json`)
 - `admin-get-admin-ok-parity` (`status`)
-- `admin-market-data-no-auth-unauthorized` (`status`)
+- `admin-market-data-no-auth-unauthorized` (`json`)
 - `admin-market-data-user-forbidden-parity` (`status`)
 - `admin-market-data-admin-ok-parity` (`status`)
 - `admin-market-data-admin-query-json-parity` (`json`)
 - `admin-market-data-admin-sort-json-parity` (`json`)
-- `admin-users-no-auth-unauthorized` (`status`)
+- `admin-users-no-auth-unauthorized` (`json`)
 - `admin-users-user-forbidden-parity` (`status`)
 - `admin-users-admin-ok-parity` (`status`)
 - `admin-user-by-id-no-auth-unauthorized` (`status`)
 - `admin-user-by-id-admin-ok-parity` (`status`)
-- `admin-user-by-id-admin-missing-not-found-parity` (`status`)
-- `admin-user-by-id-admin-invalid-format-parity` (`status`)
+- `admin-user-by-id-admin-missing-not-found-parity` (`json`)
+- `admin-user-by-id-admin-invalid-format-parity` (`json`)
+- `admin-profile-data-create-no-auth-unauthorized` (`status`)
+- `admin-profile-data-create-user-forbidden-parity` (`status`)
+- `admin-profile-data-create-admin-null-body-status-parity` (`status`)
+- `admin-profile-data-delete-admin-null-body-asset-status-parity` (`status`)
+- `admin-demo-user-sync-no-auth-unauthorized-json-parity` (`json`)
+- `admin-demo-user-sync-user-forbidden-json-parity` (`json`)
+- `admin-settings-put-no-auth-unauthorized-json-parity` (`json`)
+- `admin-settings-put-user-forbidden-json-parity` (`json`)
+- `admin-market-data-test-no-auth-unauthorized-json-parity` (`json`)
+- `admin-market-data-test-user-forbidden-json-parity` (`json`)
 
 ### `asset.json` (3)
 
@@ -181,11 +195,13 @@ Each fixture file contains an array of test-case objects. Case names and modes:
 - `asset-get-missing-symbol-json-parity` (`json`)
 - `asset-get-missing-symbol-fallback-parity` (`status`)
 
-### `benchmark.json` (6)
+### `benchmark.json` (8)
 
-- `benchmarks-post-no-auth-unauthorized` (`status`)
+- `benchmarks-post-no-auth-unauthorized` (`json`)
 - `benchmarks-post-user-forbidden-parity` (`status`)
 - `benchmarks-delete-no-auth-unauthorized` (`status`)
+- `benchmarks-post-admin-missing-symbol-status-parity` (`status`)
+- `benchmarks-delete-admin-missing-symbol-status-parity` (`status`)
 - `benchmarks-detail-no-auth-unauthorized` (`status`)
 - `benchmarks-get-status-parity` (`status`)
 - `benchmarks-get-json-parity` (`json`)
@@ -203,7 +219,7 @@ Each fixture file contains an array of test-case objects. Case names and modes:
 
 ### `exchange_rate.json` (3)
 
-- `exchange-rate-no-auth-unauthorized` (`status`)
+- `exchange-rate-no-auth-unauthorized` (`json`)
 - `exchange-rate-auth-status-parity` (`status`)
 - `exchange-rate-unknown-pair-status-parity` (`status`)
 
@@ -224,9 +240,9 @@ Each fixture file contains an array of test-case objects. Case names and modes:
 
 ### `health.json` (3)
 
-- `health-basic-status` (`status`)
-- `health-data-enhancer-status` (`status`)
-- `health-data-provider-status` (`status`)
+- `health-basic-status` (`json`)
+- `health-data-enhancer-status` (`json`)
+- `health-data-provider-status` (`json`)
 
 ### `info.json` (2)
 
@@ -239,29 +255,32 @@ Each fixture file contains an array of test-case objects. Case names and modes:
 - `logo-by-url-missing-url-status-parity` (`status`)
 - `logo-by-symbol-unknown-status-parity` (`status`)
 
-### `market_data.json` (7)
+### `market_data.json` (10)
 
 - `market-data-by-symbol-no-auth-unauthorized` (`status`)
 - `market-data-by-symbol-no-auth-unauthorized-json-parity` (`json`)
 - `market-data-by-symbol-user-common-forbidden-parity` (`status`)
 - `market-data-by-symbol-user-common-forbidden-json-parity` (`json`)
 - `market-data-by-symbol-admin-common-ok-parity` (`status`)
-- `market-data-by-symbol-missing-noncurrency-not-found-parity` (`status`)
+- `market-data-by-symbol-missing-noncurrency-not-found-parity` (`json`)
 - `market-data-by-symbol-missing-currency-fallback-parity` (`status`)
+- `market-data-update-no-auth-unauthorized` (`status`)
+- `market-data-update-user-common-forbidden-parity` (`status`)
+- `market-data-update-admin-status-parity` (`status`)
 
-### `new_endpoints.json` (27)
+### `new_endpoints.json` (28)
 
 - `auth-anonymous-post-valid-json-parity` (`json`)
 - `auth-anonymous-post-invalid-forbidden-parity` (`status`)
 - `auth-anonymous-get-valid-json-parity` (`json`)
 - `auth-anonymous-get-invalid-forbidden-parity` (`status`)
-- `api-keys-post-no-auth-unauthorized` (`status`)
+- `api-keys-post-no-auth-unauthorized` (`json`)
 - `api-keys-post-user-json-parity` (`json`)
 - `ai-prompt-portfolio-no-auth-unauthorized` (`status`)
 - `ai-prompt-portfolio-user-status-parity` (`status`)
 - `ai-prompt-analysis-user-status-parity` (`status`)
-- `cache-flush-no-auth-unauthorized` (`status`)
-- `cache-flush-user-forbidden-parity` (`status`)
+- `cache-flush-no-auth-unauthorized` (`json`)
+- `cache-flush-user-forbidden-parity` (`json`)
 - `cache-flush-admin-status-parity` (`status`)
 - `auth-device-delete-no-auth-unauthorized` (`status`)
 - `auth-device-delete-user-status-parity` (`status`)
@@ -278,6 +297,7 @@ Each fixture file contains an array of test-case objects. Case names and modes:
 - `admin-queue-job-execute-no-auth-unauthorized` (`status`)
 - `admin-queue-job-execute-user-forbidden-parity` (`status`)
 - `admin-queue-job-execute-admin-status-parity` (`status`)
+- `api-unknown-route-status-parity` (`status`)
 
 ### `order.json` (8)
 
@@ -303,7 +323,7 @@ Each fixture file contains an array of test-case objects. Case names and modes:
 - `platform-update-admin-foreign-id-forbidden-parity` (`status`)
 - `platform-delete-admin-foreign-id-forbidden-parity` (`status`)
 
-### `portfolio.json` (38)
+### `portfolio.json` (40)
 
 - `portfolio-holdings-authed` (`status`)
 - `portfolio-holdings-unauthed` (`status`)
@@ -335,6 +355,8 @@ Each fixture file contains an array of test-case objects. Case names and modes:
 - `portfolio-details-empty-user` (`status`)
 - `portfolio-performance-empty-user` (`status`)
 - `portfolio-holding-tags-update-unauthed` (`status`)
+- `portfolio-holding-tags-update-user-object-payload-status-parity` (`status`)
+- `portfolio-holding-tags-update-user-missing-holding-status-parity` (`status`)
 - `roai-holdings-json` (`json`)
 - `roai-details-json` (`json`)
 - `roai-performance-max-json` (`json`)
@@ -346,9 +368,9 @@ Each fixture file contains an array of test-case objects. Case names and modes:
 
 ### `symbol.json` (4)
 
-- `symbol-lookup-no-auth-unauthorized` (`status`)
+- `symbol-lookup-no-auth-unauthorized` (`json`)
 - `symbol-by-date-no-auth-unauthorized` (`status`)
-- `symbol-get-invalid-data-source-not-found-parity` (`status`)
+- `symbol-get-invalid-data-source-not-found-parity` (`json`)
 - `symbol-get-missing-symbol-not-found-parity` (`status`)
 
 ### `tag.json` (7)
@@ -382,8 +404,8 @@ Each fixture file contains an array of test-case objects. Case names and modes:
 - `watchlist-get-empty-user-json-parity` (`json`)
 - `watchlist-create-no-auth-unauthorized` (`status`)
 - `watchlist-delete-no-auth-unauthorized` (`status`)
-- `watchlist-create-unknown-symbol-bad-request-parity` (`status`)
-- `watchlist-delete-unknown-symbol-not-found-parity` (`status`)
+- `watchlist-create-unknown-symbol-bad-request-parity` (`json`)
+- `watchlist-delete-unknown-symbol-not-found-parity` (`json`)
 
 ## Auth
 
@@ -412,18 +434,22 @@ Fields:
 - `requiredEnv`: optional list of env vars required for the case; case is skipped if any are missing
 - `body`: optional JSON payload
 - `ignoreJsonPaths`: optional list of dot-paths to ignore in JSON mode
+- `flexibleArrayPath`: optional dot-path to one array that can be compared with a length tolerance
+- `flexibleArrayLengthDelta`: optional max allowed absolute count difference at `flexibleArrayPath`
+- `flexibleArrayEnforceItemShape`: optional boolean; when true, item JSON shape sets must match even when length differs
 
 In JSON mode, the harness:
 
 - decodes JSON from both responses
 - removes all configured `ignoreJsonPaths`
-- canonicalizes with Go `json.Marshal`
+- if configured, compares one target array with `flexibleArray*` rules
+- canonicalizes remaining JSON with Go `json.Marshal`
 - compares byte-for-byte
 
 Path syntax supports object traversal and arrays, including wildcard array
 elements with `*` (for example `positions.*.id`).
 
-Example JSON compare case:
+Example strict JSON compare case:
 
 ```json
 {
@@ -432,5 +458,19 @@ Example JSON compare case:
   "path": "/api/v1/public/abc123/portfolio",
   "mode": "json",
   "ignoreJsonPaths": ["meta.generatedAt", "positions.*.id"]
+}
+```
+
+Example flexible-array JSON compare case:
+
+```json
+{
+  "name": "roai-investments-json",
+  "method": "GET",
+  "path": "/api/v1/portfolio/investments",
+  "mode": "json",
+  "flexibleArrayPath": "investments",
+  "flexibleArrayLengthDelta": 2,
+  "flexibleArrayEnforceItemShape": true
 }
 ```

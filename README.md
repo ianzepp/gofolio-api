@@ -47,8 +47,9 @@ Go eliminates the ceremony. No decorators, no DI containers, no module system. F
 
 Current parity snapshot:
 
-- Differential harness: `196` cases total (`156` status + `40` JSON) across `21` fixture files
-- Differential pass rate (verified): `196/196` passing on `2026-03-01` via `./tests/integration/run.sh` against legacy (`localhost:3333`) and Go (`localhost:3334`)
+- Differential harness: `214` cases total (`150` status + `64` JSON) across `21` fixture files
+- Differential pass rate (verified): `214/214` passing on `2026-03-01` via `./tests/integration/run.sh` against legacy (`localhost:3333`) and Go (`localhost:3334`)
+- Differential JSON comparator supports optional flexible array tolerance for ROAI-sensitive series (`flexibleArrayPath`, `flexibleArrayLengthDelta`, `flexibleArrayEnforceItemShape`)
 - 20 services wired into handler `Deps` struct
 - 14 repository files, 13 model files, 3 provider files, 22 service files, 6 calculator files
 - Recently wired: admin settings (upsert/delete with side-effects), benchmark detail (historical performance), portfolio report (X-Ray rules engine with 17 rules across 8 categories), graceful shutdown (SIGTERM/SIGINT with 15s drain)
