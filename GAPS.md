@@ -51,7 +51,7 @@ Background job triggers. NestJS uses BullMQ to enqueue gather tasks.
 | POST   | `/admin/gather/:dataSource/:symbol`              | Gather symbol data             |
 | POST   | `/admin/gather/:dataSource/:symbol/:dateString`  | Gather symbol data for date    |
 
-**Dependency:** Requires goroutine-based job queue (see `migrate-off-redis.md`).
+Status: routes now enqueue Redis-backed queue jobs. Remaining work is worker-side execution parity and payload semantics.
 
 ### ~~2b. Admin — Profile Data CRUD (3 routes)~~ DONE
 
@@ -121,7 +121,7 @@ Main README parity snapshot updated to reflect 196 cases across 21 fixture files
 Areas with no or minimal differential test coverage:
 
 - [ ] Import endpoints (no fixtures — stubbed)
-- [ ] Admin gather endpoints (no JSON fixtures — stubbed)
+- [ ] Admin gather endpoints (no JSON fixtures — enqueue semantics only)
 - [ ] Admin profile data CRUD (no fixtures — stubbed)
 - [ ] Benchmark create/delete/detail (status only, no JSON)
 - [ ] Market data create (no fixtures — stubbed)
@@ -168,7 +168,7 @@ None open. Previously reported HIGH issues were fixed.
 3. ~~**Import**~~ DONE
 4. ~~**Admin profile data CRUD**~~ DONE
 5. ~~**Benchmark create/delete**~~ DONE (detail still stub)
-6. **Admin gather** — Depends on job queue design decision (goroutines vs external).
+6. **Admin gather execution parity** — Redis queue is wired; worker execution semantics still need parity.
 7. **Portfolio report** — Rules engine, lower priority.
 8. **Correctness fixes (MEDIUM/LOW)** — Performance double-queries, race conditions, graceful shutdown.
 9. ~~**README update**~~ DONE

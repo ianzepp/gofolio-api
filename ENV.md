@@ -17,6 +17,13 @@ This file documents environment variables currently used by `gofolio-api`.
 | `ACCESS_TOKEN_SALT` | Yes (for anonymous token flows) | none | `internal/handler/user.go` | Required to hash access tokens (HMAC-SHA512). |
 | `BOOTSTRAP_ADMIN_TOKEN` | Required when no admin user exists in production | none | `internal/db/migrate.go` | One-time bootstrap admin token. Startup hashes it with `ACCESS_TOKEN_SALT` and inserts an `ADMIN` user if none exists. |
 | `BOOTSTRAP_ADMIN_ID` | No | `00000000-0000-0000-0000-000000000001` | `internal/db/migrate.go` | Optional fixed ID for the bootstrap admin row. |
+| `REDIS_URL` | No | none | `internal/redis/client.go`, queue/cache handlers | Redis DSN used for cache flush and admin queue/gather endpoints. |
+| `REDIS_HOST` | No | none | `internal/redis/client.go` | Host fallback when `REDIS_URL` is unset. |
+| `REDIS_PORT` | No | `6379` | `internal/redis/client.go` | Port fallback when `REDIS_URL` is unset. |
+| `REDIS_PASSWORD` | No | none | `internal/redis/client.go` | Password fallback when `REDIS_URL` is unset. |
+| `REDIS_DB` | No | `0` | `internal/redis/client.go` | DB index fallback when `REDIS_URL` is unset. |
+| `BULL_QUEUE_PREFIX` | No | `bull` | `cmd/server/main.go` | Redis key prefix for queue compatibility. |
+| `BULL_QUEUE_NAMES` | No | `DATA_GATHERING_QUEUE,PORTFOLIO_SNAPSHOT_COMPUTATION_QUEUE` | `cmd/server/main.go` | Comma-separated queue names to manage via admin queue endpoints. |
 | `ROOT_URL` | No | `http://localhost:4200` | `internal/handler/auth.go` | Base frontend URL for OAuth callback redirects. |
 | `ENABLE_FEATURE_AUTH_OIDC` | No | effectively `false` | `internal/handler/auth.go`, `internal/service/info.go` | Controls OIDC auth exposure. Handler checks strict string equality (`"true"`). |
 | `ENABLE_FEATURE_SUBSCRIPTION` | No | effectively `false` | `internal/handler/public.go`, `internal/service/info.go` | Enables subscription-gated behavior and `info` global permission. Handler checks strict string equality (`"true"`). |
@@ -65,6 +72,9 @@ JWT_SECRET_KEY=replace-me
 ACCESS_TOKEN_SALT=replace-me
 BOOTSTRAP_ADMIN_TOKEN=replace-with-long-random-secret
 BOOTSTRAP_ADMIN_ID=00000000-0000-0000-0000-000000000001
+REDIS_URL=redis://localhost:6379/0
+BULL_QUEUE_PREFIX=bull
+BULL_QUEUE_NAMES=DATA_GATHERING_QUEUE,PORTFOLIO_SNAPSHOT_COMPUTATION_QUEUE
 ROOT_URL=http://localhost:4200
 
 DB_CONNECT_TIMEOUT=10s

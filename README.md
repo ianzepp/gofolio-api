@@ -60,7 +60,7 @@ Current parity snapshot:
   - `roai-investments-json`
   - `roai-holdings-filter-roai-account-json`
 - Recently wired: benchmark create/delete, admin profile-data CRUD, market-data write, portfolio holding tags update, `auth/anonymous`, `api-keys`, `ai/prompt`, `cache/flush`, `auth-device`, `public` portfolio
-- Remaining stub areas: `import`, admin gather (job queue), admin settings, benchmark detail, portfolio report
+- Remaining stub areas: admin gather worker execution semantics, admin settings, benchmark detail, portfolio report
 - Excluded from scope: `agent/*` (local-only code), `subscription/*` (Stripe-only), `auth/oauth` (Google/OIDC server-side), `auth/webauthn` (FIDO2 crypto)
 - See [`GAPS.md`](./GAPS.md) for the full remaining-work inventory
 
@@ -96,8 +96,8 @@ db/              → Pool management, DBTX interface, WithTx helper
 - **Database:** `jmoiron/sqlx` over `database/sql` with `lib/pq` driver (raw SQL, no ORM)
 - **Scanning:** `sqlx.Select`/`sqlx.Get` with `db:"columnName"` struct tags
 - **Data providers:** Yahoo Finance (`provider/yahoo.go`), Manual (`provider/manual.go`)
-- **Cache:** In-memory with TTL (planned, see `migrate-off-redis.md`)
-- **Job queue:** Goroutine-based (planned, see `migrate-off-redis.md`)
+- **Cache:** Redis-backed namespace invalidation for admin flush endpoint
+- **Job queue:** Redis/Bull-compatible key operations for admin gather/queue endpoints
 - **Decimal math:** `shopspring/decimal` (used in calculator layer for ROAI computations)
 - **No frameworks.** Standard library + minimal dependencies.
 
@@ -272,6 +272,9 @@ See [`ENV.md`](./ENV.md) for the full reference. Key variables:
 | `ACCESS_TOKEN_SALT` | Yes | — | HMAC key for access token hashing |
 | `BOOTSTRAP_ADMIN_TOKEN` | Yes (prod-first boot) | — | One-time admin bootstrap token |
 | `BOOTSTRAP_ADMIN_ID` | No | `00000000-0000-0000-0000-000000000001` | Admin user ID override |
+| `REDIS_URL` | No | — | Redis DSN for queue/cache interoperability |
+| `BULL_QUEUE_PREFIX` | No | `bull` | Queue key prefix |
+| `BULL_QUEUE_NAMES` | No | `DATA_GATHERING_QUEUE,PORTFOLIO_SNAPSHOT_COMPUTATION_QUEUE` | Queue names managed by admin endpoints |
 | `PORT` | No | `3333` | HTTP listen port |
 
 The `.env.example` ships with dev defaults (`1234` for local secrets, port `3334`), plus placeholders for bootstrap admin envs.

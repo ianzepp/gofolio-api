@@ -1,5 +1,9 @@
 # Migrate Off Redis — Pure Go Replacements
 
+> Status note (2026-03-01): the mainline server now supports Redis-backed
+> queue/cache interoperability for drop-in Ghostfolio compatibility. This
+> document remains as an optional future direction, not the active plan.
+
 ## Current State
 
 - **No differential tests** cover cache or queue endpoints

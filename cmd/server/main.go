@@ -29,12 +29,16 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ianzepp/gofolio-api/internal/auth"
+	"github.com/ianzepp/gofolio-api/internal/cache"
 	"github.com/ianzepp/gofolio-api/internal/db"
 	"github.com/ianzepp/gofolio-api/internal/handler"
 	"github.com/ianzepp/gofolio-api/internal/provider"
+	"github.com/ianzepp/gofolio-api/internal/queue"
+	redisclient "github.com/ianzepp/gofolio-api/internal/redis"
 	"github.com/ianzepp/gofolio-api/internal/service"
 	"github.com/jmoiron/sqlx"
 )
@@ -114,6 +118,29 @@ func main() {
 		defer dbCloser()
 	}
 
+	redisConn, redisErr := redisclient.NewFromEnv(context.Background())
+	if redisErr != nil {
+		log.Printf("redis init warning: %v", redisErr)
+	} else if redisConn != nil {
+		defer redisConn.Close()
+
+		deps.CacheService = cache.NewService(redisConn.Raw())
+
+		queuePrefix := strings.TrimSpace(os.Getenv("BULL_QUEUE_PREFIX"))
+		queueNames := queue.DefaultQueues()
+		if raw := strings.TrimSpace(os.Getenv("BULL_QUEUE_NAMES")); raw != "" {
+			parts := strings.Split(raw, ",")
+			queueNames = make([]string, 0, len(parts))
+			for _, p := range parts {
+				if name := strings.TrimSpace(p); name != "" {
+					queueNames = append(queueNames, name)
+				}
+			}
+		}
+		deps.QueueService = queue.NewService(redisConn.Raw(), queuePrefix, queueNames)
+		log.Printf("redis connected (cache+queue enabled)")
+	}
+
 	// PHASE 3: AUTH CONFIG
 	// WHY: authCfg holds the JWT secret and pool reference used by every
 	// auth middleware closure. Constructing it once here avoids each
@@ -152,15 +179,15 @@ func main() {
 
 	// Admin
 	mux.HandleFunc("GET /api/v1/admin", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdmin(deps)))
-	mux.HandleFunc("GET /api/v1/admin/demo-user/sync", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleSyncDemoUser))
-	mux.HandleFunc("POST /api/v1/admin/gather", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGatherData))
-	mux.HandleFunc("POST /api/v1/admin/gather/max", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGatherMax))
-	mux.HandleFunc("POST /api/v1/admin/gather/profile-data", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGatherProfileData))
-	mux.HandleFunc("POST /api/v1/admin/gather/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGatherProfileDataForSymbol))
-	mux.HandleFunc("POST /api/v1/admin/gather/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGatherDataForSymbol))
-	mux.HandleFunc("POST /api/v1/admin/gather/{dataSource}/{symbol}/{dateString}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGatherDataForDate))
+	mux.HandleFunc("GET /api/v1/admin/demo-user/sync", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.SyncDemoUser(deps)))
+	mux.HandleFunc("POST /api/v1/admin/gather", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GatherData(deps)))
+	mux.HandleFunc("POST /api/v1/admin/gather/max", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GatherMax(deps)))
+	mux.HandleFunc("POST /api/v1/admin/gather/profile-data", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GatherProfileData(deps)))
+	mux.HandleFunc("POST /api/v1/admin/gather/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GatherProfileDataForSymbol(deps)))
+	mux.HandleFunc("POST /api/v1/admin/gather/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GatherDataForSymbol(deps)))
+	mux.HandleFunc("POST /api/v1/admin/gather/{dataSource}/{symbol}/{dateString}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GatherDataForDate(deps)))
 	mux.HandleFunc("GET /api/v1/admin/market-data", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminMarketData(deps)))
-	mux.HandleFunc("POST /api/v1/admin/market-data/{dataSource}/{symbol}/test", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleTestMarketData))
+	mux.HandleFunc("POST /api/v1/admin/market-data/{dataSource}/{symbol}/test", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.TestMarketData(deps)))
 	mux.HandleFunc("DELETE /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.DeleteProfileData(deps)))
 	mux.HandleFunc("PATCH /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.UpdateProfileData(deps)))
 	mux.HandleFunc("POST /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.CreateProfileData(deps)))
@@ -169,10 +196,10 @@ func main() {
 	mux.HandleFunc("GET /api/v1/admin/user/{id}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminUser(deps)))
 
 	// Admin Queue
-	mux.HandleFunc("DELETE /api/v1/admin/queue/job", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleDeleteQueueJobs))
-	mux.HandleFunc("GET /api/v1/admin/queue/job", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGetQueueJobs))
-	mux.HandleFunc("DELETE /api/v1/admin/queue/job/{id}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleDeleteQueueJob))
-	mux.HandleFunc("GET /api/v1/admin/queue/job/{id}/execute", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleExecuteQueueJob))
+	mux.HandleFunc("DELETE /api/v1/admin/queue/job", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.DeleteQueueJobs(deps)))
+	mux.HandleFunc("GET /api/v1/admin/queue/job", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetQueueJobs(deps)))
+	mux.HandleFunc("DELETE /api/v1/admin/queue/job/{id}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.DeleteQueueJob(deps)))
+	mux.HandleFunc("GET /api/v1/admin/queue/job/{id}/execute", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.ExecuteQueueJob(deps)))
 
 	// Agent
 	mux.HandleFunc("POST /api/v1/agent/chat", handler.HandleCreateAgentChat)
@@ -212,7 +239,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/benchmarks/{dataSource}/{symbol}/{startDateString}", auth.Authenticate(authCfg, handler.HandleGetBenchmarkDetail))
 
 	// Cache
-	mux.HandleFunc("POST /api/v1/cache/flush", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleFlushCache))
+	mux.HandleFunc("POST /api/v1/cache/flush", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.FlushCache(deps)))
 
 	// Data Providers
 	mux.HandleFunc(

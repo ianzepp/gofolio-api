@@ -2,11 +2,20 @@ package handler
 
 import "net/http"
 
-// HandleFlushCache handles POST /cache/flush.
-// In the Go server there is no Redis cache to flush — this is a no-op that
-// maintains API contract compatibility with the NestJS server.
+// FlushCache handles POST /cache/flush.
+// When Redis is configured, this clears cache namespaces used by Ghostfolio.
+// Without Redis, it degrades to a no-op for local/dev parity.
 // Auth: admin-only (accessAdminControl), enforced at the routing layer.
-func HandleFlushCache(w http.ResponseWriter, r *http.Request) {
-	// NestJS @Post handlers default to 201 when no explicit HttpCode is set.
-	w.WriteHeader(http.StatusCreated)
+func FlushCache(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps != nil && deps.CacheService != nil {
+			if err := deps.CacheService.Flush(r.Context()); err != nil {
+				Error(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
+
+		// NestJS @Post handlers default to 201 when no explicit HttpCode is set.
+		w.WriteHeader(http.StatusCreated)
+	}
 }

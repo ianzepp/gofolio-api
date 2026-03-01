@@ -24,28 +24,72 @@ Routes + request/response shape:
   Response: currently stubbed (placeholder; implement to match Nest behavior).
 */
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/ianzepp/gofolio-api/internal/queue"
+)
 
 // DELETE /admin/queue/job
-func HandleDeleteQueueJobs(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{})
+func DeleteQueueJobs(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps != nil && deps.QueueService != nil {
+			if err := deps.QueueService.DeleteAllJobs(r.Context()); err != nil {
+				Error(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
+		JSON(w, http.StatusOK, map[string]any{})
+	}
 }
 
 // GET /admin/queue/job
-func HandleGetQueueJobs(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, []any{})
+func GetQueueJobs(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.QueueService == nil {
+			JSON(w, http.StatusOK, map[string]any{"jobs": []any{}})
+			return
+		}
+		jobs, err := deps.QueueService.ListJobs(r.Context(), 200)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		JSON(w, http.StatusOK, map[string]any{"jobs": jobs})
+	}
 }
 
 // DELETE /admin/queue/job/:id
-func HandleDeleteQueueJob(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	_ = id
-	JSON(w, http.StatusOK, map[string]any{})
+func DeleteQueueJob(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		if deps != nil && deps.QueueService != nil {
+			if err := deps.QueueService.DeleteJob(r.Context(), id); err != nil {
+				Error(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
+		JSON(w, http.StatusOK, map[string]any{})
+	}
 }
 
 // GET /admin/queue/job/:id/execute
-func HandleExecuteQueueJob(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	_ = id
-	JSON(w, http.StatusOK, map[string]any{})
+func ExecuteQueueJob(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		if deps != nil && deps.QueueService != nil {
+			if err := deps.QueueService.ExecuteJob(r.Context(), id); err != nil {
+				Error(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
+		JSON(w, http.StatusOK, map[string]any{})
+	}
+}
+
+func enqueueGatherJob(deps *Deps, r *http.Request, name string, data map[string]any) {
+	if deps == nil || deps.QueueService == nil {
+		return
+	}
+	_, _ = deps.QueueService.Enqueue(r.Context(), queue.DataGatheringQueueName, name, data)
 }

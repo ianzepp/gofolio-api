@@ -17,6 +17,7 @@ import (
 	"net/http"
 
 	"github.com/ianzepp/gofolio-api/internal/auth"
+	"github.com/ianzepp/gofolio-api/internal/queue"
 )
 
 // GetAdmin handles GET /api/v1/admin and returns the admin dashboard summary.
@@ -119,68 +120,109 @@ func GetAdminUser(deps *Deps) http.HandlerFunc {
 // --- Stubs that remain unchanged ---
 
 // GET /admin/demo-user/sync
-func HandleSyncDemoUser(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{})
+func SyncDemoUser(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		enqueueGatherJob(deps, r, queue.JobComputePortfolioSnapshot, map[string]any{
+			"source": "admin/demo-user/sync",
+		})
+		JSON(w, http.StatusOK, map[string]any{})
+	}
 }
 
 // POST /admin/gather
-func HandleGatherData(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{})
+func GatherData(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		enqueueGatherJob(deps, r, queue.JobGatherHistoricalMarketData, map[string]any{
+			"mode": "default",
+		})
+		JSON(w, http.StatusOK, map[string]any{})
+	}
 }
 
 // POST /admin/gather/:dataSource/:symbol
-func HandleGatherDataForSymbol(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
-	symbol := r.PathValue("symbol")
-	dateRange := r.URL.Query().Get("range")
-	_ = dataSource
-	_ = symbol
-	_ = dateRange
-	JSON(w, http.StatusOK, map[string]any{})
+func GatherDataForSymbol(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dataSource := r.PathValue("dataSource")
+		symbol := r.PathValue("symbol")
+		dateRange := r.URL.Query().Get("range")
+
+		enqueueGatherJob(deps, r, queue.JobGatherHistoricalMarketData, map[string]any{
+			"dataSource": dataSource,
+			"symbol":     symbol,
+			"range":      dateRange,
+		})
+		JSON(w, http.StatusOK, map[string]any{})
+	}
 }
 
 // POST /admin/gather/:dataSource/:symbol/:dateString
-func HandleGatherDataForDate(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
-	symbol := r.PathValue("symbol")
-	dateString := r.PathValue("dateString")
-	_ = dataSource
-	_ = symbol
-	_ = dateString
-	JSON(w, http.StatusOK, map[string]any{})
+func GatherDataForDate(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dataSource := r.PathValue("dataSource")
+		symbol := r.PathValue("symbol")
+		dateString := r.PathValue("dateString")
+
+		enqueueGatherJob(deps, r, queue.JobGatherHistoricalMarketData, map[string]any{
+			"dataSource": dataSource,
+			"symbol":     symbol,
+			"dateString": dateString,
+		})
+		JSON(w, http.StatusOK, map[string]any{})
+	}
 }
 
 // POST /admin/gather/max
-func HandleGatherMax(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{})
+func GatherMax(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		enqueueGatherJob(deps, r, queue.JobGatherHistoricalMarketData, map[string]any{
+			"mode": "max",
+		})
+		JSON(w, http.StatusOK, map[string]any{})
+	}
 }
 
 // POST /admin/gather/profile-data
-func HandleGatherProfileData(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{})
+func GatherProfileData(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		enqueueGatherJob(deps, r, queue.JobGatherAssetProfile, map[string]any{
+			"mode": "all",
+		})
+		JSON(w, http.StatusOK, map[string]any{})
+	}
 }
 
 // POST /admin/gather/profile-data/:dataSource/:symbol
-func HandleGatherProfileDataForSymbol(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
-	symbol := r.PathValue("symbol")
-	_ = dataSource
-	_ = symbol
-	JSON(w, http.StatusOK, map[string]any{})
+func GatherProfileDataForSymbol(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dataSource := r.PathValue("dataSource")
+		symbol := r.PathValue("symbol")
+
+		enqueueGatherJob(deps, r, queue.JobGatherAssetProfile, map[string]any{
+			"dataSource": dataSource,
+			"symbol":     symbol,
+		})
+		JSON(w, http.StatusOK, map[string]any{})
+	}
 }
 
 // POST /admin/market-data/:dataSource/:symbol/test
-func HandleTestMarketData(w http.ResponseWriter, r *http.Request) {
-	dataSource := r.PathValue("dataSource")
-	symbol := r.PathValue("symbol")
-	_ = dataSource
-	_ = symbol
-	var body map[string]any
-	if !Bind(w, r, &body) {
-		return
+func TestMarketData(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dataSource := r.PathValue("dataSource")
+		symbol := r.PathValue("symbol")
+		var body map[string]any
+		if !Bind(w, r, &body) {
+			return
+		}
+
+		enqueueGatherJob(deps, r, queue.JobGatherHistoricalMarketData, map[string]any{
+			"mode":       "test",
+			"dataSource": dataSource,
+			"symbol":     symbol,
+			"payload":    body,
+		})
+		JSON(w, http.StatusOK, map[string]any{})
 	}
-	_ = body
-	JSON(w, http.StatusOK, map[string]any{})
 }
 
 // DELETE /admin/profile-data/:dataSource/:symbol

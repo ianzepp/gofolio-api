@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"github.com/ianzepp/gofolio-api/internal/cache"
+	"github.com/ianzepp/gofolio-api/internal/queue"
 	"github.com/ianzepp/gofolio-api/internal/service"
 	"github.com/jmoiron/sqlx"
 )
@@ -21,6 +23,8 @@ import (
 // must guard against this.
 type Deps struct {
 	DB                    *sqlx.DB
+	CacheService          *cache.Service
+	QueueService          *queue.Service
 	AccountBalanceService *service.AccountBalanceService
 	AccountService        *service.AccountService
 	AccessService         *service.AccessService
