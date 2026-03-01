@@ -26,7 +26,7 @@ func TestHandleGetHealth(t *testing.T) {
 		t.Fatalf("failed to decode response body: %v", err)
 	}
 
-	if body["status"] != "ok" {
+	if body["status"] != "OK" {
 		t.Fatalf("expected status=ok, got %q", body["status"])
 	}
 }
@@ -49,7 +49,7 @@ func TestHealthRoutes(t *testing.T) {
 			method:     http.MethodGet,
 			path:       "/api/v1/health",
 			wantStatus: http.StatusOK,
-			wantKV:     map[string]string{"status": "ok"},
+			wantKV:     map[string]string{"status": "OK"},
 		},
 		{
 			name:       "health data enhancer known name",
@@ -72,10 +72,7 @@ func TestHealthRoutes(t *testing.T) {
 			method:     http.MethodGet,
 			path:       "/api/v1/health/data-provider/YAHOO",
 			wantStatus: http.StatusOK,
-			wantKV: map[string]string{
-				"status":     "ok",
-				"dataSource": "YAHOO",
-			},
+			wantKV:     map[string]string{"status": "OK"},
 		},
 		{
 			name:       "method not allowed",

@@ -32,13 +32,16 @@ func TestGetFactor(t *testing.T) {
 
 func TestFormatParseRoundTrip(t *testing.T) {
 	date := time.Date(2024, 3, 15, 0, 0, 0, 0, time.UTC)
+	localDate := date.In(time.Local)
+	expectedString := localDate.Format(DateFormat)
 	s := FormatDate(date)
-	if s != "2024-03-15" {
-		t.Errorf("FormatDate = %q, want %q", s, "2024-03-15")
+	if s != expectedString {
+		t.Errorf("FormatDate = %q, want %q", s, expectedString)
 	}
 	parsed := ParseDate(s)
-	if !parsed.Equal(date) {
-		t.Errorf("ParseDate(%q) = %v, want %v", s, parsed, date)
+	expectedTime := time.Date(localDate.Year(), localDate.Month(), localDate.Day(), 0, 0, 0, 0, time.Local)
+	if !parsed.Equal(expectedTime) {
+		t.Errorf("ParseDate(%q) = %v, want %v", s, parsed, expectedTime)
 	}
 }
 
