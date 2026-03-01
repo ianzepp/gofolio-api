@@ -1,6 +1,7 @@
 # Gofolio API
 
 Go backend for the Gofolio portfolio tracker, originally a drop-in replacement for the [Ghostfolio](https://github.com/ghostfolio/ghostfolio) NestJS backend. Same REST contract, same database schema.
+This service is API-only: it does not serve frontend/static assets.
 
 ### Related projects
 
@@ -341,6 +342,7 @@ Optional auth env vars for integration fixtures:
 ## Route Surface
 
 All routes are prefixed with `/api/v1`.
+Non-API paths return JSON 404 from the catch-all handler.
 
 ### Auth patterns
 
@@ -530,10 +532,8 @@ These are required for clients (gofolio-web, gofolio-cli) to load and render the
 | GET    | `/logo/:dataSource/:symbol`              | Logo by symbol        |
 | GET    | `/logo`                                  | Logo by URL           |
 | GET    | `/asset/:dataSource/:symbol`             | Asset details         |
-| GET    | `/sitemap.xml`                           | Sitemap               |
 | GET    | `/ai/prompt/:mode`                       | AI prompt             |
 | POST   | `/api-keys`                              | Create API key        |
-| GET    | `/assets/:languageCode/site.webmanifest` | Web manifest          |
 | GET    | `/health/data-enhancer/:name`            | Data enhancer health  |
 | GET    | `/health/data-provider/:dataSource`      | Data provider health  |
 | DELETE | `/auth-device/:id`                       | Delete auth device    |

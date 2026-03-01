@@ -96,16 +96,7 @@ Holding tags update wired. Report remains a stub.
 
 Wired: Full implementation with date parsing and DB lookup.
 
-### 2i. Infrastructure (2 routes)
-
-| Method | Path                                     | Purpose            |
-| ------ | ---------------------------------------- | ------------------ |
-| GET    | `/sitemap.xml`                           | Sitemap generation |
-| GET    | `/assets/:languageCode/site.webmanifest` | Web manifest       |
-
----
-
-## 3. Excluded from Scope (14 routes)
+## 3. Excluded from Scope (16 routes)
 
 These are intentionally not being ported. Documented here for completeness.
 
@@ -115,6 +106,7 @@ These are intentionally not being ported. Documented here for completeness.
 | `auth/webauthn`              | 4      | FIDO2/WebAuthn crypto                  |
 | `subscription/*`             | 3      | Stripe-only billing                    |
 | `agent/*`                    | 3      | Local-only agent code, not upstream    |
+| static/web endpoints         | 2      | API-only server (`/sitemap.xml`, `/assets/:languageCode/site.webmanifest`) |
 
 ---
 
