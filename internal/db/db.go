@@ -34,6 +34,8 @@ import (
 
 // ErrNoRows is re-exported from database/sql so callers import the db package
 // instead of database/sql directly for sentinel error checks.
+// NOTE: db.ErrNoRows == sql.ErrNoRows (exact alias), so errors.Is checks are
+// equivalent regardless of which sentinel a caller uses.
 var ErrNoRows = sql.ErrNoRows
 
 // DBTX is the minimal database execution interface shared by *sqlx.DB

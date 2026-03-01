@@ -39,6 +39,7 @@ func GetPublicPortfolio(deps *Deps) http.HandlerFunc {
 		if os.Getenv("ENABLE_FEATURE_SUBSCRIPTION") == "true" {
 			subscriptionRepo := repository.NewSubscriptionRepository(deps.DB)
 			if _, err := subscriptionRepo.FindActiveByUserID(r.Context(), ownerID); err != nil {
+				// db.ErrNoRows is an alias of sql.ErrNoRows in internal/db.
 				if errors.Is(err, db.ErrNoRows) {
 					hasDetails = false
 				} else {

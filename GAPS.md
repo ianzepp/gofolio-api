@@ -137,48 +137,38 @@ Issues found by deep correctness analysis, ordered by severity.
 
 ### HIGH
 
-| #   | Issue                                          | Location                     | Description                                                                                          |
-| --- | ---------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
-| 1   | Nil dereference in `matchesFilter`             | `service/portfolio.go:154`   | Passing `nil` filter from `GetHolding` and `GetPublicPortfolio` panics on `f.IsEmpty()`. Add nil guard. |
-| 2   | Impersonation bypass                           | `handler/portfolio.go:228`   | `resolveUserID` accepts `Impersonation-Id` header from any user, not just admins. Authorization bypass. |
-| 3   | `accountUserId` client-controlled in UpdateOrder | `handler/order.go:211`     | Unlike `CreateOrder`, `UpdateOrder` passes client-supplied `accountUserId` directly. Pin to auth user. |
-| 4   | Admin routes lack auth middleware              | `main.go:155-180`            | ~13 admin/agent stub routes registered without any authentication wrapper.                            |
-| 5   | `GetPortfolioPerformance` always returns 404   | `handler/portfolio.go:196`   | Handler unconditionally returns 404 despite service method being fully implemented.                   |
+None open. Previously reported HIGH issues were fixed.
 
 ### MEDIUM
 
 | #   | Issue                                        | Location                     | Description                                                                                          |
 | --- | -------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
-| 6   | Swallowed errors in `GetPublicPortfolio`     | `handler/public.go:59-61`    | Three `GetPerformance` calls discard errors with `_`. Silent zero-data on failure.                   |
-| 7   | Double `buildCalculator` in `GetDetails`     | `service/portfolio.go:432`   | Calls `buildCalculator`+`computeSnapshot`, then calls `GetHoldings` which does it again. 2x DB load. |
-| 8   | Double query in `GetDividends`               | `service/portfolio.go:524`   | `buildCalculator` loads all orders, then `GetDividends` queries them again separately.               |
-| 9   | `TransferBalance` race condition             | `handler/account.go:360`     | Balance check outside transaction; concurrent transfers can overdraw.                                |
-| 10  | `isCurrencyLikeSymbol` uses `strings.Replace` | `handler/market_data.go:160` | Should use `strings.TrimSuffix`; "USDJPY" misidentified as currency-like.                           |
-| 11  | Yahoo forex detection too broad              | `provider/yahoo.go:621`      | 6-letter uppercase stock tickers treated as forex pairs and appended with `=X`.                      |
-| 12  | Missing auth on `GET /asset` route           | `main.go:189`                | Asset profile endpoint allows unauthenticated access.                                                |
-| 13  | Missing auth on `GET /symbol` route          | `main.go:287`                | Symbol endpoint allows unauthenticated external provider calls.                                      |
-| 14  | `db.ErrNoRows` vs `sql.ErrNoRows`           | `handler/public.go:42`       | May compare against wrong sentinel, breaking no-rows detection.                                      |
-| 15  | No graceful shutdown                         | `main.go:324`                | No signal handling or `server.Shutdown()`; in-flight requests dropped on SIGTERM.                    |
+| 1   | Swallowed errors in `GetPublicPortfolio`     | `handler/public.go:59-61`    | Three `GetPerformance` calls discard errors with `_`. Silent zero-data on failure.                   |
+| 2   | Double `buildCalculator` in `GetDetails`     | `service/portfolio.go:432`   | Calls `buildCalculator`+`computeSnapshot`, then calls `GetHoldings` which does it again. 2x DB load. |
+| 3   | Double query in `GetDividends`               | `service/portfolio.go:524`   | `buildCalculator` loads all orders, then `GetDividends` queries them again separately.               |
+| 4   | `TransferBalance` race condition             | `handler/account.go:360`     | Balance check outside transaction; concurrent transfers can overdraw.                                |
+| 5   | `isCurrencyLikeSymbol` uses `strings.Replace` | `handler/market_data.go:160` | Should use `strings.TrimSuffix`; "USDJPY" misidentified as currency-like.                           |
+| 6   | Yahoo forex detection too broad              | `provider/yahoo.go:621`      | 6-letter uppercase stock tickers treated as forex pairs and appended with `=X`.                      |
+| 7   | No graceful shutdown                         | `main.go:324`                | No signal handling or `server.Shutdown()`; in-flight requests dropped on SIGTERM.                    |
 
 ### LOW
 
 | #   | Issue                                   | Location                       | Description                                                                      |
 | --- | --------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------- |
-| 16  | Errgroup panic leaks goroutine          | `service/data_provider.go:84`  | Panic in provider goroutine prevents channel close; request goroutine blocks forever. |
-| 17  | Large dynamic SQL OR-chains             | `repository/market_data.go:207`| Many-symbol queries build huge OR-chains; consider CTE or temp table at scale.   |
-| 18  | `GetAccounts` totalValue semantically wrong | `handler/account.go:100`   | Adds cost basis + dividends + interest; not actual portfolio value.               |
+| 1   | Errgroup panic leaks goroutine          | `service/data_provider.go:84`  | Panic in provider goroutine prevents channel close; request goroutine blocks forever. |
+| 2   | Large dynamic SQL OR-chains             | `repository/market_data.go:207`| Many-symbol queries build huge OR-chains; consider CTE or temp table at scale.   |
+| 3   | `GetAccounts` totalValue semantically wrong | `handler/account.go:100`   | Adds cost basis + dividends + interest; not actual portfolio value.               |
 
 ---
 
 ## 7. Suggested Priority Order
 
-1. **Correctness fixes (HIGH)** — Nil dereference, impersonation bypass, missing auth on admin routes. Security and crash bugs.
-2. **ROAI calculator parity** — Fix the 8 JSON failures. This is the hardest and highest-value work. The calculator is the core differentiator of the app.
-3. **Details response enrichment** — Wire `accounts`, `platforms`, `markets`, `summary` into the details endpoint. Partially blocks ROAI parity.
-4. ~~**Import**~~ DONE
-5. ~~**Admin profile data CRUD**~~ DONE
-6. ~~**Benchmark create/delete**~~ DONE (detail still stub)
-7. **Admin gather** — Depends on job queue design decision (goroutines vs external).
-8. **Portfolio report** — Rules engine, lower priority.
-9. **Correctness fixes (MEDIUM/LOW)** — Performance double-queries, race conditions, graceful shutdown.
-10. ~~**README update**~~ DONE
+1. **ROAI calculator parity** — Fix the 8 JSON failures. This is the hardest and highest-value work. The calculator is the core differentiator of the app.
+2. **Details response enrichment** — Wire `accounts`, `platforms`, `markets`, `summary` into the details endpoint. Partially blocks ROAI parity.
+3. ~~**Import**~~ DONE
+4. ~~**Admin profile data CRUD**~~ DONE
+5. ~~**Benchmark create/delete**~~ DONE (detail still stub)
+6. **Admin gather** — Depends on job queue design decision (goroutines vs external).
+7. **Portfolio report** — Rules engine, lower priority.
+8. **Correctness fixes (MEDIUM/LOW)** — Performance double-queries, race conditions, graceful shutdown.
+9. ~~**README update**~~ DONE

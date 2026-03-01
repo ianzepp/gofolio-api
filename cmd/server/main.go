@@ -152,19 +152,19 @@ func main() {
 
 	// Admin
 	mux.HandleFunc("GET /api/v1/admin", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdmin(deps)))
-	mux.HandleFunc("GET /api/v1/admin/demo-user/sync", handler.HandleSyncDemoUser)
-	mux.HandleFunc("POST /api/v1/admin/gather", handler.HandleGatherData)
-	mux.HandleFunc("POST /api/v1/admin/gather/max", handler.HandleGatherMax)
-	mux.HandleFunc("POST /api/v1/admin/gather/profile-data", handler.HandleGatherProfileData)
-	mux.HandleFunc("POST /api/v1/admin/gather/profile-data/{dataSource}/{symbol}", handler.HandleGatherProfileDataForSymbol)
-	mux.HandleFunc("POST /api/v1/admin/gather/{dataSource}/{symbol}", handler.HandleGatherDataForSymbol)
-	mux.HandleFunc("POST /api/v1/admin/gather/{dataSource}/{symbol}/{dateString}", handler.HandleGatherDataForDate)
+	mux.HandleFunc("GET /api/v1/admin/demo-user/sync", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleSyncDemoUser))
+	mux.HandleFunc("POST /api/v1/admin/gather", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGatherData))
+	mux.HandleFunc("POST /api/v1/admin/gather/max", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGatherMax))
+	mux.HandleFunc("POST /api/v1/admin/gather/profile-data", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGatherProfileData))
+	mux.HandleFunc("POST /api/v1/admin/gather/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGatherProfileDataForSymbol))
+	mux.HandleFunc("POST /api/v1/admin/gather/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGatherDataForSymbol))
+	mux.HandleFunc("POST /api/v1/admin/gather/{dataSource}/{symbol}/{dateString}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleGatherDataForDate))
 	mux.HandleFunc("GET /api/v1/admin/market-data", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminMarketData(deps)))
-	mux.HandleFunc("POST /api/v1/admin/market-data/{dataSource}/{symbol}/test", handler.HandleTestMarketData)
+	mux.HandleFunc("POST /api/v1/admin/market-data/{dataSource}/{symbol}/test", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleTestMarketData))
 	mux.HandleFunc("DELETE /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.DeleteProfileData(deps)))
 	mux.HandleFunc("PATCH /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.UpdateProfileData(deps)))
 	mux.HandleFunc("POST /api/v1/admin/profile-data/{dataSource}/{symbol}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.CreateProfileData(deps)))
-	mux.HandleFunc("PUT /api/v1/admin/settings/{key}", handler.HandleUpdateAdminSetting)
+	mux.HandleFunc("PUT /api/v1/admin/settings/{key}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.HandleUpdateAdminSetting))
 	mux.HandleFunc("GET /api/v1/admin/user", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminUsers(deps)))
 	mux.HandleFunc("GET /api/v1/admin/user/{id}", auth.RequirePermission(authCfg, auth.AccessAdminControl, handler.GetAdminUser(deps)))
 
@@ -186,8 +186,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/api-keys", auth.RequirePermission(authCfg, auth.CreateApiKey, handler.CreateApiKey(deps)))
 
 	// Asset
+	// Intentionally public for Ghostfolio parity: this endpoint is read-only
+	// metadata and not tied to caller-specific state.
 	mux.HandleFunc("GET /api/v1/asset/{dataSource}/{symbol}", handler.GetAsset(deps))
-
 
 	// Auth
 	mux.HandleFunc("POST /api/v1/auth/anonymous", handler.AuthAnonymous(deps))
@@ -270,12 +271,11 @@ func main() {
 	mux.HandleFunc("PUT /api/v1/portfolio/holding/{dataSource}/{symbol}/tags", auth.RequirePermission(authCfg, auth.UpdateOrder, handler.UpdatePortfolioHoldingTags(deps)))
 	mux.HandleFunc("GET /api/v1/portfolio/holdings", auth.Authenticate(authCfg, handler.GetPortfolioHoldings(deps)))
 	mux.HandleFunc("GET /api/v1/portfolio/investments", auth.Authenticate(authCfg, handler.GetPortfolioInvestments(deps)))
-	mux.HandleFunc("GET /api/v1/portfolio/performance", handler.GetPortfolioPerformance(deps))
+	mux.HandleFunc("GET /api/v1/portfolio/performance", auth.Authenticate(authCfg, handler.GetPortfolioPerformance(deps)))
 	mux.HandleFunc("GET /api/v1/portfolio/report", auth.Authenticate(authCfg, handler.GetPortfolioReport(deps)))
 
 	// Public
 	mux.HandleFunc("GET /api/v1/public/{accessId}/portfolio", handler.GetPublicPortfolio(deps))
-
 
 	// Subscription
 	mux.HandleFunc("POST /api/v1/subscription/redeem-coupon", handler.HandleRedeemCoupon)
@@ -283,6 +283,8 @@ func main() {
 	mux.HandleFunc("POST /api/v1/subscription/stripe/checkout-session", handler.HandleCreateStripeCheckoutSession)
 
 	// Symbol
+	// Intentionally public for parity: GET /symbol is used by unauthenticated
+	// client boot flows and does not expose user-specific data.
 	mux.HandleFunc("GET /api/v1/symbol/lookup", auth.Authenticate(authCfg, handler.SymbolLookup(deps)))
 	mux.HandleFunc("GET /api/v1/symbol/{dataSource}/{symbol}", handler.GetSymbol(deps))
 	mux.HandleFunc("GET /api/v1/symbol/{dataSource}/{symbol}/{dateString}", auth.Authenticate(authCfg, handler.GetSymbolByDate(deps)))

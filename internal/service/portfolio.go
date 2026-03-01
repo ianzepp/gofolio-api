@@ -151,7 +151,7 @@ func (s *PortfolioService) buildCalculator(ctx context.Context, userID string, f
 
 // matchesFilter returns true if the activity passes all non-empty filter criteria.
 func matchesFilter(a calculator.Activity, f *PortfolioFilter) bool {
-	if f.IsEmpty() {
+	if f == nil || f.IsEmpty() {
 		return true
 	}
 	if len(f.AccountIDs) > 0 {

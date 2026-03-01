@@ -43,10 +43,10 @@ import (
 	"net/http"
 	"time"
 
+	"database/sql"
+	"github.com/google/uuid"
 	"github.com/ianzepp/gofolio-api/internal/auth"
 	"github.com/ianzepp/gofolio-api/internal/model"
-	"github.com/google/uuid"
-	"database/sql"
 )
 
 // GetOrders handles GET /api/v1/order. Results are returned under the key
@@ -103,16 +103,16 @@ func CreateOrder(deps *Deps) http.HandlerFunc {
 		}
 
 		var body struct {
-			AccountId       *string        `json:"accountId"`
-			Comment         *string        `json:"comment"`
-			Currency        *string        `json:"currency"`
-			Date            time.Time      `json:"date"`
-			Fee             float64        `json:"fee"`
-			IsDraft         bool           `json:"isDraft"`
-			Quantity        float64        `json:"quantity"`
-			SymbolProfileId string         `json:"symbolProfileId"`
+			AccountId       *string         `json:"accountId"`
+			Comment         *string         `json:"comment"`
+			Currency        *string         `json:"currency"`
+			Date            time.Time       `json:"date"`
+			Fee             float64         `json:"fee"`
+			IsDraft         bool            `json:"isDraft"`
+			Quantity        float64         `json:"quantity"`
+			SymbolProfileId string          `json:"symbolProfileId"`
 			Type            model.OrderType `json:"type"`
-			UnitPrice       float64        `json:"unitPrice"`
+			UnitPrice       float64         `json:"unitPrice"`
 		}
 		if !Bind(w, r, &body) {
 			return
@@ -209,26 +209,33 @@ func UpdateOrder(deps *Deps) http.HandlerFunc {
 		}
 
 		var body struct {
-			AccountId       *string        `json:"accountId"`
-			AccountUserId   *string        `json:"accountUserId"`
-			Comment         *string        `json:"comment"`
-			Currency        *string        `json:"currency"`
-			Date            time.Time      `json:"date"`
-			Fee             float64        `json:"fee"`
-			IsDraft         bool           `json:"isDraft"`
-			Quantity        float64        `json:"quantity"`
-			SymbolProfileId string         `json:"symbolProfileId"`
+			AccountId       *string         `json:"accountId"`
+			AccountUserId   *string         `json:"accountUserId"`
+			Comment         *string         `json:"comment"`
+			Currency        *string         `json:"currency"`
+			Date            time.Time       `json:"date"`
+			Fee             float64         `json:"fee"`
+			IsDraft         bool            `json:"isDraft"`
+			Quantity        float64         `json:"quantity"`
+			SymbolProfileId string          `json:"symbolProfileId"`
 			Type            model.OrderType `json:"type"`
-			UnitPrice       float64        `json:"unitPrice"`
+			UnitPrice       float64         `json:"unitPrice"`
 		}
 		if !Bind(w, r, &body) {
 			return
 		}
 
+		// Parity with CreateOrder: do not trust client-supplied accountUserId.
+		// If an account is linked, pin the foreign-key owner to the authenticated user.
+		var accountUserID *string
+		if body.AccountId != nil {
+			accountUserID = &userID
+		}
+
 		order := model.Order{
 			ID:              id,
 			AccountId:       body.AccountId,
-			AccountUserId:   body.AccountUserId,
+			AccountUserId:   accountUserID,
 			Comment:         body.Comment,
 			Currency:        body.Currency,
 			Date:            body.Date,
