@@ -150,3 +150,22 @@ func TestDataProviderService_GetQuotes_PropagatesProviderError(t *testing.T) {
 		t.Fatalf("expected provider error, got %v", err)
 	}
 }
+
+func TestBatchSymbolsNoLimit(t *testing.T) {
+	symbols := []string{"AAPL", "MSFT"}
+	batches := batchSymbols(symbols, 0)
+	if len(batches) != 1 || len(batches[0]) != 2 {
+		t.Fatalf("expected single batch with original symbols, got %v", batches)
+	}
+}
+
+func TestBatchSymbolsWithLimit(t *testing.T) {
+	symbols := []string{"AAPL", "MSFT", "GOOG"}
+	batches := batchSymbols(symbols, 2)
+	if len(batches) != 2 {
+		t.Fatalf("expected two batches, got %d", len(batches))
+	}
+	if len(batches[0]) != 2 || len(batches[1]) != 1 {
+		t.Fatalf("unexpected batch sizes: %v", batches)
+	}
+}
